@@ -19,12 +19,16 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
 # Virtual environments
 venv/
-.venv/
-ENV/
 env/
+ENV/
+.venv/
+.env
+.env.local
+.env.production
 
 # IDE
 .vscode/
@@ -35,6 +39,11 @@ env/
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
 # Logs
@@ -46,6 +55,17 @@ ai_agent.log
 .env
 .env.local
 .env.production
+
+# Browser data
+browser-logs/
+chromedriver/
+geckodriver/
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
 
 # Database
 *.db
@@ -61,6 +81,7 @@ temp/
 node_modules/
 .next/
 out/
+npm-debug.log*
 
 # Chrome/Selenium
 chromedriver
@@ -74,3 +95,6 @@ secrets/
 credentials/
 *.key
 *.pem
+
+# Render
+.render/
