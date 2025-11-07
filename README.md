@@ -1,60 +1,22 @@
-# 🤖 AI Multi-Agent MVP Generation System
+# 🤖 Freelance Agents MVP
 
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/fastapi-0.104+-009688.svg)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/react-18+-61dafb.svg)](https://reactjs.org/)
-[![Next.js](https://img.shields.io/badge/next.js-14+-000000.svg)](https://nextjs.org/)
-
-## 🚀 Описание
-
-Унифицированная система AI-powered генерации MVP (Minimum Viable Products) на основе описаний проектов. Объединяет два агента:
-
-- **Agent A**: Поиск и квалификация проектов на фриланс-платформах (Kwork)
-- **Agent B**: Генерация продающих MVP с 60-80% готовности
-
-## 🏗️ Архитектура
-
-```
-ai-multiagent-mvp-system/
-├── 📁 agents/                  # Core agents
-│   ├── agent_a.py              # Freelance Search Agent
-│   └── agent_b.py              # MVP Generation Agent (future)
-├── 📁 evaluation/              # AI-оценка проектов
-│   └── evaluator.py            # Relevance scoring
-├── 📁 shared/                  # Общие компоненты
-│   ├── config.py               # Унифицированная конфигурация
-│   └── logger.py               # Логирование
-├── 📁 templates/               # Web templates
-│   └── dashboard.html          # Веб-интерфейс
-├── 📁 static/                  # Static assets
-│   ├── css/style.css           # Styles
-│   └── js/dashboard.js         # JavaScript
-└── 📁 docs/                    # Документация
-```
+Минимальный жизнеспособный продукт для автоматизации поиска проектов на Kwork с оценкой релевантности и отправкой уведомлений в Telegram.
 
 ## 🎯 Возможности
 
-### 🤖 Agent A (Freelance Search)
-- 🔍 Автоматизированный поиск проектов на Kwork
-- 📊 AI-оценка релевантности через алгоритмы
-- 📱 Веб-dashboard с real-time логами
-- 🚀 Интеграция с Telegram для уведомлений
-- 📦 API для управления и получения данных
+- 🔍 **Поиск проектов** на Kwork по ключевому слову "бот"
+- 📊 **Оценка релевантности** на основе алгоритма (ключевые слова, бюджет, описание)
+- 📱 **Real-time dashboard** с логами и управлением
+- 📢 **Telegram уведомления** о подходящих проектах
+- 🚀 **Автоматический деплой** на Render
 
-### 🎨 Agent B (MVP Generation - Future)
-- 🧠 AI-powered выбор шаблонов (семантический анализ)
-- 📱 Каталог готовых шаблонов (Telegram bots, parsers, dashboards)
-- ⚡ Быстрая генерация (шаблоны + AI кастомизация)
-- 🚀 Автоматический деплой на Vercel
-- 💰 Продающие MVP с моковыми данными
-
-## 🛠️ Быстрый старт
+## 🚀 Быстрый старт
 
 ### 1. Клонирование и установка
 
 ```bash
-git clone <repository-url>
-cd ai-multiagent-mvp-system
+git clone <your-repo-url>
+cd freelance-mvp
 
 # Создание виртуального окружения
 python -m venv venv
@@ -66,27 +28,22 @@ source venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 ```
 
-### 2. Конфигурация
+### 2. Настройка переменных окружения
 
-Создайте `.env` файл на основе `env.example`:
+Создайте файл `.env` на основе `env.example`:
 
 ```bash
-# === AGENT A ===
-MODE=demo  # или full для реального поиска на Kwork
-SEARCH_KEYWORD=бот  # ключевое слово для поиска проектов
-KWORK_EMAIL=your_email@kwork.ru  # требуется только для MODE=full
-KWORK_PASSWORD=your_password     # требуется только для MODE=full
-TELEGRAM_BOT_TOKEN=your_bot_token  # опционально для уведомлений
-TELEGRAM_CHANNEL_ID=@your_channel   # опционально для уведомлений
+# Для демо-режима (без реального Kwork)
+MODE=demo
 
-# === AGENT B (будущий функционал) ===
-GEMINI_API_KEY=your_gemini_key
-GITHUB_USER=your_github_user
-GITHUB_TOKEN=your_github_token
+# Для полного режима (с Kwork)
+MODE=full
+KWORK_EMAIL=your_email@kwork.ru
+KWORK_PASSWORD=your_password
 
-# === SHARED ===
-LOG_LEVEL=INFO
-MAX_RETRIES=3
+# Telegram бот (опционально)
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHANNEL_ID=@your_channel
 ```
 
 ### 3. Создание Telegram бота (опционально)
@@ -106,53 +63,113 @@ python main.py
 # Откройте http://localhost:8000 в браузере
 ```
 
-## 🏗️ Архитектура системы
+## 🏗️ Архитектура
 
 ```
-ai-multiagent-mvp-system/
-├── main.py                 # FastAPI веб-сервер
-├── config.py               # Унифицированная конфигурация
-├── agents/agent_a.py       # Freelance Search Agent (Kwork)
-├── evaluation/evaluator.py # AI-оценка релевантности проектов
-├── telegram_bot.py         # Telegram уведомления
-├── utils/logger.py         # Система логирования
-├── templates/dashboard.html # Веб-интерфейс
-├── static/css/style.css    # Стили
-├── static/js/dashboard.js  # JavaScript
+freelance-mvp/
+├── main.py                 # FastAPI сервер
+├── config.py              # Конфигурация
+├── agents/
+│   └── agent_a.py         # Агент поиска на Kwork
+├── evaluation/
+│   └── evaluator.py       # Оценка проектов
+├── telegram_bot.py        # Telegram уведомления
+├── utils/
+│   └── logger.py          # Система логирования
+├── templates/
+│   └── dashboard.html     # Веб-интерфейс
+├── static/
+│   ├── css/style.css      # Стили
+│   └── js/dashboard.js    # JavaScript
 └── requirements.txt
 ```
 
-## 🔧 Деплой на Render
+## 🔧 Настройка деплоя на Railway
 
 ### 1. Создание аккаунта
-Перейдите на [render.com](https://render.com) и зарегистрируйтесь.
+Перейдите на [railway.app](https://railway.app) и зарегистрируйтесь через GitHub.
 
-### 2. Создание веб-сервиса
-1. Нажмите "New" → "Web Service"
-2. Подключите ваш GitHub репозиторий
-3. Настройте параметры:
-   - **Runtime**: Python 3
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `python main.py`
-   - **Environment Variables**: Добавьте переменные из `.env`
+### 2. Создание проекта
+1. Нажмите "New Project"
+2. Выберите "Deploy from GitHub repo"
+3. Подключите ваш GitHub репозиторий (`agent-a-kwork-mvp`)
+4. Railway автоматически определит Python проект и начнет деплой
 
-### 3. Переменные окружения для продакшена
-```
-MODE=demo
-LOG_LEVEL=INFO
+### 3. Настройка переменных окружения
+В настройках проекта (Variables) добавьте все переменные из `env.example`:
+
+```bash
+# Обязательные
+MODE=demo  # или full для реального использования
 SEARCH_KEYWORD=бот
+
+# Опциональные (для полной интеграции)
+N8N_WEBHOOK_URL=https://your-n8n-instance.com/webhook/freelance-project
+TELEGRAM_BOT_TOKEN=your_token
+TELEGRAM_CHANNEL_ID=@your_channel
+
+# Для full режима
+KWORK_EMAIL=your_email@kwork.ru
+KWORK_PASSWORD=your_password
 ```
 
-## 📊 Dashboard и возможности
+### 4. Автоматический деплой
+- Railway автоматически деплоит при каждом push в main ветку
+- Логи доступны в Railway Dashboard
+- Health check endpoint: `/health`
+- Status endpoint: `/status`
 
-### Agent A Dashboard:
-- **Real-time статус** агента в реальном времени
-- **Управление поиском** (запуск/остановка)
-- **Статистика проектов** найденных и оцененных
+### 5. Получение URL
+После деплоя Railway предоставит публичный URL вашего сервиса:
+- Dashboard: `https://your-app.railway.app/`
+- API: `https://your-app.railway.app/status`
+
+## 🔗 Интеграция с n8n (Agent B)
+
+Agent A автоматически отправляет подходящие проекты в n8n workflow через webhook.
+
+### Настройка n8n workflow:
+
+1. **Создайте webhook в n8n:**
+   - Добавьте ноду "Webhook"
+   - Скопируйте URL webhook
+   - Добавьте его в Railway переменные: `N8N_WEBHOOK_URL`
+
+2. **Структура данных, отправляемых в n8n:**
+```json
+{
+  "project_id": "demo_1",
+  "title": "Создать Telegram бота...",
+  "description": "Описание проекта...",
+  "budget": "15 000 ₽",
+  "url": "https://kwork.ru/projects/...",
+  "evaluation": {
+    "score": 0.87,
+    "reasons": ["Bot-related keywords found", ...],
+    "suitable": true
+  },
+  "found_at": "2025-11-07T21:40:00",
+  "status": "pending_review"
+}
+```
+
+3. **API endpoints для управления:**
+   - `POST /webhook/n8n` - Управление агентом из n8n (start/stop)
+   - `GET /status` - Статус агента
+   - `GET /health` - Health check
+
+## 📊 Dashboard
+
+Веб-интерфейс доступен по адресу вашего деплоя и предоставляет:
+
+- **Статус агента** в реальном времени
+- **Управление** (запуск/остановка)
+- **Статистика** найденных проектов
 - **Live логи** всех действий агента
-- **Server-Sent Events** для мгновенных обновлений
+- **Real-time обновления** через Server-Sent Events
 
-### Алгоритм оценки проектов:
+## 🔍 Алгоритм оценки проектов
+
 Проект считается подходящим если:
 
 1. **Ключевые слова ботов** (вес 0.5):
@@ -164,86 +181,69 @@ SEARCH_KEYWORD=бот
 3. **Бюджет** (вес 0.2):
    - Предпочтительно 1000-30000 ₽
 
+4. **Дополнительно**:
+   - Отсутствие негативных слов (дизайн, текст, видео)
+   - Подробное описание
+
 **Порог релевантности**: 0.7 (70%)
 
-## 🎨 Будущие возможности Agent B
+## 🛡️ Безопасность и анти-детект
 
-### MVP Generation:
-- **AI-powered анализ** описаний проектов
-- **Автоматический выбор шаблонов** (Telegram bots, parsers, dashboards)
-- **Генерация MVP** с 60-80% готовности
-- **Автоматический деплой** на Vercel/GitHub
-
-### Шаблоны MVP:
-- **🤖 Telegram Bots**: Shop Assistant, Support Bot
-- **🕷️ Parsers**: News Parser, Product Parser
-- **📊 Analytics**: Dashboard, Data Visualization
-
-## 🛡️ Безопасность
-
-- **Stealth режим** с рандомным User-Agent
+- **Stealth браузер** с рандомным User-Agent
 - **Имитация человека** (паузы, движения мыши)
-- **Демо-режим** без реального доступа к Kwork
-- **Анти-детект** меры для безопасного парсинга
+- **Ограничение сессий** (демо-режим без реального Kwork)
+- **Отключение WebRTC** для защиты IP
 
-## 📝 Мониторинг и логи
+## 📝 Логи и мониторинг
 
-Логи доступны с уровнями:
+Все действия логируются с уровнями:
 - `INFO`: Основные действия агента
 - `WARNING`: Предупреждения
 - `ERROR`: Ошибки выполнения
 - `DEBUG`: Детальная отладка
 
+Логи доступны:
+- В терминале (локально)
+- В веб-dashboard (real-time)
+- В Railway logs (при деплое)
+
 ## 🔄 Рабочие режимы
 
-### Demo режим (рекомендуется):
-- Имитация поиска без реального Kwork
+### Demo режим (рекомендуется)
+- Без реального доступа к Kwork
+- Имитация поиска и оценки
 - Полностью безопасно для тестирования
-- Идеально для разработки и демонстрации
 
-### Full режим:
-- Реальный поиск проектов на Kwork
+### Full режим
+- Реальный поиск на Kwork
 - Требует учетных данных
 - Соблюдение лимитов для безопасности
 
-## 🧪 Тестирование
+## 🚧 Ограничения MVP
 
+- Только поиск по одному ключевому слову
+- Базовый алгоритм оценки
+- Демо-режим без реальных предложений
+- Ограниченная обработка ошибок
+
+## 🛠️ Разработка
+
+### Добавление нового функционала
+1. Создайте ветку: `git checkout -b feature/new-feature`
+2. Внесите изменения
+3. Протестируйте локально
+4. Создайте PR на GitHub
+
+### Локальное тестирование
 ```bash
-# Запуск с авто-перезагрузкой для разработки
+# Запуск с авто-перезагрузкой
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-# Unit tests (планируется)
-pytest tests/
-
-# Локальное тестирование
-python main.py
+# Запуск тестов (если добавите)
+pytest
 ```
 
-## 🚀 Будущий рабочий процесс
-
-1. **Agent A** находит и квалифицирует проекты на Kwork
-2. **Agent A** отправляет данные через Telegram/API
-3. **Agent B** анализирует описание через AI (Gemini)
-4. **Agent B** выбирает подходящий шаблон
-5. **Agent B** генерирует MVP с кастомизацией
-6. **Agent B** деплоит на GitHub/Vercel
-7. **Заказчик** получает ссылку на готовый MVP
-
-## 💰 Бизнес-модель (планируется)
-
-- **MVP Generation**: $50-100 за проект
-- **Full Development**: $200-500 за полную разработку
-- **ROI**: 30%+ конверсия через демонстрацию
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/new-feature`)
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit pull request
-
-## 📄 License
+## 📄 Лицензия
 
 MIT License - свободное использование для личных целей.
 
@@ -257,4 +257,4 @@ MIT License - свободное использование для личных 
 
 ---
 
-**🚀 Powered by AI Multi-Agent MVP Generation System**
+**Happy freelancing! 🚀**
