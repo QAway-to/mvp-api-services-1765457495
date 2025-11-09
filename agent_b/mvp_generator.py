@@ -11,7 +11,8 @@ from typing import Dict, Any, Optional
 from template_selector import AITemplateSelector
 from config import Config
 
-logger = logging.getLogger(__name__)
+# Import shared logger
+from shared_logger import logger, log_agent_action
 
 class MVPGenerator:
     """Generates MVP applications from templates"""
@@ -23,17 +24,17 @@ class MVPGenerator:
     async def generate_mvp(self, project_description: str) -> Dict[str, Any]:
         """Generate MVP application based on project description"""
         try:
-            logger.info(f"🎯 Starting MVP generation for: {project_description[:100]}...")
+            log_agent_action("Agent B", f"🎯 Starting MVP generation for: {project_description[:100]}...")
 
             # 1. Select template using AI
             template_match = await self.template_selector.select_template(project_description)
             template_id = template_match.template_id
 
-            logger.info(f"✅ Selected template: {template_id} (confidence: {template_match.confidence:.2f})")
+            log_agent_action("Agent B", f"✅ Selected template: {template_id} (confidence: {template_match.confidence:.2f})")
 
             # 2. Generate unique project name
             project_name = self._generate_project_name(template_id)
-            logger.info(f"📁 Project name: {project_name}")
+            log_agent_action("Agent B", f"📁 Project name: {project_name}")
 
             # 3. Copy and customize template
             await self._create_project_from_template(template_id, project_name, project_description)
@@ -44,7 +45,7 @@ class MVPGenerator:
             # 5. Deploy to Vercel (mock for now)
             deploy_url = await self._deploy_to_vercel(project_name, github_url)
 
-            logger.info(f"🎉 MVP successfully generated: {deploy_url}")
+            log_agent_action("Agent B", f"🎉 MVP successfully generated: {deploy_url}")
 
             return {
                 "status": "success",
@@ -57,7 +58,7 @@ class MVPGenerator:
             }
 
         except Exception as e:
-            logger.error(f"❌ MVP generation failed: {str(e)}")
+            log_agent_action("Agent B", f"❌ MVP generation failed: {str(e)}")
             raise
 
     def _generate_project_name(self, template_id: str) -> str:
@@ -67,7 +68,7 @@ class MVPGenerator:
 
     async def _create_project_from_template(self, template_id: str, project_name: str, description: str):
         """Create project directory from template"""
-        logger.info(f"🔧 Creating project from template: {template_id}")
+        log_agent_action("Agent B", f"🔧 Creating project from template: {template_id}")
 
         template_path = self.templates_dir / template_id
         project_path = self.templates_dir.parent / "generated" / project_name
@@ -83,11 +84,11 @@ class MVPGenerator:
         # Customize project
         await self._customize_project(project_path, project_name, description)
 
-        logger.info(f"✅ Project created at: {project_path}")
+        log_agent_action("Agent B", f"✅ Project created at: {project_path}")
 
     async def _customize_project(self, project_path: Path, project_name: str, description: str):
         """Customize project files with project-specific data"""
-        logger.info("🎨 Customizing project files...")
+        log_agent_action("Agent B", "🎨 Customizing project files...")
 
         # Customize package.json
         package_json = project_path / "package.json"
@@ -125,11 +126,11 @@ class MVPGenerator:
                 with open(mock_file, 'w', encoding='utf-8') as f:
                     f.write(content)
 
-        logger.info("✅ Project customization completed")
+        log_agent_action("Agent B", "✅ Project customization completed")
 
     async def _push_to_github(self, project_name: str) -> str:
         """Push project to GitHub (mock implementation)"""
-        logger.info(f"🚀 Pushing {project_name} to GitHub...")
+        log_agent_action("Agent B", f"🚀 Pushing {project_name} to GitHub...")
 
         # In real implementation, this would:
         # 1. Create GitHub repository
@@ -141,12 +142,12 @@ class MVPGenerator:
         await asyncio.sleep(2)
         github_url = f"https://github.com/{Config.GITHUB_USER}/{project_name}"
 
-        logger.info(f"✅ Pushed to GitHub: {github_url}")
+        log_agent_action("Agent B", f"✅ Pushed to GitHub: {github_url}")
         return github_url
 
     async def _deploy_to_vercel(self, project_name: str, github_url: str) -> str:
         """Deploy to Vercel (mock implementation)"""
-        logger.info(f"🎯 Deploying {project_name} to Vercel...")
+        log_agent_action("Agent B", f"🎯 Deploying {project_name} to Vercel...")
 
         # In real implementation, this would:
         # 1. Use Vercel API or CLI
@@ -157,5 +158,5 @@ class MVPGenerator:
         await asyncio.sleep(2)
         deploy_url = f"https://{project_name}.vercel.app"
 
-        logger.info(f"🎉 Deployed to Vercel: {deploy_url}")
+        log_agent_action("Agent B", f"🎉 Deployed to Vercel: {deploy_url}")
         return deploy_url

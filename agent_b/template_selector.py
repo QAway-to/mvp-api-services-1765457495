@@ -10,7 +10,8 @@ import os
 import google.generativeai as genai
 from config import Config
 
-logger = logging.getLogger(__name__)
+# Import shared logger
+from shared_logger import logger, log_agent_action
 
 # Configure Gemini
 genai.configure(api_key=Config.GEMINI_API_KEY)
@@ -152,15 +153,15 @@ class AITemplateSelector:
             result = self._parse_ai_response(response.text)
 
             if result and result.template_id in self.templates:
-                logger.info(f"🤖 AI selected template: {result.template_id} (confidence: {result.confidence:.2f})")
+                log_agent_action("Agent B", f"🤖 AI selected template: {result.template_id} (confidence: {result.confidence:.2f})")
                 return result
             else:
                 # Fallback to keyword matching
-                logger.warning("AI selection failed, using keyword fallback")
+                log_agent_action("Agent B", "AI selection failed, using keyword fallback")
                 return self._keyword_fallback(project_description)
 
         except Exception as e:
-            logger.error(f"AI template selection failed: {e}")
+            log_agent_action("Agent B", f"AI template selection failed: {e}")
             return self._keyword_fallback(project_description)
 
     def _parse_ai_response(self, response_text: str) -> Optional[TemplateMatch]:
@@ -185,7 +186,7 @@ class AITemplateSelector:
                 )
 
         except Exception as e:
-            logger.error(f"Failed to parse AI response: {e}")
+            log_agent_action("Agent B", f"Failed to parse AI response: {e}")
 
         return None
 
