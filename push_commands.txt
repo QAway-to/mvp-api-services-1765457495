@@ -1,0 +1,25 @@
+# Команды для пуша на GitHub
+# Выполните эти команды в командной строке (CMD или PowerShell)
+
+cd "C:\Users\sadov\PycharmProjects\ai-multiagent-mvp-system"
+
+# Проверить текущую ветку
+git branch
+
+# Переименовать локальную ветку master в main (если нужно)
+git branch -m master main
+
+# Проверить статус
+git status
+
+# Настроить remote (если нужно)
+git remote add origin https://github.com/QAway-to/render_agent_a_mvp.git
+
+# Или изменить существующий remote
+git remote set-url origin https://github.com/QAway-to/render_agent_a_mvp.git
+
+# Запушить в main
+git push -u origin main
+
+# Если репозиторий на GitHub пустой, может понадобиться:
+# git push -u origin main --force
