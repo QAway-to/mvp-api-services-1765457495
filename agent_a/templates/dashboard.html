@@ -36,6 +36,21 @@
                         rows="3"
                     ></textarea>
                 </div>
+                <div class="mvp-build-type">
+                    <label>Тип сборки MVP:</label>
+                    <div class="build-type-options">
+                        <label class="build-type-option">
+                            <input type="radio" name="build-type" value="mock" checked>
+                            <span>🎭 Моковый MVP</span>
+                            <small>Быстрая генерация с демо-данными</small>
+                        </label>
+                        <label class="build-type-option">
+                            <input type="radio" name="build-type" value="full">
+                            <span>🚀 Полный MVP</span>
+                            <small>Реальная генерация с Agent B</small>
+                        </label>
+                    </div>
+                </div>
                 <div class="mvp-buttons">
                     <button id="generate-mvp-btn" class="btn btn-mvp">
                         🎯 Сгенерировать MVP

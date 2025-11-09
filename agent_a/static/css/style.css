@@ -455,6 +455,73 @@ header h1 {
     100% { transform: rotate(360deg); }
 }
 
+.mvp-build-type {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mvp-build-type label {
+    font-weight: 500;
+    color: #374151;
+    font-size: 0.9em;
+}
+
+.build-type-options {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.build-type-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    padding: 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    background: #f9fafb;
+    transition: all 0.2s ease;
+    flex: 1;
+    min-width: 200px;
+}
+
+.build-type-option:hover {
+    border-color: #d1d5db;
+    background: #f3f4f6;
+}
+
+.build-type-option input[type="radio"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+    accent-color: #667eea;
+}
+
+.build-type-option span {
+    font-weight: 600;
+    color: #1f2937;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.build-type-option small {
+    color: #6b7280;
+    font-size: 0.8em;
+    font-weight: 400;
+}
+
+.build-type-option input[type="radio"]:checked + span {
+    color: #667eea;
+}
+
+.build-type-option:has(input[type="radio"]:checked) {
+    border-color: #667eea;
+    background: #eef2ff;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
 @media (max-width: 768px) {
     .mvp-buttons {
         flex-direction: column;
@@ -463,5 +530,13 @@ header h1 {
 
     .mvp-status {
         margin-top: 10px;
+    }
+
+    .build-type-options {
+        flex-direction: column;
+    }
+
+    .build-type-option {
+        min-width: unset;
     }
 }

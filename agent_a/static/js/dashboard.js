@@ -19,12 +19,14 @@ class Dashboard {
         this.projectDescription = document.getElementById('project-description');
         this.generateMvpBtn = document.getElementById('generate-mvp-btn');
         this.mvpStatus = document.getElementById('mvp-status');
+        this.buildTypeInputs = document.querySelectorAll('input[name="build-type"]');
 
         this.init();
     }
 
     init() {
         this.bindEvents();
+        this.updateMVPButtonText(); // Initialize button text
         // Load status immediately on init
         this.updateStatus().then(() => {
             // Start log stream after status is loaded
@@ -43,6 +45,11 @@ class Dashboard {
         // MVP generation events
         this.generateMvpBtn.addEventListener('click', () => this.generateMVP());
         this.projectDescription.addEventListener('input', () => this.updateMVPStatus());
+
+        // Build type change events
+        this.buildTypeInputs.forEach(input => {
+            input.addEventListener('change', () => this.updateMVPButtonText());
+        });
     }
 
     startLogStream() {
@@ -376,10 +383,24 @@ class Dashboard {
             this.mvpStatus.className = 'mvp-status success';
             this.generateMvpBtn.disabled = false;
         }
+        this.updateMVPButtonText();
+    }
+
+    updateMVPButtonText() {
+        const buildType = this.getSelectedBuildType();
+        const buildTypeText = buildType === 'mock' ? 'Моковый MVP' : 'Полный MVP';
+        const emoji = buildType === 'mock' ? '🎭' : '🚀';
+        this.generateMvpBtn.innerHTML = `${emoji} Сгенерировать ${buildTypeText}`;
+    }
+
+    getSelectedBuildType() {
+        const selectedInput = document.querySelector('input[name="build-type"]:checked');
+        return selectedInput ? selectedInput.value : 'mock';
     }
 
     async generateMVP() {
         const description = this.projectDescription.value.trim();
+        const buildType = this.getSelectedBuildType();
 
         if (!description || description.length < 20) {
             this.showMVPError('Описание проекта слишком короткое');
@@ -389,7 +410,8 @@ class Dashboard {
         try {
             // Update UI
             this.generateMvpBtn.disabled = true;
-            this.mvpStatus.textContent = 'Генерация MVP...';
+            const buildTypeText = buildType === 'mock' ? 'мокового' : 'полного';
+            this.mvpStatus.textContent = `Генерация ${buildTypeText} MVP...`;
             this.mvpStatus.className = 'mvp-status loading';
 
             // Send request to generate MVP
@@ -400,6 +422,7 @@ class Dashboard {
                 },
                 body: JSON.stringify({
                     description: description,
+                    buildType: buildType,
                     timestamp: new Date().toISOString()
                 })
             });
