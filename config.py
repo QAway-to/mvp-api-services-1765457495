@@ -41,14 +41,21 @@ class Config:
     GITHUB_USER = os.getenv("GITHUB_USER")
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
     AGENT_B_TEST_MODE = os.getenv("AGENT_B_TEST_MODE", "true").lower() == "true"
-    AGENT_B_TEST_REPO = os.getenv("AGENT_B_TEST_REPO", "test-mvp-repo")
+    AGENT_B_TEST_REPO = os.getenv("AGENT_B_TEST_REPO", "mvp-test")
 
     # Common settings
-    GEMINI_MODEL = "gemini-1.5-flash"
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "models/gemini-2.0-flash")
     MAX_RETRIES = 3
     REQUEST_TIMEOUT = 30
     MAX_PROMPT_LENGTH = 100000
     MAX_CODE_LENGTH = 50000
+
+    # Semantic evaluation
+    SEMANTIC_SIMILARITY_THRESHOLD: float = float(os.getenv("SEMANTIC_SIMILARITY_THRESHOLD", "0.5"))
+
+    # Deployment hooks
+    VERCEL_DEPLOY_HOOK_URL = os.getenv("VERCEL_DEPLOY_HOOK_URL")
+    VERCEL_PROJECT_DOMAIN = os.getenv("VERCEL_PROJECT_DOMAIN")
 
     # Search limits
     MAX_PROJECTS_PER_SESSION: int = int(os.getenv('MAX_PROJECTS_PER_SESSION', '5'))

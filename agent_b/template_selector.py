@@ -58,16 +58,6 @@ class AITemplateSelector:
                 estimated_completion="75%"
             ),
 
-            "telegram-support-bot": TemplateInfo(
-                id="telegram-support-bot",
-                name="Telegram Support Bot",
-                category="telegram-bots",
-                description="Бот технической поддержки с базой знаний",
-                features=["автоответы", "эскалация", "базы знаний", "аналитика"],
-                complexity="medium",
-                estimated_completion="70%"
-            ),
-
             # Parsers
             "news-parser": TemplateInfo(
                 id="news-parser",
@@ -79,38 +69,6 @@ class AITemplateSelector:
                 estimated_completion="80%"
             ),
 
-            "product-parser": TemplateInfo(
-                id="product-parser",
-                name="E-commerce Parser",
-                category="parsers",
-                description="Парсер цен и товаров с разных площадок",
-                features=["сравнение цен", "мониторинг", "уведомления", "экспорт"],
-                complexity="medium",
-                estimated_completion="75%"
-            ),
-
-            # Discord Bots
-            "discord-moderation-bot": TemplateInfo(
-                id="discord-moderation-bot",
-                name="Discord Moderation Bot",
-                category="discord-bots",
-                description="Бот для модерации Discord сервера",
-                features=["автомодерация", "предупреждения", "бан-листы", "логи"],
-                complexity="low",
-                estimated_completion="85%"
-            ),
-
-            # Integrations
-            "api-integration": TemplateInfo(
-                id="api-integration",
-                name="API Integration Service",
-                category="integrations",
-                description="Сервис для интеграции с внешними API",
-                features=["REST API", "webhooks", "логирование", "мониторинг"],
-                complexity="medium",
-                estimated_completion="70%"
-            ),
-
             # Analytics
             "analytics-dashboard": TemplateInfo(
                 id="analytics-dashboard",
@@ -118,9 +76,9 @@ class AITemplateSelector:
                 category="analytics",
                 description="Дашборд для визуализации данных и аналитики",
                 features=["графики", "отчеты", "фильтры", "экспорт"],
-                complexity="low",
-                estimated_completion="80%"
-            )
+                complexity="medium",
+                estimated_completion="70%"
+            ),
         }
 
     async def select_template(self, project_description: str) -> TemplateMatch:
