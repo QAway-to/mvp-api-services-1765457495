@@ -29,7 +29,17 @@
             <h2>🚀 Генерация MVP</h2>
             <div class="mvp-controls">
                 <div class="mvp-input-group">
-                    <label for="project-description">Описание проекта:</label>
+                    <label for="mvp-template">Выберите шаблон MVP:</label>
+                    <select id="mvp-template">
+                        <option value="">-- Выберите шаблон --</option>
+                        <option value="telegram-shop-bot">🤖 Telegram Shop Bot (интернет-магазин)</option>
+                        <option value="news-parser">📰 News Parser (парсер новостей)</option>
+                        <option value="api-integration">🔗 API Integration (интеграция API)</option>
+                        <option value="analytics-dashboard">📊 Analytics Dashboard (дашборд аналитики)</option>
+                    </select>
+                </div>
+                <div class="mvp-input-group">
+                    <label for="project-description">Описание проекта (опционально):</label>
                     <textarea
                         id="project-description"
                         placeholder="Опишите проект, например: 'Создать Telegram бота для интернет-магазина одежды с каталогом товаров, корзиной и оформлением заказов'"

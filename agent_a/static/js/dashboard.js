@@ -16,6 +16,7 @@ class Dashboard {
         this.sessionStep = document.getElementById('session-step');
 
         // MVP generation elements
+        this.mvpTemplate = document.getElementById('mvp-template');
         this.projectDescription = document.getElementById('project-description');
         this.generateMvpBtn = document.getElementById('generate-mvp-btn');
         this.mvpStatus = document.getElementById('mvp-status');
@@ -44,6 +45,7 @@ class Dashboard {
 
         // MVP generation events
         this.generateMvpBtn.addEventListener('click', () => this.generateMVP());
+        this.mvpTemplate.addEventListener('change', () => this.updateMVPStatus());
         this.projectDescription.addEventListener('input', () => this.updateMVPStatus());
 
         // Build type change events
@@ -369,13 +371,15 @@ class Dashboard {
 
     // MVP Generation Methods
     updateMVPStatus() {
+        const template = this.mvpTemplate.value;
         const description = this.projectDescription.value.trim();
-        if (description.length === 0) {
-            this.mvpStatus.textContent = 'Выберите описание проекта выше';
+
+        if (!template) {
+            this.mvpStatus.textContent = 'Выберите шаблон MVP выше';
             this.mvpStatus.className = 'mvp-status';
             this.generateMvpBtn.disabled = true;
-        } else if (description.length < 20) {
-            this.mvpStatus.textContent = 'Описание слишком короткое (минимум 20 символов)';
+        } else if (description && description.length < 10) {
+            this.mvpStatus.textContent = 'Описание слишком короткое (минимум 10 символов)';
             this.mvpStatus.className = 'mvp-status error';
             this.generateMvpBtn.disabled = true;
         } else {
@@ -399,10 +403,16 @@ class Dashboard {
     }
 
     async generateMVP() {
+        const template = this.mvpTemplate.value;
         const description = this.projectDescription.value.trim();
         const buildType = this.getSelectedBuildType();
 
-        if (!description || description.length < 20) {
+        if (!template) {
+            this.showMVPError('Выберите шаблон MVP');
+            return;
+        }
+
+        if (description && description.length < 10) {
             this.showMVPError('Описание проекта слишком короткое');
             return;
         }
@@ -421,6 +431,7 @@ class Dashboard {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    template: template,
                     description: description,
                     buildType: buildType,
                     timestamp: new Date().toISOString()

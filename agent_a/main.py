@@ -272,23 +272,44 @@ async def n8n_projects_webhook(request: Request):
 # MVP Generation API
 @app.post("/api/generate-mvp")
 async def generate_mvp(request: Request):
-    """Generate MVP based on project description"""
+    """Generate MVP based on template and project description"""
     try:
         data = await request.json()
+        template = data.get("template", "").strip()
         description = data.get("description", "").strip()
+        build_type = data.get("buildType", "mock")
 
-        if not description or len(description) < 20:
+        if not template:
             return {
                 "status": "error",
-                "error": "Описание проекта слишком короткое (минимум 20 символов)"
+                "error": "Не выбран шаблон MVP"
             }
 
-        log_agent_action("MVP", f"🎯 Starting MVP generation for: {description[:100]}...")
+        if description and len(description) < 10:
+            return {
+                "status": "error",
+                "error": "Описание проекта слишком короткое (минимум 10 символов)"
+            }
+
+        log_agent_action("MVP", f"🎯 Starting MVP generation - Template: {template}, Build: {build_type}")
+        if description:
+            log_agent_action("MVP", f"📝 Description: {description[:100]}...")
 
         # Import and use MVP generator
         try:
             from mvp_generator import MVPGenerator
             generator = MVPGenerator()
+
+            # For now, create a description from template if none provided
+            if not description:
+                template_descriptions = {
+                    "telegram-shop-bot": "Создать Telegram бота для интернет-магазина с каталогом товаров, корзиной и оформлением заказов",
+                    "news-parser": "Создать веб-приложение для парсинга и анализа новостей с визуализацией данных",
+                    "api-integration": "Создать сервис для интеграции с внешними API с документацией",
+                    "analytics-dashboard": "Создать дашборд для визуализации данных и аналитики бизнеса"
+                }
+                description = template_descriptions.get(template, f"Создать MVP на основе шаблона {template}")
+
             result = await generator.generate_mvp(description)
 
             log_agent_action("MVP", f"✅ MVP successfully generated: {result['deploy_url']}")
@@ -299,21 +320,23 @@ async def generate_mvp(request: Request):
                 "deployUrl": result["deploy_url"],
                 "projectName": result["project_name"],
                 "confidence": result["confidence"],
+                "buildType": build_type,
                 "message": "MVP успешно создан и развернут"
             }
 
         except ImportError:
             # Fallback to mock response if Agent B is not available
             log_agent_action("MVP", "⚠️ Agent B not available, using mock generation")
+
             import asyncio
             import time
 
-            log_agent_action("MVP", f"🤖 AI analyzing project description...")
+            log_agent_action("MVP", f"🤖 AI analyzing template: {template}...")
             await asyncio.sleep(1)
-            log_agent_action("MVP", f"✅ Template selected: telegram-shop-bot (confidence: 0.87)")
+            log_agent_action("MVP", f"✅ Template confirmed: {template}")
 
             await asyncio.sleep(1)
-            log_agent_action("MVP", f"🔧 Generating React components and API routes...")
+            log_agent_action("MVP", f"🔧 Generating {build_type} MVP from template...")
 
             await asyncio.sleep(1)
             log_agent_action("MVP", f"🚀 Pushing to GitHub repository...")
@@ -321,14 +344,15 @@ async def generate_mvp(request: Request):
             await asyncio.sleep(1)
             log_agent_action("MVP", f"🎉 Deploying to Vercel...")
 
-            deploy_url = f"https://ai-mvp-{int(time.time())}.vercel.app"
+            deploy_url = f"https://ai-mvp-{template}-{int(time.time())}.vercel.app"
             log_agent_action("MVP", f"✅ MVP successfully generated and deployed: {deploy_url}")
 
             return {
                 "status": "success",
-                "template": "telegram-shop-bot",
+                "template": template,
                 "deployUrl": deploy_url,
-                "message": "MVP успешно создан и развернут (mock mode)"
+                "buildType": build_type,
+                "message": f"MVP успешно создан и развернут (mock mode)"
             }
 
     except Exception as e:

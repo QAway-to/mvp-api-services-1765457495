@@ -746,14 +746,10 @@ class AgentA:
                     log_agent_action("Agent A", f"✅ [EVALUATION] Project APPROVED: {project['title'][:50]}... (score: {score:.2f})")
                     log_agent_action("Agent A", f"📋 [EVALUATION] Reasons: {', '.join(reasons[:3])}")
 
-                    # Send to Telegram if configured
+                    # Send to Telegram immediately when project is found
                     if self.telegram:
-                        log_agent_action("Agent A", f"📱 [TELEGRAM] Sending notification for project {i+1}...")
+                        log_agent_action("Agent A", f"📱 [TELEGRAM] Sending notification for suitable project: {project['title'][:50]}...")
                         asyncio.create_task(self.telegram.send_project_notification(project))
-                    
-                    # Send to n8n workflow (Agent B)
-                    log_agent_action("Agent A", f"🔗 [N8N] Sending project {i+1} to n8n workflow...")
-                    asyncio.create_task(self.send_to_n8n(project))
                 else:
                     log_agent_action("Agent A", f"❌ [EVALUATION] Project REJECTED: {project['title'][:50]}... (score: {score:.2f} < {config.EVALUATION_THRESHOLD})")
 
@@ -762,42 +758,10 @@ class AgentA:
 
         self.found_projects.extend(suitable_projects)
 
-        # Summary
+        # Summary with total count including database
+        total_suitable = len(self.found_projects)
         log_agent_action("Agent A", f"📈 [EVALUATION] Evaluation complete: {len(suitable_projects)}/{len(projects)} projects approved")
-        log_agent_action("Agent A", f"📈 [EVALUATION] Total suitable projects in history: {len(self.found_projects)}")
-
-    async def send_to_n8n(self, project: Dict[str, Any]):
-        """Send suitable project to n8n workflow (Agent B)"""
-        if not config.N8N_WEBHOOK_URL:
-            log_agent_action("Agent A", "n8n webhook URL not configured - skipping")
-            return
-
-        try:
-            async with aiohttp.ClientSession() as session:
-                payload = {
-                    "project_id": project.get("id"),
-                    "title": project.get("title"),
-                    "description": project.get("description"),  # Full description
-                    "budget": project.get("budget"),
-                    "url": project.get("url"),
-                    "proposals": project.get("proposals"),  # Number of proposals
-                    "hired": project.get("hired"),  # Number of hired freelancers
-                    "evaluation": project.get("evaluation", {}),
-                    "found_at": project.get("found_at"),
-                    "status": "pending_review"  # Waiting for manual approval
-                }
-
-                async with session.post(
-                    config.N8N_WEBHOOK_URL,
-                    json=payload,
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as response:
-                    if response.status == 200:
-                        log_agent_action("Agent A", f"✅ Project sent to n8n: {project['title'][:50]}...")
-                    else:
-                        log_agent_action("Agent A", f"⚠️ n8n webhook returned status {response.status}")
-        except Exception as e:
-            log_agent_action("Agent A", f"❌ Error sending to n8n: {str(e)}")
+        log_agent_action("Agent A", f"📈 [EVALUATION] Total suitable projects found: {total_suitable}")
 
     async def run_session(self):
         """Run one search session"""
