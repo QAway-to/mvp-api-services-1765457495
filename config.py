@@ -1,53 +1,54 @@
+"""
+Unified configuration for AI Multi-Agent MVP Generation System
+Combines settings from both Agent A and Agent B
+"""
 import os
-from typing import Optional, List
-from dotenv import load_dotenv
-
-# Try to load .env file, but don't fail if it doesn't exist
-try:
-    load_dotenv()
-except:
-    pass
+import warnings
+from typing import List
 
 class Config:
-    # App settings
-    _mode = os.getenv('MODE', 'demo').lower().strip()  # Normalize to lowercase (full, FULL, Full -> full)
-    # Validate MODE value
+    """Unified configuration class"""
+
+    # Agent A settings
+    _mode = os.getenv('MODE', 'demo').lower().strip()
     if _mode not in ['demo', 'full']:
-        # If invalid, default to demo and log warning
-        import warnings
         warnings.warn(f"Invalid MODE value: {os.getenv('MODE')}. Using 'demo' instead. Valid values: 'demo', 'full'")
         _mode = 'demo'
     MODE: str = _mode
+
     LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')
 
     # Kwork settings
     KWORK_BASE_URL: str = "https://kwork.ru"
     KWORK_PROJECTS_URL: str = f"{KWORK_BASE_URL}/projects"
-    # Search keywords - can be comma-separated list or single keyword
     SEARCH_KEYWORDS: str = os.getenv('SEARCH_KEYWORDS', 'бот, данные, скрипт, скрипты, сканер, парсер')
-    # Legacy support: if SEARCH_KEYWORD is set, use it
     _legacy_keyword = os.getenv('SEARCH_KEYWORD')
     if _legacy_keyword:
         SEARCH_KEYWORDS = _legacy_keyword
-    # Parse keywords into list (split by comma, strip whitespace)
     SEARCH_KEYWORDS_LIST: List[str] = [kw.strip() for kw in SEARCH_KEYWORDS.split(',') if kw.strip()]
-    # Primary keyword for logging (first one)
     SEARCH_KEYWORD: str = SEARCH_KEYWORDS_LIST[0] if SEARCH_KEYWORDS_LIST else 'бот'
 
     # Credentials
-    KWORK_EMAIL: Optional[str] = os.getenv('KWORK_EMAIL')
-    KWORK_PASSWORD: Optional[str] = os.getenv('KWORK_PASSWORD')
+    KWORK_EMAIL = os.getenv('KWORK_EMAIL')
+    KWORK_PASSWORD = os.getenv('KWORK_PASSWORD')
 
     # Telegram
-    TELEGRAM_BOT_TOKEN: Optional[str] = os.getenv('TELEGRAM_BOT_TOKEN')
-    TELEGRAM_CHANNEL_ID: Optional[str] = os.getenv('TELEGRAM_CHANNEL_ID')
-    
-    # n8n Integration
-    N8N_WEBHOOK_URL: Optional[str] = os.getenv('N8N_WEBHOOK_URL')
-    
-    # Gemini AI (for semantic evaluation)
-    GEMINI_API_KEY: Optional[str] = os.getenv('GEMINI_API_KEY')
-    SEMANTIC_SIMILARITY_THRESHOLD: float = float(os.getenv('SEMANTIC_SIMILARITY_THRESHOLD', '0.50'))  # Lowered from 0.75 to 0.50 for better matching
+    TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+    TELEGRAM_CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID')
+
+    # Agent B settings
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    GITHUB_USER = os.getenv("GITHUB_USER")
+    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+    AGENT_B_TEST_MODE = os.getenv("AGENT_B_TEST_MODE", "true").lower() == "true"
+    AGENT_B_TEST_REPO = os.getenv("AGENT_B_TEST_REPO", "test-mvp-repo")
+
+    # Common settings
+    GEMINI_MODEL = "gemini-1.5-flash"
+    MAX_RETRIES = 3
+    REQUEST_TIMEOUT = 30
+    MAX_PROMPT_LENGTH = 100000
+    MAX_CODE_LENGTH = 50000
 
     # Search limits
     MAX_PROJECTS_PER_SESSION: int = int(os.getenv('MAX_PROJECTS_PER_SESSION', '5'))
@@ -64,4 +65,38 @@ class Config:
     DELAY_BETWEEN_ACTIONS_MAX: float = 8.0
     MOUSE_MOVEMENT_STEPS: int = 10
 
+    @classmethod
+    def validate(cls):
+        """Validate required environment variables"""
+        required_vars = []
+
+        # Agent A required vars
+        if cls.MODE not in ["demo"]:
+            if not cls.KWORK_EMAIL:
+                required_vars.append("KWORK_EMAIL")
+            if not cls.KWORK_PASSWORD:
+                required_vars.append("KWORK_PASSWORD")
+
+        if cls.TELEGRAM_BOT_TOKEN:
+            if not cls.TELEGRAM_CHANNEL_ID:
+                required_vars.append("TELEGRAM_CHANNEL_ID")
+
+        # Agent B required vars (only if not in test mode)
+        if not cls.AGENT_B_TEST_MODE:
+            if not cls.GEMINI_API_KEY:
+                required_vars.append("GEMINI_API_KEY")
+            if not cls.GITHUB_USER:
+                required_vars.append("GITHUB_USER")
+            if not cls.GITHUB_TOKEN:
+                required_vars.append("GITHUB_TOKEN")
+
+        if required_vars:
+            raise ValueError(f"Missing required environment variables: {', '.join(required_vars)}")
+
+        print(f"✅ Configuration validated (Mode: {cls.MODE}, Test Mode: {cls.AGENT_B_TEST_MODE})")
+
+# Validate configuration on import
+Config.validate()
+
+# Export single instance
 config = Config()

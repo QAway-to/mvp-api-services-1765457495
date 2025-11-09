@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import os
 
 import google.generativeai as genai
+# Import from root config
 from config import Config
 
 # Import shared logger

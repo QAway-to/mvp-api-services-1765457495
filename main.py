@@ -11,11 +11,11 @@ from pathlib import Path
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
 
-# Add agent directories to Python path
+# Add agent directories to Python path (agent_a first to avoid config conflicts)
 agent_a_dir = current_dir / "agent_a"
 agent_b_dir = current_dir / "agent_b"
-sys.path.insert(0, str(agent_a_dir))
-sys.path.insert(0, str(agent_b_dir))
+sys.path.insert(0, str(agent_b_dir))  # Agent B first (will be found later)
+sys.path.insert(0, str(agent_a_dir))  # Agent A second (will be found first)
 
 try:
     # Import and run Agent A application

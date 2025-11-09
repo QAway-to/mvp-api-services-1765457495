@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from template_selector import AITemplateSelector
+# Import from root config
 from config import Config
 
 # Import shared logger
