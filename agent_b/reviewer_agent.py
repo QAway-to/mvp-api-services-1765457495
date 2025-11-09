@@ -3,13 +3,13 @@ import logging
 from typing import Dict, Any
 
 import google.generativeai as genai
-from shared.config import config
+from config import Config
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # Configure Gemini
-genai.configure(api_key=config.GEMINI_API_KEY)
+genai.configure(api_key=Config.GEMINI_API_KEY)
 
 
 def review_code(file_name: str, code: str) -> Dict[str, Any]:
@@ -21,15 +21,15 @@ def review_code(file_name: str, code: str) -> Dict[str, Any]:
         if not code or not code.strip():
             return {"status": "reject", "comments": ["Empty or invalid code provided"]}
 
-        reviewer = genai.GenerativeModel(config.GEMINI_MODEL)
+        reviewer = genai.GenerativeModel(Config.GEMINI_MODEL)
 
         # Truncate code if too long for review
-        review_code = code[:config.MAX_CODE_LENGTH] if len(code) > config.MAX_CODE_LENGTH else code
+        review_code = code[:Config.MAX_CODE_LENGTH] if len(code) > Config.MAX_CODE_LENGTH else code
 
         prompt = build_review_prompt(file_name, review_code)
 
         # Review with retries
-        for attempt in range(config.MAX_RETRIES):
+        for attempt in range(Config.MAX_RETRIES):
             try:
                 response = reviewer.generate_content(prompt)
                 if not response or not response.text:
@@ -46,7 +46,7 @@ def review_code(file_name: str, code: str) -> Dict[str, Any]:
 
             except Exception as e:
                 logger.warning(f"⚠️ Review attempt {attempt + 1} failed for {file_name}: {e}")
-                if attempt == config.MAX_RETRIES - 1:
+                if attempt == Config.MAX_RETRIES - 1:
                     break
 
         # Fallback review result

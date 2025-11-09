@@ -1,7 +1,7 @@
 from typing import Dict, Any, Tuple, List
 import re
-from shared.config import config
-from shared.logger import log_agent_action
+from config import config
+from utils.logger import log_agent_action
 
 # Try to import semantic evaluator
 try:

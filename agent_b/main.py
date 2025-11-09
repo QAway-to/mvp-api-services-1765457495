@@ -5,7 +5,7 @@ import logging
 import sys
 from typing import Optional
 
-from shared.config import config
+from config import Config
 from architect_agent import run_architect
 
 # Configure logging
@@ -55,12 +55,7 @@ def main():
 def setup_environment() -> bool:
     """Setup and validate environment"""
     try:
-        issues = config.validate_agent_b()
-        if issues:
-            print("❌ Agent B configuration issues:")
-            for issue in issues:
-                print(f"  - {issue}")
-            return
+        Config.validate()
         logger.info("Environment configuration validated")
         return True
     except ValueError as e:

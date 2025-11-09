@@ -2,19 +2,19 @@ import logging
 from typing import Dict, Any, Optional, Union, List
 
 import google.generativeai as genai
-from shared.config import config
+from config import Config
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # Configure Gemini
-genai.configure(api_key=config.GEMINI_API_KEY)
+genai.configure(api_key=Config.GEMINI_API_KEY)
 
 
 def generate_code(module_info: Dict[str, Any], project_context: str, review_feedback: Optional[Union[List, Dict, str]] = None) -> str:
     """Generate code for a module with optional review feedback"""
     try:
-        coder = genai.GenerativeModel(config.GEMINI_MODEL)
+        coder = genai.GenerativeModel(Config.GEMINI_MODEL)
         path = module_info.get('path', 'unknown.py')
         purpose = module_info.get('purpose', 'General module')
 
@@ -24,13 +24,13 @@ def generate_code(module_info: Dict[str, Any], project_context: str, review_feed
         feedback_text = prepare_feedback_text(review_feedback)
 
         # Truncate context if too long
-        truncated_context = truncate_text(project_context, config.MAX_PROMPT_LENGTH // 2)
-        truncated_feedback = truncate_text(feedback_text, config.MAX_PROMPT_LENGTH // 4)
+        truncated_context = truncate_text(project_context, Config.MAX_PROMPT_LENGTH // 2)
+        truncated_feedback = truncate_text(feedback_text, Config.MAX_PROMPT_LENGTH // 4)
 
         prompt = build_code_generation_prompt(path, purpose, truncated_context, truncated_feedback)
 
         # Generate with retries
-        for attempt in range(config.MAX_RETRIES):
+        for attempt in range(Config.MAX_RETRIES):
             try:
                 response = coder.generate_content(prompt)
                 if not response or not response.text:
@@ -39,9 +39,9 @@ def generate_code(module_info: Dict[str, Any], project_context: str, review_feed
                 code = clean_code_response(response.text)
 
                 # Validate code length
-                if len(code) > config.MAX_CODE_LENGTH:
+                if len(code) > Config.MAX_CODE_LENGTH:
                     logger.warning(f"⚠️ Code for {path} too long ({len(code)} chars), truncating...")
-                    code = code[:config.MAX_CODE_LENGTH] + "\n# Code truncated due to length limit"
+                    code = code[:Config.MAX_CODE_LENGTH] + "\n# Code truncated due to length limit"
 
                 # Basic syntax check
                 if not is_basic_syntax_valid(code):
@@ -52,10 +52,10 @@ def generate_code(module_info: Dict[str, Any], project_context: str, review_feed
 
             except Exception as e:
                 logger.warning(f"⚠️ Attempt {attempt + 1} failed for {path}: {e}")
-                if attempt == config.MAX_RETRIES - 1:
+                if attempt == Config.MAX_RETRIES - 1:
                     raise
 
-        raise Exception(f"Failed to generate code after {config.MAX_RETRIES} attempts")
+        raise Exception(f"Failed to generate code after {Config.MAX_RETRIES} attempts")
 
     except Exception as e:
         error_msg = f"# Generation failed for {module_info.get('path', 'unknown.py')}\n# Error: {str(e)}"

@@ -3,8 +3,8 @@ from typing import Dict, Any
 from telegram import Bot
 from telegram.error import TelegramError
 
-from shared.config import config
-from shared.logger import log_agent_action
+from config import config
+from utils.logger import log_agent_action
 
 class TelegramNotifier:
     def __init__(self):

@@ -17,8 +17,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from urllib.parse import quote_plus
 
-from shared.config import config
-from shared.logger import logger, log_agent_action
+from config import config
+from utils.logger import logger, log_agent_action
 from evaluation.evaluator import ProjectEvaluator
 from telegram_bot import TelegramNotifier
 

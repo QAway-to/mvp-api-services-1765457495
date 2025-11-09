@@ -139,7 +139,7 @@ class MVPGenerator:
 
         # Mock response
         await asyncio.sleep(2)
-        github_url = f"https://github.com/{config.GITHUB_USER}/{project_name}"
+        github_url = f"https://github.com/{Config.GITHUB_USER}/{project_name}"
 
         logger.info(f"✅ Pushed to GitHub: {github_url}")
         return github_url

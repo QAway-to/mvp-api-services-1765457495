@@ -8,12 +8,12 @@ from dataclasses import dataclass
 import os
 
 import google.generativeai as genai
-from shared.config import config
+from config import Config
 
 logger = logging.getLogger(__name__)
 
 # Configure Gemini
-genai.configure(api_key=config.GEMINI_API_KEY)
+genai.configure(api_key=Config.GEMINI_API_KEY)
 
 @dataclass
 class TemplateMatch:
@@ -40,7 +40,7 @@ class AITemplateSelector:
 
     def __init__(self):
         self.templates = self._load_templates()
-        self.model = genai.GenerativeModel(config.GEMINI_MODEL)
+        self.model = genai.GenerativeModel(Config.GEMINI_MODEL)
 
     def _load_templates(self) -> Dict[str, TemplateInfo]:
         """Load available templates"""

@@ -1,3 +1,8 @@
+# Environment variables
+.env
+.env.local
+.env.example
+
 # Python
 __pycache__/
 *.py[cod]
@@ -17,104 +22,32 @@ sdist/
 var/
 wheels/
 *.egg-info/
-.installed.cfg
 *.egg
-<<<<<<< HEAD
 
-# Virtual environments
-venv/
-.venv/
-ENV/
-env/
-=======
-MANIFEST
-
-# Virtual environments
-venv/
-env/
-ENV/
-.venv/
-.env
-.env.local
-.env.production
->>>>>>> 9da0c3e (Initial MVP implementation with real-time dashboard)
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
+
+# Logs
+logs/
+*.log
+ai_agent.log
 
 # OS
 .DS_Store
-<<<<<<< HEAD
-=======
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
->>>>>>> 9da0c3e (Initial MVP implementation with real-time dashboard)
 Thumbs.db
 
-# Logs
-*.log
-logs/
-<<<<<<< HEAD
-ai_agent.log
-
-# Environment variables
-.env
-.env.local
-.env.production
-=======
-
-# Browser data
-browser-logs/
-chromedriver/
-geckodriver/
-
-# Temporary files
-*.tmp
-*.temp
-temp/
-tmp/
->>>>>>> 9da0c3e (Initial MVP implementation with real-time dashboard)
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-<<<<<<< HEAD
-# Temporary files
-tmp/
-temp/
-*.tmp
-
-# Node.js (for templates)
-node_modules/
-.next/
-out/
-
-# Chrome/Selenium
-chromedriver
-geckodriver
-
-# Generated MVPs
+# Generated content
 agent_b/generated/
+generated/
 
-# Secrets and credentials
-secrets/
-credentials/
-*.key
-*.pem
-=======
-# Node.js (if any)
-node_modules/
-npm-debug.log*
-
-# Render
-.render/
->>>>>>> 9da0c3e (Initial MVP implementation with real-time dashboard)
+# Cache
+.cache/

@@ -8,9 +8,9 @@ from fastapi.responses import StreamingResponse
 import logging
 import json
 
-from shared.config import config
+from config import config
 from agents.agent_a import AgentA
-from shared.logger import setup_logging, log_queue, log_agent_action
+from utils.logger import setup_logging, log_queue, log_agent_action
 
 # Setup logging
 setup_logging()
@@ -269,37 +269,6 @@ async def n8n_projects_webhook(request: Request):
             "message": str(e)
         }
 
-async def generate_mock_mvp(description: str):
-    """Generate a mock MVP with simulated steps"""
-    import asyncio
-    import time
-
-    log_agent_action("MVP", f"🤖 AI analyzing project description...")
-    await asyncio.sleep(1)
-    log_agent_action("MVP", f"✅ Template selected: telegram-shop-bot (confidence: 0.87)")
-
-    await asyncio.sleep(1)
-    log_agent_action("MVP", f"🔧 Generating React components and API routes...")
-
-    await asyncio.sleep(1)
-    log_agent_action("MVP", f"🚀 Pushing to GitHub repository...")
-
-    await asyncio.sleep(1)
-    log_agent_action("MVP", f"🎉 Deploying to Vercel...")
-
-    deploy_url = f"https://ai-mvp-{int(time.time())}.vercel.app"
-    log_agent_action("MVP", f"✅ Mock MVP successfully generated and deployed: {deploy_url}")
-
-    return {
-        "status": "success",
-        "template": "telegram-shop-bot",
-        "deployUrl": deploy_url,
-        "projectName": f"ai-mvp-{int(time.time())}",
-        "confidence": 0.87,
-        "buildType": "mock",
-        "message": "Моковый MVP успешно создан (демо-режим)"
-    }
-
 # MVP Generation API
 @app.post("/api/generate-mvp")
 async def generate_mvp(request: Request):
@@ -307,7 +276,6 @@ async def generate_mvp(request: Request):
     try:
         data = await request.json()
         description = data.get("description", "").strip()
-        build_type = data.get("buildType", "mock")  # Default to mock if not specified
 
         if not description or len(description) < 20:
             return {
@@ -315,20 +283,15 @@ async def generate_mvp(request: Request):
                 "error": "Описание проекта слишком короткое (минимум 20 символов)"
             }
 
-        build_type_text = "мокового" if build_type == "mock" else "полного"
-        log_agent_action("MVP", f"🎯 Starting {build_type_text} MVP generation for: {description[:100]}...")
+        log_agent_action("MVP", f"🎯 Starting MVP generation for: {description[:100]}...")
 
-        # If mock build requested, skip real generation
-        if build_type == "mock":
-            return await generate_mock_mvp(description)
-
-        # Full build - try to use real MVP generator (Agent B)
+        # Import and use MVP generator
         try:
             from mvp_generator import MVPGenerator
             generator = MVPGenerator()
             result = await generator.generate_mvp(description)
 
-            log_agent_action("MVP", f"✅ Full MVP successfully generated: {result['deploy_url']}")
+            log_agent_action("MVP", f"✅ MVP successfully generated: {result['deploy_url']}")
 
             return {
                 "status": "success",
@@ -336,14 +299,37 @@ async def generate_mvp(request: Request):
                 "deployUrl": result["deploy_url"],
                 "projectName": result["project_name"],
                 "confidence": result["confidence"],
-                "buildType": "full",
-                "message": "Полный MVP успешно создан и развернут"
+                "message": "MVP успешно создан и развернут"
             }
 
         except ImportError:
             # Fallback to mock response if Agent B is not available
-            log_agent_action("MVP", "⚠️ Agent B not available, falling back to mock generation")
-            return await generate_mock_mvp(description)
+            log_agent_action("MVP", "⚠️ Agent B not available, using mock generation")
+            import asyncio
+            import time
+
+            log_agent_action("MVP", f"🤖 AI analyzing project description...")
+            await asyncio.sleep(1)
+            log_agent_action("MVP", f"✅ Template selected: telegram-shop-bot (confidence: 0.87)")
+
+            await asyncio.sleep(1)
+            log_agent_action("MVP", f"🔧 Generating React components and API routes...")
+
+            await asyncio.sleep(1)
+            log_agent_action("MVP", f"🚀 Pushing to GitHub repository...")
+
+            await asyncio.sleep(1)
+            log_agent_action("MVP", f"🎉 Deploying to Vercel...")
+
+            deploy_url = f"https://ai-mvp-{int(time.time())}.vercel.app"
+            log_agent_action("MVP", f"✅ MVP successfully generated and deployed: {deploy_url}")
+
+            return {
+                "status": "success",
+                "template": "telegram-shop-bot",
+                "deployUrl": deploy_url,
+                "message": "MVP успешно создан и развернут (mock mode)"
+            }
 
     except Exception as e:
         log_agent_action("MVP", f"❌ MVP generation failed: {str(e)}")

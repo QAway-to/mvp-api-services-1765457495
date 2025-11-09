@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from validators import CodeValidator
-from shared.config import config
+from config import Config
 
 
 class TestCodeValidator(unittest.TestCase):
@@ -68,7 +68,7 @@ class TestConfig(unittest.TestCase):
         """Test configuration validation"""
         # Should not raise exception with required env vars
         try:
-            config.validate_agent_b()
+            Config.validate()
         except ValueError:
             self.fail("Config validation failed with required environment variables")
 
@@ -76,7 +76,7 @@ class TestConfig(unittest.TestCase):
         """Test configuration with missing variables"""
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError) as context:
-                config.validate_agent_b()
+                Config.validate()
             self.assertIn("Missing required environment variables", str(context.exception))
 
 

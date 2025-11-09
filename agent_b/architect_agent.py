@@ -10,7 +10,7 @@ from typing import Dict, List, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-from shared.config import config
+from config import Config
 from coder_agent import generate_code
 from reviewer_agent import review_code
 
@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Configure Gemini
-genai.configure(api_key=config.GEMINI_API_KEY)
+genai.configure(api_key=Config.GEMINI_API_KEY)
 
 @dataclass
 class ModuleResult:
@@ -36,13 +36,13 @@ def create_repo(repo_name: str) -> Dict[str, Any]:
     """Create a new GitHub repository"""
     url = "https://api.github.com/user/repos"
     headers = {
-        "Authorization": f"Bearer {config.GITHUB_TOKEN}",
+        "Authorization": f"Bearer {Config.GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json",
     }
     data = {"name": repo_name, "private": True, "auto_init": True}
 
     try:
-        r = requests.post(url, headers=headers, json=data, timeout=config.REQUEST_TIMEOUT)
+        r = requests.post(url, headers=headers, json=data, timeout=Config.REQUEST_TIMEOUT)
         r.raise_for_status()
         repo_data = r.json()
         logger.info(f"📦 Репозиторий создан: {repo_data['html_url']}")
@@ -58,16 +58,16 @@ def push_to_github(repo_name: str, file_path: str, content: str, commit_msg: str
         logger.info(f"📂 Пропущен пуш директории {file_path}")
         return True
 
-    url = f"https://api.github.com/repos/{config.GITHUB_USER}/{repo_name}/contents/{file_path}"
+    url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{file_path}"
     headers = {
-        "Authorization": f"Bearer {config.GITHUB_TOKEN}",
+        "Authorization": f"Bearer {Config.GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json",
     }
 
     try:
         # Check if file exists
         sha = None
-        check = requests.get(url, headers=headers, timeout=config.REQUEST_TIMEOUT)
+        check = requests.get(url, headers=headers, timeout=Config.REQUEST_TIMEOUT)
         if check.status_code == 200:
             sha = check.json().get("sha")
 
@@ -80,7 +80,7 @@ def push_to_github(repo_name: str, file_path: str, content: str, commit_msg: str
             data["sha"] = sha
 
         # Upload/update file
-        r = requests.put(url, headers=headers, json=data, timeout=config.REQUEST_TIMEOUT)
+        r = requests.put(url, headers=headers, json=data, timeout=Config.REQUEST_TIMEOUT)
         r.raise_for_status()
 
         action = "обновлён" if sha else "создан новый файл"
@@ -149,7 +149,7 @@ def run_architect(project_description: str) -> None:
 
     try:
         # Generate project architecture
-        architect = genai.GenerativeModel(config.GEMINI_MODEL)
+        architect = genai.GenerativeModel(Config.GEMINI_MODEL)
         structure = generate_project_structure(architect, project_description)
 
         logger.info(f"🏗️ Проект: {structure['project_type']}")
@@ -221,7 +221,7 @@ def generate_project_structure(architect, project_description: str) -> Dict[str,
     Keep modules limited (max 8 per phase) and focused on core functionality.
     """
 
-    for attempt in range(config.MAX_RETRIES):
+    for attempt in range(Config.MAX_RETRIES):
         try:
             response = architect.generate_content(plan_prompt)
             text = clean_json_response(response.text or "")
@@ -232,8 +232,8 @@ def generate_project_structure(architect, project_description: str) -> Dict[str,
 
         except (json.JSONDecodeError, ValueError) as e:
             logger.warning(f"⚠️ Attempt {attempt + 1} failed: {e}")
-            if attempt == config.MAX_RETRIES - 1:
-                raise Exception(f"Failed to generate valid project structure after {config.MAX_RETRIES} attempts")
+            if attempt == Config.MAX_RETRIES - 1:
+                raise Exception(f"Failed to generate valid project structure after {Config.MAX_RETRIES} attempts")
 
     raise Exception("Unexpected error in structure generation")
 
