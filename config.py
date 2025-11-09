@@ -68,6 +68,9 @@ class Config:
     @classmethod
     def validate(cls):
         """Validate required environment variables"""
+        print(f"🔧 Config validation - MODE: {cls.MODE}, TEST_MODE: {cls.AGENT_B_TEST_MODE}")
+        print(f"🔧 Environment vars - GITHUB_USER: {'***' if cls.GITHUB_USER else 'NOT SET'}, GITHUB_TOKEN: {'***' if cls.GITHUB_TOKEN else 'NOT SET'}")
+
         required_vars = []
 
         # Agent A required vars
@@ -83,12 +86,15 @@ class Config:
 
         # Agent B required vars (only if not in test mode)
         if not cls.AGENT_B_TEST_MODE:
+            print("🔧 Agent B not in test mode - validating GitHub credentials")
             if not cls.GEMINI_API_KEY:
                 required_vars.append("GEMINI_API_KEY")
             if not cls.GITHUB_USER:
                 required_vars.append("GITHUB_USER")
             if not cls.GITHUB_TOKEN:
                 required_vars.append("GITHUB_TOKEN")
+        else:
+            print("🔧 Agent B in test mode - skipping GitHub validation")
 
         if required_vars:
             raise ValueError(f"Missing required environment variables: {', '.join(required_vars)}")
