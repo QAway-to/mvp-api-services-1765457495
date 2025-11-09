@@ -11,9 +11,11 @@ from pathlib import Path
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
 
-# Add agent_a to Python path
+# Add agent directories to Python path
 agent_a_dir = current_dir / "agent_a"
+agent_b_dir = current_dir / "agent_b"
 sys.path.insert(0, str(agent_a_dir))
+sys.path.insert(0, str(agent_b_dir))
 
 try:
     # Import and run Agent A application

@@ -724,7 +724,7 @@ class AgentA:
             log_agent_action("Agent A", f"⚠️ [SELENIUM] No projects found with proposal button available")
             return []
 
-    def evaluate_and_notify(self, projects: List[Dict[str, Any]]):
+    async def evaluate_and_notify(self, projects: List[Dict[str, Any]]):
         """Evaluate projects and send notifications - projects are already evaluated in _search_real_projects"""
         log_agent_action("Agent A", f"📊 [EVALUATION] Processing {len(projects)} pre-evaluated projects...")
         log_agent_action("Agent A", f"📊 [EVALUATION] Threshold: {config.EVALUATION_THRESHOLD}")
@@ -746,10 +746,11 @@ class AgentA:
                     log_agent_action("Agent A", f"✅ [EVALUATION] Project APPROVED: {project['title'][:50]}... (score: {score:.2f})")
                     log_agent_action("Agent A", f"📋 [EVALUATION] Reasons: {', '.join(reasons[:3])}")
 
-                    # Send to Telegram immediately when project is found
+                    # Send to Telegram immediately when project is found (sequential)
                     if self.telegram:
                         log_agent_action("Agent A", f"📱 [TELEGRAM] Sending notification for suitable project: {project['title'][:50]}...")
-                        asyncio.create_task(self.telegram.send_project_notification(project))
+                        # Wait for notification to complete before processing next project
+                        await self.telegram.send_project_notification(project)
                 else:
                     log_agent_action("Agent A", f"❌ [EVALUATION] Project REJECTED: {project['title'][:50]}... (score: {score:.2f} < {config.EVALUATION_THRESHOLD})")
 
@@ -793,7 +794,7 @@ class AgentA:
                 # Step 2: Send notifications for suitable projects
                 step_start = datetime.now()
                 log_agent_action("Agent A", f"📊 [SESSION] Step 2/2: Sending notifications for {len(projects)} projects...")
-                self.evaluate_and_notify(projects)
+                await self.evaluate_and_notify(projects)
                 step_duration = (datetime.now() - step_start).total_seconds()
                 log_agent_action("Agent A", f"✅ [SESSION] Step 2/2 completed: Notifications sent in {step_duration:.2f}s")
             else:
