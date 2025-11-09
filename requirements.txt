@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+# === Core Dependencies ===
+=======
+>>>>>>> 9da0c3e (Initial MVP implementation with real-time dashboard)
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 selenium==4.15.2
@@ -9,6 +13,22 @@ python-dotenv==1.0.0
 rich==13.7.0
 jinja2==3.1.2
 aiofiles==23.2.1
+<<<<<<< HEAD
 aiohttp==3.9.1
 google-generativeai>=0.3.0
 numpy>=1.24.0
+requests>=2.32.3
+
+# === Development & Testing ===
+pytest>=8.3.3
+pytest-asyncio>=0.23.8
+coverage>=7.6.2
+
+# === Agent B Specific ===
+asyncio-mqtt>=0.16.1
+
+# === Optional ===
+# For Vercel deployment monitoring
+# vercel>=2.0.0
+=======
+>>>>>>> 9da0c3e (Initial MVP implementation with real-time dashboard)

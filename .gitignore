@@ -19,6 +19,14 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+<<<<<<< HEAD
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+=======
 MANIFEST
 
 # Virtual environments
@@ -29,6 +37,7 @@ ENV/
 .env
 .env.local
 .env.production
+>>>>>>> 9da0c3e (Initial MVP implementation with real-time dashboard)
 
 # IDE
 .vscode/
@@ -39,22 +48,27 @@ ENV/
 
 # OS
 .DS_Store
+<<<<<<< HEAD
+=======
 .DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
 ehthumbs.db
+>>>>>>> 9da0c3e (Initial MVP implementation with real-time dashboard)
 Thumbs.db
 
 # Logs
 *.log
 logs/
+<<<<<<< HEAD
 ai_agent.log
 
 # Environment variables
 .env
 .env.local
 .env.production
+=======
 
 # Browser data
 browser-logs/
@@ -66,12 +80,14 @@ geckodriver/
 *.temp
 temp/
 tmp/
+>>>>>>> 9da0c3e (Initial MVP implementation with real-time dashboard)
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
 
+<<<<<<< HEAD
 # Temporary files
 tmp/
 temp/
@@ -81,7 +97,6 @@ temp/
 node_modules/
 .next/
 out/
-npm-debug.log*
 
 # Chrome/Selenium
 chromedriver
@@ -95,6 +110,11 @@ secrets/
 credentials/
 *.key
 *.pem
+=======
+# Node.js (if any)
+node_modules/
+npm-debug.log*
 
 # Render
 .render/
+>>>>>>> 9da0c3e (Initial MVP implementation with real-time dashboard)
