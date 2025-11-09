@@ -11,7 +11,7 @@ import json
 # Import from root config (unified configuration)
 from config import config
 from agents.agent_a import AgentA
-from utils.logger import setup_logging, log_queue, log_agent_action
+from shared_logger import setup_logging, log_queue, log_agent_action
 
 # Setup logging
 setup_logging()
