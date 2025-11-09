@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import StreamingResponse
 import logging
 import json
+from datetime import datetime
 
 # Import from root config (unified configuration)
 from config import config
@@ -39,45 +40,41 @@ async def dashboard(request: Request):
 
 @app.get("/logs/stream")
 async def stream_logs():
-    """Server-Sent Events for real-time logs - optimized for streaming"""
+    """Server-Sent Events for real-time logs with paced delivery"""
     async def event_generator():
         while True:
             try:
-                # Rapidly read all available messages from queue
-                batch = []
-                max_batch = 200  # Read up to 200 messages at once
-                
-                # Collect all available messages immediately
-                while len(batch) < max_batch:
-                    try:
-                        log_message = log_queue.get_nowait()
-                        batch.append(log_message)
-                    except asyncio.QueueEmpty:
-                        break
-                
-                # Send all collected messages one by one (for streaming effect)
-                for log_message in batch:
-                    yield f"data: {log_message}\n\n"
-                    # Minimal delay - just enough to allow browser to process
-                    if len(batch) > 1:
-                        await asyncio.sleep(0.0001)  # Very small delay for streaming
-                
-                # If we sent messages, check again immediately
-                if batch:
-                    continue
-                
-                # No messages available - wait briefly for new messages
                 try:
-                    log_message = await asyncio.wait_for(log_queue.get(), timeout=0.01)
+                    # Wait for the next log line with timeout to send keepalives
+                    log_message = await asyncio.wait_for(log_queue.get(), timeout=1.0)
                     yield f"data: {log_message}\n\n"
+                    await asyncio.sleep(0.05)  # brief pause for step-by-step effect
+
+                    # Drain additional buffered messages, but keep short delays
+                    drained = 0
+                    while drained < 20:
+                        try:
+                            buffered_message = log_queue.get_nowait()
+                            yield f"data: {buffered_message}\n\n"
+                            drained += 1
+                            await asyncio.sleep(0.05)
+                        except asyncio.QueueEmpty:
+                            break
+
                 except asyncio.TimeoutError:
-                    # Send keepalive to maintain connection
-                    yield f": keepalive\n\n"
-                    await asyncio.sleep(0.05)  # Very short wait
-                    
+                    # Send keepalive comment so connection stays open
+                    yield ": keepalive\n\n"
+                    await asyncio.sleep(0.1)
+
             except Exception as e:
-                yield f"data: {{\"error\": \"{str(e)}\"}}\n\n"
-                await asyncio.sleep(0.1)
+                error_payload = json.dumps({
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "level": "ERROR",
+                    "module": "logs",
+                    "message": f"Stream error: {str(e)}"
+                })
+                yield f"data: {error_payload}\n\n"
+                await asyncio.sleep(0.5)
 
     return StreamingResponse(
         event_generator(),
@@ -85,7 +82,7 @@ async def stream_logs():
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
+            "X-Accel-Buffering": "no",
         }
     )
 
@@ -157,7 +154,6 @@ async def stop_agent():
 @app.get("/status")
 async def get_status():
     """Get current agent status"""
-    from datetime import datetime
     
     session_info = None
     if agent_a.current_session_start:
@@ -182,24 +178,6 @@ async def get_status():
         "search_keyword": config.SEARCH_KEYWORD
     }
 
-@app.post("/webhook/n8n")
-async def n8n_webhook(request: Request):
-    """Webhook endpoint for n8n to trigger agent actions"""
-    try:
-        data = await request.json()
-        action = data.get("action", "")
-        
-        if action == "start":
-            asyncio.create_task(agent_a.run_continuous())
-            return {"status": "started", "message": "Agent A started via n8n webhook"}
-        elif action == "stop":
-            await agent_a.stop()
-            return {"status": "stopped", "message": "Agent A stopped via n8n webhook"}
-        else:
-            return {"status": "error", "message": f"Unknown action: {action}"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
 @app.get("/projects")
 async def get_projects():
     """Get list of all found projects"""
@@ -211,6 +189,7 @@ async def get_projects():
         "projects": agent_a.found_projects
     }
 
+
 @app.get("/projects/suitable")
 async def get_suitable_projects():
     """Get only suitable projects"""
@@ -219,56 +198,6 @@ async def get_suitable_projects():
         "total": len(suitable),
         "projects": suitable
     }
-
-@app.post("/webhook/n8n/projects")
-async def n8n_projects_webhook(request: Request):
-    """Webhook endpoint for n8n to get projects data"""
-    try:
-        data = await request.json()
-        action = data.get("action", "all")  # all, suitable, or specific project_id
-
-        if action == "suitable":
-            # Return only suitable projects
-            suitable = [p for p in agent_a.found_projects if p.get('evaluation', {}).get('suitable', False)]
-            return {
-                "status": "success",
-                "total": len(suitable),
-                "projects": suitable
-            }
-        elif action == "all":
-            # Return all projects
-            suitable_count = len([p for p in agent_a.found_projects if p.get('evaluation', {}).get('suitable', False)])
-            return {
-                "status": "success",
-                "total": len(agent_a.found_projects),
-                "suitable": suitable_count,
-                "projects": agent_a.found_projects
-            }
-        elif action == "get" and data.get("project_id"):
-            # Return specific project
-            project_id = data.get("project_id")
-            project = next((p for p in agent_a.found_projects if p.get("id") == project_id), None)
-            if project:
-                return {
-                    "status": "success",
-                    "project": project
-                }
-            else:
-                return {
-                    "status": "not_found",
-                    "message": f"Project with ID {project_id} not found"
-                }
-        else:
-            return {
-                "status": "error",
-                "message": "Invalid action. Use 'all', 'suitable', or 'get' with project_id"
-            }
-    except Exception as e:
-        log_agent_action("API", f"Error in n8n projects webhook: {str(e)}")
-        return {
-            "status": "error",
-            "message": str(e)
-        }
 
 # MVP Generation API
 @app.post("/api/generate-mvp")

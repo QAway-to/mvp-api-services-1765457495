@@ -129,8 +129,7 @@ MODE=demo  # или full для реального использования
 SEARCH_KEYWORD=бот
 PORT=8000  # Render автоматически установит PORT
 
-# Опциональные (для полной интеграции)
-N8N_WEBHOOK_URL=https://your-n8n-instance.com/webhook/freelance-project
+# Опциональные параметры
 TELEGRAM_BOT_TOKEN=your_token
 TELEGRAM_CHANNEL_ID=@your_channel
 
@@ -180,40 +179,6 @@ MODE=demo  # для тестирования без браузера
 2. Проверьте, что установлен Starter план или выше
 3. Проверьте логи в Render Dashboard для деталей ошибки
 4. Убедитесь, что `MODE=full` установлен в переменных окружения
-
-## 🔗 Интеграция с n8n (Agent B)
-
-Agent A автоматически отправляет подходящие проекты в n8n workflow через webhook.
-
-### Настройка n8n workflow:
-
-1. **Создайте webhook в n8n:**
-   - Добавьте ноду "Webhook"
-   - Скопируйте URL webhook
-   - Добавьте его в Render переменные окружения: `N8N_WEBHOOK_URL`
-
-2. **Структура данных, отправляемых в n8n:**
-```json
-{
-  "project_id": "demo_1",
-  "title": "Создать Telegram бота...",
-  "description": "Описание проекта...",
-  "budget": "15 000 ₽",
-  "url": "https://kwork.ru/projects/...",
-  "evaluation": {
-    "score": 0.87,
-    "reasons": ["Bot-related keywords found", ...],
-    "suitable": true
-  },
-  "found_at": "2025-11-07T21:40:00",
-  "status": "pending_review"
-}
-```
-
-3. **API endpoints для управления:**
-   - `POST /webhook/n8n` - Управление агентом из n8n (start/stop)
-   - `GET /status` - Статус агента
-   - `GET /health` - Health check
 
 ## 📊 Dashboard
 
