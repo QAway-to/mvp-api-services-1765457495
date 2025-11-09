@@ -1,0 +1,31 @@
+# === AGENT A (Freelance Search) ===
+MODE=full
+SEARCH_KEYWORDS=бот,данные,скрипт,скрипты,сканер,парсер,api,интеграция
+KWORK_EMAIL=your_email@kwork.ru
+KWORK_PASSWORD=your_password
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHANNEL_ID=@your_channel
+
+# === AGENT B (MVP Generation) ===
+GEMINI_API_KEY=your_gemini_api_key
+GITHUB_USER=your_github_user
+GITHUB_TOKEN=your_github_token
+AGENT_B_TEST_MODE=true
+AGENT_B_TEST_REPO=ai-mvp-test
+
+# === SHARED SETTINGS ===
+LOG_LEVEL=INFO
+MAX_RETRIES=3
+REQUEST_TIMEOUT=30
+
+# === DATABASE ===
+DATABASE_URL=sqlite:///freelance_agent.db
+
+# === QUEUE SETTINGS ===
+MAX_CONCURRENT_MVPS=2
+
+# === OPTIONAL ===
+# N8N_WEBHOOK_URL=https://your-n8n-instance.com/webhook/freelance-project
+# VERCEL_DEPLOY_HOOK=https://api.vercel.com/v1/integrations/deploy/your-hook-id
+# SEMANTIC_SIMILARITY_THRESHOLD=0.75
+# EVALUATION_THRESHOLD=0.4
