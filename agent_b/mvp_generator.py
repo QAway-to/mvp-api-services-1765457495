@@ -26,7 +26,23 @@ class MVPGenerator:
     def __init__(self):
         self.template_selector = AITemplateSelector()
         self.templates_dir = Path(__file__).parent / "mvp_templates"
-    
+
+    def _wait_for_repo_ready(self, repo_name: str, headers: Dict[str, str], branch: str = "main", timeout: int = 60) -> None:
+        """Wait until GitHub branch/contents are accessible (helps Vercel pick up repo)."""
+        branch_url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/branches/{branch}"
+        pkg_url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/package.json"
+
+        start = time.time()
+        while time.time() - start < timeout:
+            branch_resp = requests.get(branch_url, headers=headers, timeout=Config.REQUEST_TIMEOUT)
+            if branch_resp.status_code == 200 and branch_resp.json().get("commit", {}).get("sha"):
+                pkg_resp = requests.get(pkg_url, headers=headers, timeout=Config.REQUEST_TIMEOUT)
+                if pkg_resp.status_code in (200, 404):
+                    return
+            time.sleep(2)
+
+        raise RuntimeError(f"GitHub repo '{repo_name}' is not ready within {timeout}s")
+
     def _raise_for_status_verbose(self, resp: Response, context: str):
         """Log verbose HTTP error details before raising."""
         try:
@@ -183,6 +199,8 @@ class MVPGenerator:
 
         # Ensure project linked with GitHub repo
         await asyncio.to_thread(self._ensure_vercel_project, project_name, repo_name)
+        # Give Vercel a short moment to pick up freshly linked GitHub repo
+        await asyncio.sleep(2)
         # Trigger deployment and wait until ready
         deploy_url = await asyncio.to_thread(self._create_vercel_deployment, project_name, repo_name)
         return deploy_url
@@ -203,6 +221,8 @@ class MVPGenerator:
 
         log_agent_action("Agent B", f"📤 Uploading {project_path} to {repo_name}")
         self._upload_directory(repo_name, project_path, headers, branch, project_name)
+        # Ensure GitHub returns latest commits/contents before Vercel deploy
+        self._wait_for_repo_ready(repo_name, headers, branch)
 
     def _ensure_repository(self, repo_name: str, headers: Dict[str, str]) -> Dict[str, Any]:
         """Ensure repository exists. Create if needed (only in non-test mode)."""
@@ -355,7 +375,8 @@ class MVPGenerator:
             "source": "git",
             "gitSource": {
                 "type": "github",
-                "repoId": f"{Config.GITHUB_USER}/{repo_name}",
+                "org": Config.GITHUB_USER,
+                "repo": repo_name,
                 "ref": "main"
             }
         }
