@@ -6,6 +6,7 @@ import shutil
 import time
 import logging
 import base64
+import json
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
@@ -28,29 +29,26 @@ class MVPGenerator:
     async def generate_mvp(self, project_description: str) -> Dict[str, Any]:
         """Generate MVP application based on project description"""
         try:
-            log_agent_action("Agent B", f"🎯 Starting MVP generation for: {project_description[:100]}...")
+            log_agent_action("Agent B", f"🎯 Starting MVP generation...")
 
             # 1. Select template using AI
             template_match = await self.template_selector.select_template(project_description)
             template_id = template_match.template_id
 
-            log_agent_action("Agent B", f"✅ Selected template: {template_id} (confidence: {template_match.confidence:.2f})")
-
-            # 2. Generate unique project name (used for repo when not in test mode)
+            # 2. Generate unique project name
             project_name = self._generate_project_name(template_id)
             repo_name = Config.AGENT_B_TEST_REPO if Config.AGENT_B_TEST_MODE else project_name
-            log_agent_action("Agent B", f"📁 Project name: {project_name} | Repository: {repo_name}")
 
             # 3. Copy and customize template
             await self._create_project_from_template(template_id, project_name, project_description)
 
-            # 4. Push to GitHub (creates or updates repository)
+            # 4. Push to GitHub
             github_url = await self._push_to_github(project_name, repo_name)
 
             # 5. Trigger Vercel deployment
             deploy_url = await self._deploy_to_vercel(project_name, repo_name, github_url)
 
-            log_agent_action("Agent B", f"🎉 MVP successfully generated: {deploy_url}")
+            log_agent_action("Agent B", f"✅ MVP created: {deploy_url}")
 
             return {
                 "status": "success",
@@ -137,8 +135,6 @@ class MVPGenerator:
 
     async def _push_to_github(self, project_name: str, repo_name: str) -> str:
         """Push project to GitHub (supports reusable or per-project repositories)"""
-        log_agent_action("Agent B", f"🚀 Preparing GitHub repository {repo_name}...")
-
         if not Config.GITHUB_USER or not Config.GITHUB_TOKEN:
             raise RuntimeError("GitHub credentials are not configured")
 
@@ -150,22 +146,17 @@ class MVPGenerator:
         await asyncio.to_thread(self._sync_repository, repo_name, project_path, project_name)
 
         github_url = f"https://github.com/{Config.GITHUB_USER}/{repo_name}"
-        log_agent_action("Agent B", f"✅ Repository synced: {github_url}")
         return github_url
 
     async def _deploy_to_vercel(self, project_name: str, repo_name: str, github_url: str) -> str:
         """Deploy to Vercel via REST API project creation."""
-        log_agent_action("Agent B", f"🎯 Deploying {project_name} to Vercel...")
-
         if not Config.VERCEL_TOKEN:
-            log_agent_action("Agent B", "⚠️ Vercel token not configured. Skipping automatic deployment.")
             fallback_url = f"https://{project_name}.vercel.app"
             return fallback_url
 
         project_info = await asyncio.to_thread(self._ensure_vercel_project, project_name, repo_name)
         alias_url = self._extract_vercel_domain(project_info, project_name)
 
-        log_agent_action("Agent B", f"✅ Vercel project ready: {alias_url}")
         return alias_url
 
     def _sync_repository(self, repo_name: str, project_path: Path, project_name: str) -> None:

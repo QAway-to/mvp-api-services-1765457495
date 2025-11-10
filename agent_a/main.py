@@ -210,27 +210,18 @@ async def generate_mvp(request: Request):
         build_type = data.get("buildType", "mock")
 
         if not template:
-            return {
-                "status": "error",
-                "error": "Не выбран шаблон MVP"
-            }
+            return {"status": "error", "error": "Не выбран шаблон MVP"}
 
         if description and len(description) < 10:
-            return {
-                "status": "error",
-                "error": "Описание проекта слишком короткое (минимум 10 символов)"
-            }
+            return {"status": "error", "error": "Описание проекта слишком короткое (минимум 10 символов)"}
 
-        log_agent_action("MVP", f"🎯 Starting MVP generation - Template: {template}, Build: {build_type}")
-        if description:
-            log_agent_action("MVP", f"📝 Description: {description[:100]}...")
+        log_agent_action("MVP", f"🎯 Generating MVP: {template}")
 
         # Import and use MVP generator
         try:
             from mvp_generator import MVPGenerator
             generator = MVPGenerator()
 
-            # For now, create a description from template if none provided
             if not description:
                 template_descriptions = {
                     "telegram-shop-bot": "Создать Telegram бота для интернет-магазина с каталогом товаров, корзиной и оформлением заказов",
@@ -241,8 +232,7 @@ async def generate_mvp(request: Request):
                 description = template_descriptions.get(template, f"Создать MVP на основе шаблона {template}")
 
             result = await generator.generate_mvp(description)
-
-            log_agent_action("MVP", f"✅ MVP successfully generated: {result['deploy_url']}")
+            log_agent_action("MVP", f"✅ MVP created: {result['deploy_url']}")
 
             return {
                 "status": "success",
@@ -256,41 +246,25 @@ async def generate_mvp(request: Request):
 
         except ImportError:
             # Fallback to mock response if Agent B is not available
-            log_agent_action("MVP", "⚠️ Agent B not available, using mock generation")
+            log_agent_action("MVP", "⚠️ Agent B not available, using mock mode")
 
-            import asyncio
             import time
-
-            log_agent_action("MVP", f"🤖 AI analyzing template: {template}...")
-            await asyncio.sleep(1)
-            log_agent_action("MVP", f"✅ Template confirmed: {template}")
-
-            await asyncio.sleep(1)
-            log_agent_action("MVP", f"🔧 Generating {build_type} MVP from template...")
-
-            await asyncio.sleep(1)
-            log_agent_action("MVP", f"🚀 Pushing to GitHub repository...")
-
-            await asyncio.sleep(1)
-            log_agent_action("MVP", f"🎉 Deploying to Vercel...")
+            await asyncio.sleep(3)  # Simulate work
 
             deploy_url = f"https://ai-mvp-{template}-{int(time.time())}.vercel.app"
-            log_agent_action("MVP", f"✅ MVP successfully generated and deployed: {deploy_url}")
+            log_agent_action("MVP", f"✅ MVP created (mock): {deploy_url}")
 
             return {
                 "status": "success",
                 "template": template,
                 "deployUrl": deploy_url,
                 "buildType": build_type,
-                "message": f"MVP успешно создан и развернут (mock mode)"
+                "message": f"MVP успешно создан (mock mode)"
             }
 
     except Exception as e:
         log_agent_action("MVP", f"❌ MVP generation failed: {str(e)}")
-        return {
-            "status": "error",
-            "error": str(e)
-        }
+        return {"status": "error", "error": str(e)}
 
 @app.get("/health")
 async def health_check():
