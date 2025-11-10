@@ -36,18 +36,19 @@ class MVPGenerator:
 
             log_agent_action("Agent B", f"✅ Selected template: {template_id} (confidence: {template_match.confidence:.2f})")
 
-            # 2. Generate unique project name
+            # 2. Generate unique project name (used for repo when not in test mode)
             project_name = self._generate_project_name(template_id)
-            log_agent_action("Agent B", f"📁 Project name: {project_name}")
+            repo_name = Config.AGENT_B_TEST_REPO if Config.AGENT_B_TEST_MODE else project_name
+            log_agent_action("Agent B", f"📁 Project name: {project_name} | Repository: {repo_name}")
 
             # 3. Copy and customize template
             await self._create_project_from_template(template_id, project_name, project_description)
 
-            # 4. Push to GitHub (mock for now)
-            github_url = await self._push_to_github(project_name)
+            # 4. Push to GitHub (creates or updates repository)
+            github_url = await self._push_to_github(project_name, repo_name)
 
-            # 5. Deploy to Vercel (mock for now)
-            deploy_url = await self._deploy_to_vercel(project_name, github_url)
+            # 5. Trigger Vercel deployment
+            deploy_url = await self._deploy_to_vercel(project_name, repo_name, github_url)
 
             log_agent_action("Agent B", f"🎉 MVP successfully generated: {deploy_url}")
 
@@ -55,6 +56,7 @@ class MVPGenerator:
                 "status": "success",
                 "template": template_id,
                 "project_name": project_name,
+                "repository": repo_name,
                 "github_url": github_url,
                 "deploy_url": deploy_url,
                 "confidence": template_match.confidence,
@@ -133,55 +135,38 @@ class MVPGenerator:
 
         log_agent_action("Agent B", "✅ Project customization completed")
 
-    async def _push_to_github(self, project_name: str) -> str:
-        """Push project to GitHub (supports reusable test repository)"""
-        log_agent_action("Agent B", f"🚀 Pushing {project_name} to GitHub...")
+    async def _push_to_github(self, project_name: str, repo_name: str) -> str:
+        """Push project to GitHub (supports reusable or per-project repositories)"""
+        log_agent_action("Agent B", f"🚀 Preparing GitHub repository {repo_name}...")
 
         if not Config.GITHUB_USER or not Config.GITHUB_TOKEN:
             raise RuntimeError("GitHub credentials are not configured")
 
-        repo_name = Config.AGENT_B_TEST_REPO if Config.AGENT_B_TEST_MODE else project_name
         project_path = self.templates_dir.parent / "generated" / project_name
 
         if not project_path.exists():
             raise FileNotFoundError(f"Generated project folder not found: {project_path}")
 
-        # Run sync in thread to avoid blocking event loop
         await asyncio.to_thread(self._sync_repository, repo_name, project_path, project_name)
 
         github_url = f"https://github.com/{Config.GITHUB_USER}/{repo_name}"
-        log_agent_action("Agent B", f"✅ Pushed to GitHub: {github_url}")
+        log_agent_action("Agent B", f"✅ Repository synced: {github_url}")
         return github_url
 
-    async def _deploy_to_vercel(self, project_name: str, github_url: str) -> str:
-        """Deploy to Vercel via deploy hook (optional)."""
+    async def _deploy_to_vercel(self, project_name: str, repo_name: str, github_url: str) -> str:
+        """Deploy to Vercel via REST API project creation."""
         log_agent_action("Agent B", f"🎯 Deploying {project_name} to Vercel...")
 
-        deploy_url = None
-        if Config.VERCEL_PROJECT_DOMAIN:
-            deploy_url = f"https://{Config.VERCEL_PROJECT_DOMAIN}"
+        if not Config.VERCEL_TOKEN:
+            log_agent_action("Agent B", "⚠️ Vercel token not configured. Skipping automatic deployment.")
+            fallback_url = f"https://{project_name}.vercel.app"
+            return fallback_url
 
-        if Config.VERCEL_DEPLOY_HOOK_URL:
-            try:
-                response = requests.post(
-                    Config.VERCEL_DEPLOY_HOOK_URL,
-                    json={"trigger": project_name, "source": "agent-b"},
-                    timeout=Config.REQUEST_TIMEOUT,
-                )
-                response.raise_for_status()
-                log_agent_action("Agent B", "✅ Vercel deploy hook triggered")
-            except requests.RequestException as exc:
-                log_agent_action("Agent B", f"⚠️ Failed to trigger Vercel deploy hook: {exc}")
-        else:
-            log_agent_action("Agent B", "⚠️ Vercel deploy hook URL not configured. Skipping automatic deploy.")
+        project_info = await asyncio.to_thread(self._ensure_vercel_project, project_name, repo_name)
+        alias_url = self._extract_vercel_domain(project_info, project_name)
 
-        # Fallback demo URL if project domain not provided
-        if not deploy_url:
-            deploy_url = f"https://{project_name}.vercel.app"
-
-        await asyncio.sleep(2)
-        log_agent_action("Agent B", f"🎉 Deployed to Vercel: {deploy_url}")
-        return deploy_url
+        log_agent_action("Agent B", f"✅ Vercel project ready: {alias_url}")
+        return alias_url
 
     def _sync_repository(self, repo_name: str, project_path: Path, project_name: str) -> None:
         """Synchronize generated project with GitHub repository."""
@@ -208,16 +193,23 @@ class MVPGenerator:
         if response.status_code == 200:
             return response.json()
 
-        if Config.AGENT_B_TEST_MODE:
-            raise RuntimeError(f"GitHub repository '{repo_name}' not found. Create it manually for test mode.")
-
         log_agent_action("Agent B", f"📦 Repository {repo_name} not found. Creating...")
+        create_payload = {
+            "name": repo_name,
+            "auto_init": True,
+            "private": False if Config.AGENT_B_TEST_MODE else True,
+            "description": "Auto-generated by Agent B"
+        }
         create_resp = requests.post(
             "https://api.github.com/user/repos",
             headers=headers,
-            json={"name": repo_name, "private": False},
+            json=create_payload,
             timeout=Config.REQUEST_TIMEOUT,
         )
+        if create_resp.status_code == 422:
+            # Repository may exist under different visibility settings
+            log_agent_action("Agent B", f"⚠️ Repository {repo_name} already exists but could not be fetched; continuing")
+            return {"name": repo_name, "default_branch": "main"}
         create_resp.raise_for_status()
         return create_resp.json()
 
@@ -249,6 +241,13 @@ class MVPGenerator:
         project_name: str,
     ) -> None:
         for file_path in project_path.rglob('*'):
+            if file_path.is_dir():
+                continue
+
+            parts = file_path.relative_to(project_path).parts
+            if parts and parts[0] in {'.git', '.next', 'node_modules'}:
+                continue
+
             if file_path.is_file():
                 relative_path = file_path.relative_to(project_path).as_posix()
                 url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{relative_path}"
@@ -277,3 +276,64 @@ class MVPGenerator:
             return []
         resp.raise_for_status()
         return resp.json()
+
+    def _ensure_vercel_project(self, project_name: str, repo_name: str) -> Dict[str, Any]:
+        """Create Vercel project if needed and return project metadata."""
+        headers = {
+            "Authorization": f"Bearer {Config.VERCEL_TOKEN}",
+            "Content-Type": "application/json",
+        }
+        params = {}
+        if Config.VERCEL_TEAM_ID:
+            params["teamId"] = Config.VERCEL_TEAM_ID
+
+        project_payload = {
+            "name": project_name,
+            "gitRepository": {
+                "type": "github",
+                "repo": f"{Config.GITHUB_USER}/{repo_name}"
+            }
+        }
+
+        create_resp = requests.post(
+            "https://api.vercel.com/v9/projects",
+            headers=headers,
+            params=params,
+            json=project_payload,
+            timeout=Config.REQUEST_TIMEOUT,
+        )
+
+        if create_resp.status_code == 409:
+            log_agent_action("Agent B", f"ℹ️ Vercel project {project_name} already exists. Fetching metadata...")
+            return self._get_vercel_project(project_name, headers, params)
+
+        create_resp.raise_for_status()
+        log_agent_action("Agent B", f"✅ Vercel project {project_name} created")
+        return create_resp.json()
+
+    def _get_vercel_project(self, project_name: str, headers: Dict[str, str], params: Dict[str, str]) -> Dict[str, Any]:
+        resp = requests.get(
+            f"https://api.vercel.com/v9/projects/{project_name}",
+            headers=headers,
+            params=params,
+            timeout=Config.REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def _extract_vercel_domain(self, project_info: Dict[str, Any], project_name: str) -> str:
+        link = project_info.get("link", {}) if isinstance(project_info, dict) else {}
+        url = link.get("url") or link.get("domain")
+
+        if not url:
+            aliases = project_info.get("alias", []) if isinstance(project_info, dict) else []
+            if isinstance(aliases, list) and aliases:
+                url = aliases[0]
+
+        if not url:
+            url = f"{project_name}.vercel.app"
+
+        if not url.startswith("http"):
+            url = f"https://{url}"
+
+        return url

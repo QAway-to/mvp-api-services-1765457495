@@ -566,9 +566,6 @@ class Dashboard {
         } catch (error) {
             console.error('MVP generation error:', error);
             this.showMVPError(error.message);
-        } finally {
-            this.generateMvpBtn.disabled = false;
-            this.mvpStatus.className = 'mvp-status';
         }
     }
 
@@ -591,12 +588,11 @@ class Dashboard {
                 this.updateMVPStatus();
             }
         }, 3000);
+
+        this.generateMvpBtn.disabled = false;
     }
 
     showMVPError(message) {
-        if (!this.mvpStatus) {
-            return;
-        }
         this.mvpStatus.textContent = `❌ Ошибка: ${message}`;
         this.mvpStatus.className = 'mvp-status error';
 
@@ -607,6 +603,8 @@ class Dashboard {
             message: `❌ MVP generation failed: ${message}`,
             module: 'MVP'
         });
+
+        this.generateMvpBtn.disabled = false;
     }
 
     destroy() {

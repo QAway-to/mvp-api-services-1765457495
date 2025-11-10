@@ -53,9 +53,9 @@ class Config:
     # Semantic evaluation
     SEMANTIC_SIMILARITY_THRESHOLD: float = float(os.getenv("SEMANTIC_SIMILARITY_THRESHOLD", "0.5"))
 
-    # Deployment hooks
-    VERCEL_DEPLOY_HOOK_URL = os.getenv("VERCEL_DEPLOY_HOOK_URL")
-    VERCEL_PROJECT_DOMAIN = os.getenv("VERCEL_PROJECT_DOMAIN")
+    # Deployment integration
+    VERCEL_TOKEN = os.getenv("VERCEL_TOKEN")
+    VERCEL_TEAM_ID = os.getenv("VERCEL_TEAM_ID")
 
     # Search limits
     MAX_PROJECTS_PER_SESSION: int = int(os.getenv('MAX_PROJECTS_PER_SESSION', '5'))
