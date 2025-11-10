@@ -226,8 +226,8 @@ async def generate_mvp(request: Request):
                 template_descriptions = {
                     "telegram-shop-bot": "Создать Telegram бота для интернет-магазина с каталогом товаров, корзиной и оформлением заказов",
                     "news-parser": "Создать веб-приложение для парсинга и анализа новостей с визуализацией данных",
-                    "api-integration": "Создать сервис для интеграции с внешними API с документацией",
-                    "analytics-dashboard": "Создать дашборд для визуализации данных и аналитики бизнеса"
+                    "analytics-dashboard": "Создать дашборд для визуализации данных и аналитики бизнеса",
+                    "email-campaign-manager": "Создать панель управления email-рассылками с SendGrid интеграцией и автоответами"
                 }
                 description = template_descriptions.get(template, f"Создать MVP на основе шаблона {template}")
 

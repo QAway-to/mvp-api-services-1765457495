@@ -79,6 +79,17 @@ class AITemplateSelector:
                 complexity="medium",
                 estimated_completion="70%"
             ),
+
+            # Email marketing
+            "email-campaign-manager": TemplateInfo(
+                id="email-campaign-manager",
+                name="Email Campaign Manager",
+                category="marketing",
+                description="Панель управления email-рассылками с автоматизацией и мониторингом ответов",
+                features=["дашборд кампаний", "ротация шаблонов", "автоответы", "SendGrid интеграция"],
+                complexity="medium",
+                estimated_completion="80%"
+            ),
         }
 
     async def select_template(self, project_description: str) -> TemplateMatch:
@@ -163,6 +174,15 @@ class AITemplateSelector:
         elif "discord" in desc_lower:
             return TemplateMatch("discord-moderation-bot", 0.8, "Keyword match: Discord bot", "discord-bots", ["moderation", "chat"])
 
+        elif "email" in desc_lower or "рассыл" in desc_lower or "campaign" in desc_lower:
+            return TemplateMatch(
+                "email-campaign-manager",
+                0.85,
+                "Keyword match: email/campaign manager",
+                "marketing",
+                ["sendgrid", "templates", "statistics"],
+            )
+
         elif "парсер" in desc_lower or "parser" in desc_lower:
             if "новост" in desc_lower or "news" in desc_lower:
                 return TemplateMatch("news-parser", 0.8, "Keyword match: News parser", "parsers", ["scraping", "news"])
@@ -173,7 +193,7 @@ class AITemplateSelector:
             return TemplateMatch("analytics-dashboard", 0.8, "Keyword match: Analytics dashboard", "analytics", ["charts", "reports"])
 
         else:
-            return TemplateMatch("api-integration", 0.5, "Fallback: General API integration", "integrations", ["api", "webhooks"])
+            return TemplateMatch("analytics-dashboard", 0.5, "Fallback: General analytics dashboard", "analytics", ["charts", "reports"])
 
     def get_template_info(self, template_id: str) -> Optional[TemplateInfo]:
         """Get template information"""

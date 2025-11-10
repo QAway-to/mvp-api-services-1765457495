@@ -8,7 +8,7 @@ import logging
 import base64
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 import requests
 import asyncio
@@ -152,13 +152,13 @@ class MVPGenerator:
     async def _deploy_to_vercel(self, project_name: str, repo_name: str, github_url: str) -> str:
         """Deploy to Vercel via REST API project creation."""
         if not Config.VERCEL_TOKEN:
-            fallback_url = f"https://{project_name}.vercel.app"
-            return fallback_url
+            return f"https://{project_name}.vercel.app"
 
-        project_info = await asyncio.to_thread(self._ensure_vercel_project, project_name, repo_name)
-        alias_url = self._extract_vercel_domain(project_info, project_name)
-
-        return alias_url
+        # Ensure project linked with GitHub repo
+        await asyncio.to_thread(self._ensure_vercel_project, project_name, repo_name)
+        # Trigger deployment and wait until ready
+        deploy_url = await asyncio.to_thread(self._create_vercel_deployment, project_name, repo_name)
+        return deploy_url
 
     def _sync_repository(self, repo_name: str, project_path: Path, project_name: str) -> None:
         """Synchronize generated project with GitHub repository."""
@@ -270,15 +270,19 @@ class MVPGenerator:
         resp.raise_for_status()
         return resp.json()
 
-    def _ensure_vercel_project(self, project_name: str, repo_name: str) -> Dict[str, Any]:
-        """Create Vercel project if needed and return project metadata."""
+    def _vercel_headers_params(self) -> Tuple[Dict[str, str], Dict[str, str]]:
         headers = {
             "Authorization": f"Bearer {Config.VERCEL_TOKEN}",
             "Content-Type": "application/json",
         }
-        params = {}
+        params: Dict[str, str] = {}
         if Config.VERCEL_TEAM_ID:
             params["teamId"] = Config.VERCEL_TEAM_ID
+        return headers, params
+
+    def _ensure_vercel_project(self, project_name: str, repo_name: str) -> Dict[str, Any]:
+        """Create Vercel project if needed and return project metadata."""
+        headers, params = self._vercel_headers_params()
 
         project_payload = {
             "name": project_name,
@@ -313,6 +317,53 @@ class MVPGenerator:
         )
         resp.raise_for_status()
         return resp.json()
+
+    def _create_vercel_deployment(self, project_name: str, repo_name: str) -> str:
+        headers, params = self._vercel_headers_params()
+        payload = {
+            "name": project_name,
+            "project": project_name,
+            "target": "production",
+            "source": "git",
+            "gitSource": {
+                "type": "github",
+                "repoId": f"{Config.GITHUB_USER}/{repo_name}",
+                "ref": "main"
+            }
+        }
+
+        create = requests.post(
+            "https://api.vercel.com/v13/deployments",
+            headers=headers,
+            params=params,
+            json=payload,
+            timeout=Config.REQUEST_TIMEOUT,
+        )
+        create.raise_for_status()
+        deployment = create.json()
+        deployment_id = deployment["id"]
+
+        # Poll status until deployment ready
+        for _ in range(60):
+            status_resp = requests.get(
+                f"https://api.vercel.com/v13/deployments/{deployment_id}",
+                headers=headers,
+                params=params,
+                timeout=Config.REQUEST_TIMEOUT,
+            )
+            status_resp.raise_for_status()
+            status_data = status_resp.json()
+            state = status_data.get("readyState")
+            if state in {"READY", "FROZEN"}:
+                url = status_data.get("url") or deployment.get("url")
+                if url and not url.startswith("http"):
+                    url = f"https://{url}"
+                return url or f"https://{project_name}.vercel.app"
+            if state in {"ERROR", "CANCELED"}:
+                raise RuntimeError(f"Vercel deployment failed: {state}")
+            time.sleep(3)
+
+        return f"https://{project_name}.vercel.app"
 
     def _extract_vercel_domain(self, project_info: Dict[str, Any], project_name: str) -> str:
         link = project_info.get("link", {}) if isinstance(project_info, dict) else {}
