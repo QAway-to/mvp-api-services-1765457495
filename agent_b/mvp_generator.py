@@ -37,8 +37,8 @@ class MVPGenerator:
 
             # 2. Generate unique project name
             project_name = self._generate_project_name(template_id)
-        # Always create a new repository per MVP run (no more single mvp-test reuse)
-        repo_name = project_name
+            # Always create a new repository per MVP run (no more single mvp-test reuse)
+            repo_name = project_name
 
             # 3. Copy and customize template
             await self._create_project_from_template(template_id, project_name, project_description)
