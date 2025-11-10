@@ -33,6 +33,9 @@ class AgentA:
         self.current_session_start = None
         self.current_session_end = None
         self.session_steps: List[Dict[str, Any]] = []
+        # Live streaming of projects during Selenium run
+        self.live_queue = None  # type: ignore
+        self._loop = None  # event loop captured per session for thread-safe puts
 
     def setup_driver(self):
         """Setup stealth browser"""
@@ -468,6 +471,12 @@ class AgentA:
                         }
 
                         all_projects.append(project_data)
+                        # Push to live queue for immediate evaluation/notification (from Selenium thread)
+                        try:
+                            if self.live_queue is not None and self._loop is not None:
+                                asyncio.run_coroutine_threadsafe(self.live_queue.put(project_data), self._loop)
+                        except Exception:
+                            pass
 
                         # Human delay between projects
                         self.human_delay(1, 3)
@@ -565,6 +574,10 @@ class AgentA:
 
     async def run_session(self):
         """Run one search session"""
+        # Prepare live streaming pipeline
+        self.live_queue = asyncio.Queue()
+        self._loop = asyncio.get_running_loop()
+
         session_start = datetime.now()
         self.current_session_start = session_start
         self.session_steps = []
@@ -579,15 +592,16 @@ class AgentA:
         self.last_run_time = datetime.now().isoformat()
 
         try:
-            # Search projects
-            projects = self.search_projects()
+            # Start consumer to evaluate and notify as projects appear
+            consumer_task = asyncio.create_task(self._consume_and_notify_live(max_notifications=5))
+
+            # Run blocking Selenium search off the event loop to avoid blocking notifications
+            projects = await asyncio.to_thread(self.search_projects)
             log_agent_action("Agent A", f"🔍 Found {len(projects)} projects")
 
-            if projects:
-                # Send notifications
-                await self.evaluate_and_notify(projects)
-            else:
-                log_agent_action("Agent A", "⚠️ No projects found")
+            # Signal consumer that producer finished
+            await self.live_queue.put(None)
+            await consumer_task
 
             # Session summary
             session_duration = (datetime.now() - session_start).total_seconds()
@@ -602,6 +616,52 @@ class AgentA:
             self.status = "waiting"
             self.current_session_start = None
             self.current_session_end = None
+            self.live_queue = None
+            self._loop = None
+
+    async def _consume_and_notify_live(self, max_notifications: int = 5):
+        """
+        Consume projects from live_queue, evaluate them, and send Telegram
+        notifications immediately while Selenium continues collecting.
+        """
+        sent = 0
+        live_suitable: List[Dict[str, Any]] = []
+
+        while True:
+            item = await self.live_queue.get()
+            if item is None:
+                break
+
+            try:
+                score, reasons = self.evaluator.evaluate_project(item)
+                item["evaluation"] = {
+                    "score": score,
+                    "reasons": reasons,
+                    "suitable": score >= config.EVALUATION_THRESHOLD
+                }
+
+                if item["evaluation"]["suitable"] and sent < max_notifications:
+                    live_suitable.append(item)
+                    if self.telegram:
+                        await self.telegram.send_project_notification(item)
+                    sent += 1
+
+                    if sent == max_notifications:
+                        # Send summary after the 5th suitable project
+                        summary_stats = {
+                            "checked": len(self.found_projects) + sent,
+                            "suitable": len(self.found_projects) + sent,
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        if self.telegram:
+                            await self.telegram.send_summary_notification(summary_stats)
+                        log_agent_action("Agent A", f"📈 Summary sent: {sent} projects found")
+
+            except Exception as e:
+                log_agent_action("Agent A", f"❌ Live notify error: {str(e)[:80]}")
+
+        # Persist suitable projects discovered live
+        self.found_projects.extend(live_suitable)
 
     async def run_continuous(self):
         """Run continuous monitoring"""
