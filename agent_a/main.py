@@ -263,8 +263,15 @@ async def generate_mvp(request: Request):
             }
 
     except Exception as e:
-        log_agent_action("MVP", f"❌ MVP generation failed: {str(e)}")
-        return {"status": "error", "error": str(e)}
+        # Expand error with possible HTTP response body for diagnostics
+        err_msg = str(e)
+        try:
+            if hasattr(e, "response") and e.response is not None:
+                err_msg = f"{err_msg} | {e.response.text}"
+        except Exception:
+            pass
+        log_agent_action("MVP", f"❌ MVP generation failed: {err_msg}")
+        return {"status": "error", "error": err_msg}
 
 @app.get("/health")
 async def health_check():

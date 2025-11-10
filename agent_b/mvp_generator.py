@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
 import requests
+from requests import Response, exceptions as req_exc
 import asyncio
 
 from template_selector import AITemplateSelector
@@ -25,6 +26,22 @@ class MVPGenerator:
     def __init__(self):
         self.template_selector = AITemplateSelector()
         self.templates_dir = Path(__file__).parent / "mvp_templates"
+    
+    def _raise_for_status_verbose(self, resp: Response, context: str):
+        """Log verbose HTTP error details before raising."""
+        try:
+            body_text = resp.text
+        except Exception:
+            body_text = "<no response text>"
+        # Print to console (helps on Render logs)
+        print("❌", resp.status_code, body_text)
+        # Log to shared logger (UI)
+        try:
+            parsed = resp.json()
+        except Exception:
+            parsed = body_text
+        log_agent_action("Agent B", f"❌ {context} failed: HTTP {resp.status_code} - {parsed}")
+        resp.raise_for_status()
 
     async def generate_mvp(self, project_description: str) -> Dict[str, Any]:
         """Generate MVP application based on project description"""
@@ -62,8 +79,18 @@ class MVPGenerator:
                 "reasoning": template_match.reasoning
             }
 
+        except req_exc.HTTPError as e:
+            detail = ""
+            try:
+                detail = e.response.text  # type: ignore[attr-defined]
+            except Exception:
+                detail = str(e)
+            log_agent_action("Agent B", f"❌ MVP generation failed (HTTP): {detail}")
+            print("❌ HTTPError:", detail)
+            raise
         except Exception as e:
             log_agent_action("Agent B", f"❌ MVP generation failed: {str(e)}")
+            print("❌ Exception:", str(e))
             raise
 
     def _generate_project_name(self, template_id: str) -> str:
@@ -304,7 +331,8 @@ class MVPGenerator:
             log_agent_action("Agent B", f"ℹ️ Vercel project {project_name} already exists. Fetching metadata...")
             return self._get_vercel_project(project_name, headers, params)
 
-        create_resp.raise_for_status()
+        if create_resp.status_code >= 400:
+            self._raise_for_status_verbose(create_resp, "Vercel create project")
         log_agent_action("Agent B", f"✅ Vercel project {project_name} created")
         return create_resp.json()
 
@@ -339,7 +367,8 @@ class MVPGenerator:
             json=payload,
             timeout=Config.REQUEST_TIMEOUT,
         )
-        create.raise_for_status()
+        if create.status_code >= 400:
+            self._raise_for_status_verbose(create, "Vercel create deployment")
         deployment = create.json()
         deployment_id = deployment["id"]
 
@@ -351,7 +380,8 @@ class MVPGenerator:
                 params=params,
                 timeout=Config.REQUEST_TIMEOUT,
             )
-            status_resp.raise_for_status()
+            if status_resp.status_code >= 400:
+                self._raise_for_status_verbose(status_resp, "Vercel deployment status")
             status_data = status_resp.json()
             state = status_data.get("readyState")
             if state in {"READY", "FROZEN"}:
@@ -360,6 +390,12 @@ class MVPGenerator:
                     url = f"https://{url}"
                 return url or f"https://{project_name}.vercel.app"
             if state in {"ERROR", "CANCELED"}:
+                # Emit full status for diagnostics
+                try:
+                    print("❌", state, json.dumps(status_data, ensure_ascii=False))
+                except Exception:
+                    print("❌", state, "<unable to dump status>")
+                log_agent_action("Agent B", f"❌ Vercel deployment failed: {state} - {status_data}")
                 raise RuntimeError(f"Vercel deployment failed: {state}")
             time.sleep(3)
 
