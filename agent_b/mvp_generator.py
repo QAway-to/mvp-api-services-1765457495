@@ -80,7 +80,7 @@ class MVPGenerator:
             github_url = await self._push_to_github(project_name, repo_name)
 
             # 5. Trigger Vercel deployment
-            deploy_url = await self._deploy_to_vercel(project_name, repo_name, github_url)
+            deploy_url = await self._deploy_to_vercel(project_name, repo_name, github_url, template_id)
 
             log_agent_action("Agent B", f"✅ MVP created: {deploy_url}")
 
@@ -192,13 +192,14 @@ class MVPGenerator:
         github_url = f"https://github.com/{Config.GITHUB_USER}/{repo_name}"
         return github_url
 
-    async def _deploy_to_vercel(self, project_name: str, repo_name: str, github_url: str) -> str:
+    async def _deploy_to_vercel(self, project_name: str, repo_name: str, github_url: str, template_id: str) -> str:
         """Deploy to Vercel via REST API project creation."""
         if not Config.VERCEL_TOKEN:
             return f"https://{project_name}.vercel.app"
 
         # Ensure project linked with GitHub repo
-        await asyncio.to_thread(self._ensure_vercel_project, project_name, repo_name)
+        project_info = await asyncio.to_thread(self._ensure_vercel_project, project_name, repo_name)
+        await asyncio.to_thread(self._configure_vercel_envs, project_name, project_info, template_id)
         # Give Vercel a short moment to pick up freshly linked GitHub repo
         await asyncio.sleep(2)
         # Trigger deployment and wait until ready
@@ -438,3 +439,80 @@ class MVPGenerator:
             url = f"https://{url}"
 
         return url
+
+    def _configure_vercel_envs(self, project_name: str, project_info: Dict[str, Any], template_id: str) -> None:
+        """Configure template-specific environment variables on Vercel."""
+        if not Config.VERCEL_TOKEN:
+            return
+
+        if template_id != "mini-etl-pipeline":
+            return
+
+        project_id = project_info.get("id") or project_info.get("projectId") or project_name
+        if not project_id:
+            log_agent_action("Agent B", f"⚠️ Unable to determine Vercel project id for {project_name}, skipping env configuration")
+            return
+
+        spacex_url = Config.SPACEX_API_URL
+        if not spacex_url:
+            log_agent_action("Agent B", "ℹ️ SPACEX_API_URL not set in environment; skipping Vercel env injection")
+            return
+
+        try:
+            self._set_vercel_env_var(project_id, "SPACEX_API_URL", spacex_url)
+            log_agent_action("Agent B", f"🔐 Vercel env configured for {project_name} (SPACEX_API_URL)")
+        except Exception as error:
+            log_agent_action("Agent B", f"❌ Failed to configure Vercel env vars: {error}")
+
+    def _set_vercel_env_var(self, project_id: str, key: str, value: str) -> None:
+        """Create or update a Vercel environment variable (encrypted)."""
+        headers, params = self._vercel_headers_params()
+        base_url = f"https://api.vercel.com/v9/projects/{project_id}/env"
+        payload = {
+            "key": key,
+            "value": value,
+            "type": "encrypted",
+            "target": ["production", "preview"]
+        }
+
+        resp = requests.post(
+            base_url,
+            headers=headers,
+            params=params,
+            json=payload,
+            timeout=Config.REQUEST_TIMEOUT,
+        )
+
+        if resp.status_code == 409:
+            # Environment variable exists — delete and recreate
+            list_resp = requests.get(
+                base_url,
+                headers=headers,
+                params=params,
+                timeout=Config.REQUEST_TIMEOUT,
+            )
+            list_resp.raise_for_status()
+            envs = list_resp.json().get("envs", [])
+            for env in envs:
+                if env.get("key") == key:
+                    env_id = env.get("id")
+                    if not env_id:
+                        continue
+                    delete_resp = requests.delete(
+                        f"{base_url}/{env_id}",
+                        headers=headers,
+                        params=params,
+                        timeout=Config.REQUEST_TIMEOUT,
+                    )
+                    delete_resp.raise_for_status()
+            # Retry create
+            resp = requests.post(
+                base_url,
+                headers=headers,
+                params=params,
+                json=payload,
+                timeout=Config.REQUEST_TIMEOUT,
+            )
+
+        if resp.status_code >= 400:
+            self._raise_for_status_verbose(resp, "Vercel set env var")

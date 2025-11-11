@@ -1,4 +1,6 @@
-import etl from '../src/mock-data/etl.json';
+import Link from 'next/link';
+import etlFallback from '../src/mock-data/etl.json';
+import { loadLaunches, buildMetrics } from '../src/lib/spacex';
 
 const container = {
   fontFamily: 'Inter, sans-serif',
@@ -17,18 +19,18 @@ const card = {
   boxShadow: '0 20px 28px rgba(8, 47, 73, 0.45)'
 };
 
-export default function MiniETL() {
+export default function MiniETL({ metrics, launches }) {
   return (
     <main style={container}>
       <header style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 36, margin: 0 }}>🔄 Mini‑ETL Pipeline</h1>
         <p style={{ color: '#94a3b8', marginTop: 8 }}>
-          Продающая демо-панель конвейера Extract → Transform → Load. В полной версии подключаются Airbyte, dbt, Snowflake.
+          Proof-of-Concept: вытягиваем реальные данные из SpaceX API, прогоняем через шаги Extract → Transform → Load и показываем метрики.
         </p>
       </header>
 
       <section style={{ ...card, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        {etl.pipeline.map((step, idx) => (
+        {etlFallback.pipeline.map((step, idx) => (
           <div
             key={step}
             style={{
@@ -47,23 +49,44 @@ export default function MiniETL() {
       <section style={{ ...card }}>
         <h2 style={{ marginTop: 0 }}>📊 Metrics</h2>
         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-          <Metric label="Rows in" value={etl.metrics.rows_in} />
-          <Metric label="Rows out" value={etl.metrics.rows_out} />
-          <Metric label="Duplicates removed" value={etl.metrics.dedup_removed} />
-          <Metric label="Duration (sec)" value={etl.metrics.duration_sec} />
+          <Metric label="Rows in (launches fetched)" value={metrics.rows_in} />
+          <Metric label="Rows out (successful)" value={metrics.rows_out} />
+          <Metric label="Removed (failed)" value={metrics.dedup_removed} />
+          <Metric label="Upcoming launches" value={metrics.upcoming} />
         </div>
       </section>
 
       <section style={{ ...card }}>
         <h2 style={{ marginTop: 0 }}>📝 Logs</h2>
         <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.6, color: '#cbd5f5' }}>
-          {etl.logs.map((line, idx) => (
-            <li key={idx}>{line}</li>
+          <li>Extract → получено {metrics.rows_in} запусков с SpaceX API</li>
+          <li>Transform → оставлено {metrics.rows_out} успешных миссий</li>
+          <li>Load → загружено в аналитическое хранилище (демо)</li>
+        </ul>
+        <p style={{ color: '#94a3b8', marginTop: 12 }}>
+          Посмотреть подробный аналитический отчёт можно на вкладке{' '}
+          <Link href="/analytics" style={{ color: '#38bdf8' }}>Analytics</Link>.
+        </p>
+      </section>
+
+      <section style={{ ...card, marginTop: 24 }}>
+        <h2 style={{ marginTop: 0 }}>🚀 Последние миссии</h2>
+        <p style={{ color: '#94a3b8' }}>
+          Тянем данные напрямую с публичного SpaceX API. Нажмите на миссию, чтобы раскрыть детальную карточку.
+        </p>
+        <ul style={{ margin: 0, paddingLeft: 20, color: '#cbd5f5', lineHeight: 1.7 }}>
+          {launches.slice(-5).reverse().map((launch) => (
+            <li key={launch.id}>
+              <Link href={`/launch/${launch.id}`} style={{ color: '#38bdf8', textDecoration: 'none' }}>
+                {launch.name}
+              </Link>{' '}
+              · {new Date(launch.date_utc).toLocaleString()} · {launch.success ? '✅ Success' : launch.upcoming ? '🕒 Upcoming' : '⚠️ Failed'}
+            </li>
           ))}
         </ul>
       </section>
 
-      <section style={{ ...card }}>
+      <section style={{ ...card, marginTop: 24 }}>
         <h2 style={{ marginTop: 0 }}>⚙️ Управление</h2>
         <p style={{ color: '#94a3b8' }}>
           Кнопки ниже демонстрируют перезапуск/откат. В проде интеграция с Airflow, Prefect, dbt Cloud.
@@ -76,6 +99,18 @@ export default function MiniETL() {
       </section>
     </main>
   );
+}
+
+export async function getServerSideProps() {
+  const launches = await loadLaunches();
+  const metrics = launches.length ? buildMetrics(launches) : etlFallback.metrics;
+
+  return {
+    props: {
+      metrics,
+      launches
+    }
+  };
 }
 
 function Metric({ label, value }) {

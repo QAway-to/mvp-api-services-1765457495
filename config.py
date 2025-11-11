@@ -56,6 +56,10 @@ class Config:
     # Deployment integration
     VERCEL_TOKEN = os.getenv("VERCEL_TOKEN")
     VERCEL_TEAM_ID = os.getenv("VERCEL_TEAM_ID")
+    NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
+    FAKESTORE_API_URL = os.getenv("FAKESTORE_API_URL", "https://fakestoreapi.com/products")
+    QUOTES_API_URL = os.getenv("QUOTES_API_URL", "http://quotes.toscrape.com/")
+    SPACEX_API_URL = os.getenv("SPACEX_API_URL", "https://api.spacexdata.com/v5/launches")
 
     # Search limits
     MAX_PROJECTS_PER_SESSION: int = int(os.getenv('MAX_PROJECTS_PER_SESSION', '5'))
