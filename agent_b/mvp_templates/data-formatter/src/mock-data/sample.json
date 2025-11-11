@@ -1,0 +1,21 @@
+{
+  "mapping": {
+    "Name": "name",
+    "Mail": "email",
+    "Phone": "phone"
+  },
+  "rules": [
+    "lowercase(email)",
+    "trim(name)",
+    "digits_only(phone)"
+  ],
+  "sample_in": [
+    { "Name": "  ALEx  ", "Mail": "A@B.COM", "Phone": "+1 (555) 12 34" },
+    { "Name": "Maria", "Mail": " maria@example.com ", "Phone": "8-999-123" }
+  ],
+  "sample_out": [
+    { "name": "alex", "email": "a@b.com", "phone": "15551234" },
+    { "name": "maria", "email": "maria@example.com", "phone": "8999123" }
+  ]
+}
+

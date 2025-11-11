@@ -1,0 +1,32 @@
+{
+  "sku_list": ["A123", "B777", "C900"],
+  "records": [
+    {
+      "sku": "A123",
+      "site": "ShopX",
+      "price": 19.99,
+      "currency": "USD",
+      "in_stock": true,
+      "discount": 10,
+      "ts": "2025-11-11T08:00:00Z"
+    },
+    {
+      "sku": "B777",
+      "site": "MarketY",
+      "price": 47.5,
+      "currency": "USD",
+      "in_stock": false,
+      "discount": 0,
+      "ts": "2025-11-11T09:30:00Z"
+    }
+  ],
+  "alerts": [
+    {
+      "sku": "A123",
+      "rule": "price <= 20",
+      "active": true,
+      "channel": "email"
+    }
+  ]
+}
+

@@ -430,30 +430,59 @@ class AgentA:
                         proposals = 0
                         hired = 0
                         try:
-                            page_text = self.driver.page_source
+                            page_text = ""
+                            try:
+                                page_text = self.driver.page_source
+                            except Exception:
+                                page_text = ""
 
-                            # Proposals
-                            proposals_patterns = [
-                                r'(\d+)\s+предложен', r'(\d+)\s+предложений',
-                                r'(\d+)\s+отклик', r'(\d+)\s+откликов',
-                                r'откликов[:\s]+(\d+)', r'предложений[:\s]+(\d+)'
+                            # Proposals (first try DOM elements, then fallback to raw HTML)
+                            proposals_xpath = [
+                                "//*[contains(translate(., 'ОТКЛИКИПРЕДЛОЖЕНИЙ', 'откликипредложений'), 'отклик')]",
+                                "//*[contains(translate(., 'ОТКЛИКИПРЕДЛОЖЕНИЙ', 'откликипредложений'), 'предлож')]",
+                                "//*[contains(@class,'responses') or contains(@class,'proposals')]"
                             ]
-                            for pattern in proposals_patterns:
-                                match = re.search(pattern, page_text, re.IGNORECASE)
-                                if match:
-                                    proposals = int(match.group(1))
-                                    break
+                            for xp in proposals_xpath:
+                                try:
+                                    elem = WebDriverWait(self.driver, 5).until(
+                                        EC.presence_of_element_located((By.XPATH, xp))
+                                    )
+                                    if elem and elem.text:
+                                        match = re.search(r'(\d+)', elem.text.replace('\xa0', ' '))
+                                        if match:
+                                            proposals = int(match.group(1))
+                                            break
+                                except Exception:
+                                    continue
+
+                            if proposals == 0 and page_text:
+                                proposals_patterns = [
+                                    r'откликов[:\s]+(\d+)',
+                                    r'предложений[:\s]+(\d+)',
+                                    r'(\d+)\s+отклик',
+                                    r'(\d+)\s+откликов',
+                                    r'(\d+)\s+предложен',
+                                    r'(\d+)\s+предложений'
+                                ]
+                                for pattern in proposals_patterns:
+                                    match = re.search(pattern, page_text, re.IGNORECASE)
+                                    if match:
+                                        proposals = int(match.group(1))
+                                        break
 
                             # Hired
-                            hired_patterns = [
-                                r'(\d+)\s+исполнител', r'нанят[:\s]+(\d+)',
-                                r'исполнитель.*нанят', r'нанято[:\s]+(\d+)'
-                            ]
-                            for pattern in hired_patterns:
-                                match = re.search(pattern, page_text, re.IGNORECASE)
-                                if match:
-                                    hired = int(match.group(1)) if match.lastindex else 1
-                                    break
+                            if page_text:
+                                hired_patterns = [
+                                    r'(\d+)\s+исполнител',
+                                    r'нанят[:\s]+(\d+)',
+                                    r'исполнитель.*нанят',
+                                    r'нанято[:\s]+(\d+)'
+                                ]
+                                for pattern in hired_patterns:
+                                    match = re.search(pattern, page_text, re.IGNORECASE)
+                                    if match:
+                                        hired = int(match.group(1)) if match.lastindex else 1
+                                        break
                         except Exception:
                             pass
 

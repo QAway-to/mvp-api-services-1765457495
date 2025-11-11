@@ -90,6 +90,50 @@ class AITemplateSelector:
                 complexity="medium",
                 estimated_completion="80%"
             ),
+
+            # Brand Mention Monitor
+            "brand-mention-monitor": TemplateInfo(
+                id="brand-mention-monitor",
+                name="Brand Mention Monitor",
+                category="parsers",
+                description="Мониторинг упоминаний бренда в новостях, блогах и форумах",
+                features=["rss", "sentiment", "digest", "favorites"],
+                complexity="low",
+                estimated_completion="80%"
+            ),
+
+            # Data Formatter
+            "data-formatter": TemplateInfo(
+                id="data-formatter",
+                name="Data Formatter / Normalizer",
+                category="tools",
+                description="Нормализация CSV/Excel с маппингом и предпросмотром",
+                features=["mapping", "rules", "preview", "export"],
+                complexity="low",
+                estimated_completion="80%"
+            ),
+
+            # Mini ETL
+            "mini-etl-pipeline": TemplateInfo(
+                id="mini-etl-pipeline",
+                name="Mini ETL Pipeline",
+                category="etl",
+                description="Минимальный ETL-конвейер с визуализацией шагов и метриками",
+                features=["steps", "logs", "metrics"],
+                complexity="low",
+                estimated_completion="75%"
+            ),
+
+            # Price & Stock Parser
+            "price-stock-parser": TemplateInfo(
+                id="price-stock-parser",
+                name="Price & Stock Parser",
+                category="parsers",
+                description="Мониторинг цен и наличия товаров по SKU с экспортом и алертами",
+                features=["sku tracking", "alerts", "history", "export"],
+                complexity="low",
+                estimated_completion="80%"
+            ),
         }
 
     async def select_template(self, project_description: str) -> TemplateMatch:
@@ -188,6 +232,42 @@ class AITemplateSelector:
                 return TemplateMatch("news-parser", 0.8, "Keyword match: News parser", "parsers", ["scraping", "news"])
             else:
                 return TemplateMatch("product-parser", 0.7, "Keyword match: Data parser", "parsers", ["scraping", "data"])
+
+        elif any(keyword in desc_lower for keyword in ["brand", "упомин", "mention", "pr мониторинг", "мониторинг прессы"]):
+            return TemplateMatch(
+                "brand-mention-monitor",
+                0.85,
+                "Keyword match: brand/news monitor",
+                "parsers",
+                ["rss", "sentiment", "digest"]
+            )
+
+        elif any(keyword in desc_lower for keyword in ["formatter", "normalize", "нормализ", "очист", "csv", "excel", "etl файл"]):
+            return TemplateMatch(
+                "data-formatter",
+                0.85,
+                "Keyword match: data formatter",
+                "tools",
+                ["mapping", "rules", "preview"]
+            )
+
+        elif "etl" in desc_lower or "pipeline" in desc_lower or "конвейер" in desc_lower:
+            return TemplateMatch(
+                "mini-etl-pipeline",
+                0.8,
+                "Keyword match: ETL pipeline",
+                "etl",
+                ["steps", "metrics"]
+            )
+
+        elif any(keyword in desc_lower for keyword in ["price", "цен", "stock", "sku", "налич"]):
+            return TemplateMatch(
+                "price-stock-parser",
+                0.8,
+                "Keyword match: price/stock tracking",
+                "parsers",
+                ["sku tracking", "alerts"]
+            )
 
         elif "аналитик" in desc_lower or "dashboard" in desc_lower or "дашборд" in desc_lower:
             return TemplateMatch("analytics-dashboard", 0.8, "Keyword match: Analytics dashboard", "analytics", ["charts", "reports"])

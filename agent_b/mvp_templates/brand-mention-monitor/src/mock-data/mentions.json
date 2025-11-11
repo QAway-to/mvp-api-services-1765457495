@@ -1,0 +1,21 @@
+{
+  "query": "(\"Agent B\" OR \"Project X\") -unrelated",
+  "results": [
+    {
+      "title": "Agent B template framework",
+      "url": "https://example.com/articles/agent-b-framework",
+      "source": "TechBlog",
+      "sentiment": "positive",
+      "snippet": "Agent B showcases a new framework for rapid MVP delivery..."
+    },
+    {
+      "title": "Project X mentioned in industry digest",
+      "url": "https://news.example.com/post/project-x-digest",
+      "source": "Industry Digest",
+      "sentiment": "neutral",
+      "snippet": "Weekly highlights reference Project X as a rising automation tool."
+    }
+  ],
+  "digest_ts": "2025-11-11T09:00:00Z"
+}
+

@@ -227,7 +227,11 @@ async def generate_mvp(request: Request):
                     "telegram-shop-bot": "Создать Telegram бота для интернет-магазина с каталогом товаров, корзиной и оформлением заказов",
                     "news-parser": "Создать веб-приложение для парсинга и анализа новостей с визуализацией данных",
                     "analytics-dashboard": "Создать дашборд для визуализации данных и аналитики бизнеса",
-                    "email-campaign-manager": "Создать панель управления email-рассылками с SendGrid интеграцией и автоответами"
+                    "email-campaign-manager": "Создать панель управления email-рассылками с SendGrid интеграцией и автоответами",
+                    "brand-mention-monitor": "Создать систему мониторинга упоминаний бренда в новостях, блогах и форумах",
+                    "data-formatter": "Собрать сервис нормализации CSV/Excel с маппингом полей и предпросмотром преобразований",
+                    "mini-etl-pipeline": "Создать mini-ETL конвейер с шагами Extract/Transform/Load и аналитикой выполнения",
+                    "price-stock-parser": "Сделать мониторинг цен и наличия товаров по SKU с алертами и историей изменений"
                 }
                 description = template_descriptions.get(template, f"Создать MVP на основе шаблона {template}")
 
