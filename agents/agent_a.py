@@ -75,7 +75,7 @@ class AgentA:
         except Exception as e:
             error_msg = str(e)[:500]
             log_agent_action("Agent A", f"❌ Browser setup failed: {error_msg}")
-                raise Exception(f"Could not setup Chrome driver: {error_msg}")
+            raise Exception(f"Could not setup Chrome driver: {error_msg}")
 
         try:
             stealth(self.driver,
