@@ -378,8 +378,6 @@ class AgentA:
                                         description = description[desc_start:].strip()
                                 except Exception:
                                     pass
-                                except Exception:
-                                    pass
                             
                         # Get budget
                         budget = ""
