@@ -348,6 +348,9 @@ class MVPGenerator:
                         self._raise_for_status_verbose(put_resp, f"Upload {relative_path}")
                     else:
                         uploaded_count += 1
+                        # Log critical files explicitly
+                        if 'randomuser.js' in relative_path or 'package.json' in relative_path or 'index.js' in relative_path:
+                            log_agent_action("Agent B", f"✅ Uploaded critical file: {relative_path}")
                         if uploaded_count % 10 == 0:
                             log_agent_action("Agent B", f"📤 Uploaded {uploaded_count} files...")
                 except Exception as e:
