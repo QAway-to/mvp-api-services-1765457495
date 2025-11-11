@@ -75,7 +75,7 @@ class AgentA:
         except Exception as e:
             error_msg = str(e)[:500]
             log_agent_action("Agent A", f"❌ Browser setup failed: {error_msg}")
-            raise Exception(f"Could not setup Chrome driver: {error_msg}")
+                raise Exception(f"Could not setup Chrome driver: {error_msg}")
 
         try:
             stealth(self.driver,
@@ -242,7 +242,7 @@ class AgentA:
         
         while page <= max_pages and len(all_projects) < max_relevant_projects:
             search_url = f"{config.KWORK_PROJECTS_URL}?keyword={keywords_encoded}&page={page}&a=1"
-
+            
             try:
                 self.driver.get(search_url)
             except Exception as e:
@@ -317,12 +317,12 @@ class AgentA:
                     })
                 except Exception as e:
                     continue
-
+            
             # Process each project from current page
             for project_info in page_projects:
                 if len(all_projects) >= max_relevant_projects:
                     break
-
+                    
                 try:
                     project_id = project_info["id"]
                     title = project_info["title"]
@@ -335,7 +335,7 @@ class AgentA:
                         self.human_delay(2, 4)
                     except Exception as e:
                         continue
-
+                    
                     # CHECK: Is "Предложить услугу" button available?
                     try:
                         if not self._check_proposal_button_available():
@@ -356,7 +356,7 @@ class AgentA:
                                 "[data-test-id='task-description']",
                                 ".break-word"
                             ]
-
+                            
                             for selector in desc_selectors:
                                 try:
                                     desc_elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
@@ -368,7 +368,7 @@ class AgentA:
                                                 break
                                 except Exception:
                                     continue
-
+                            
                             if not description or len(description) < 100:
                                 try:
                                     main_content = self.driver.find_element(By.CSS_SELECTOR, "main, .content, .container, [class*='wants-card']")
@@ -378,9 +378,9 @@ class AgentA:
                                         description = description[desc_start:].strip()
                                 except Exception:
                                     pass
-                        except Exception:
-                            pass
-
+                                except Exception:
+                                    pass
+                            
                         # Get budget
                         budget = ""
                         try:
@@ -405,7 +405,7 @@ class AgentA:
                                         break
                                 except Exception:
                                     continue
-
+                            
                             if not budget:
                                 try:
                                     page_source = self.driver.page_source
@@ -431,8 +431,8 @@ class AgentA:
                         hired = 0
                         try:
                             page_text = ""
-                            try:
-                                page_text = self.driver.page_source
+                        try:
+                            page_text = self.driver.page_source
                             except Exception:
                                 page_text = ""
 
@@ -456,35 +456,35 @@ class AgentA:
                                     continue
 
                             if proposals == 0 and page_text:
-                                proposals_patterns = [
+                            proposals_patterns = [
                                     r'откликов[:\s]+(\d+)',
                                     r'предложений[:\s]+(\d+)',
-                                    r'(\d+)\s+отклик',
-                                    r'(\d+)\s+откликов',
+                                r'(\d+)\s+отклик',
+                                r'(\d+)\s+откликов',
                                     r'(\d+)\s+предложен',
                                     r'(\d+)\s+предложений'
-                                ]
-                                for pattern in proposals_patterns:
-                                    match = re.search(pattern, page_text, re.IGNORECASE)
-                                    if match:
-                                        proposals = int(match.group(1))
-                                        break
-
+                            ]
+                            for pattern in proposals_patterns:
+                                match = re.search(pattern, page_text, re.IGNORECASE)
+                                if match:
+                                    proposals = int(match.group(1))
+                                    break
+                            
                             # Hired
                             if page_text:
-                                hired_patterns = [
-                                    r'(\d+)\s+исполнител',
-                                    r'нанят[:\s]+(\d+)',
-                                    r'исполнитель.*нанят',
-                                    r'нанято[:\s]+(\d+)'
-                                ]
-                                for pattern in hired_patterns:
-                                    match = re.search(pattern, page_text, re.IGNORECASE)
-                                    if match:
+                            hired_patterns = [
+                                r'(\d+)\s+исполнител',
+                                r'нанят[:\s]+(\d+)',
+                                r'исполнитель.*нанят',
+                                r'нанято[:\s]+(\d+)'
+                            ]
+                            for pattern in hired_patterns:
+                                match = re.search(pattern, page_text, re.IGNORECASE)
+                                if match:
                                         hired = int(match.group(1)) if match.lastindex else 1
-                                        break
-                        except Exception:
-                            pass
+                                                break
+                                except Exception:
+                                    pass
 
                         # Create project data
                         project_data = {
@@ -509,7 +509,7 @@ class AgentA:
 
                         # Human delay between projects
                         self.human_delay(1, 3)
-
+                        
                     except Exception:
                         continue
                         
@@ -519,11 +519,11 @@ class AgentA:
 
             # Move to next page
             page += 1
-
+            
             # Small delay before next page
             if page <= max_pages and len(all_projects) < max_relevant_projects:
                 self.human_delay(1, 2)
-
+        
         # Evaluate all projects and rank by semantic similarity
         if len(all_projects) > 0:
             evaluated_projects = []
@@ -535,7 +535,7 @@ class AgentA:
                         "reasons": reasons,
                         "suitable": score >= config.EVALUATION_THRESHOLD
                     }
-
+                    
                     # Extract semantic similarity if available
                     semantic_score = 0.0
                     for reason in reasons:
@@ -544,16 +544,16 @@ class AgentA:
                                 semantic_score = float(reason.split("Similarity:")[1].strip().split()[0])
                             except Exception:
                                 pass
-
+                    
                     project["semantic_score"] = semantic_score
                     evaluated_projects.append(project)
-
+                    
                 except Exception:
                     continue
-
+            
             # Sort by semantic score (highest first), then by total score
             evaluated_projects.sort(key=lambda x: (x.get("semantic_score", 0.0), x.get("evaluation", {}).get("score", 0.0)), reverse=True)
-
+            
             # Return top N most relevant projects
             top_projects = evaluated_projects[:output_limit]
             return top_projects
@@ -610,9 +610,9 @@ class AgentA:
         session_start = datetime.now()
         self.current_session_start = session_start
         self.session_steps = []
-
+        
         log_agent_action("Agent A", f"🚀 Starting search session...")
-
+        
         if not self.driver:
             self.setup_driver()
             log_agent_action("Agent A", "✅ Browser ready")

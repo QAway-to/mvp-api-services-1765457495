@@ -1,49 +1,16 @@
 export async function loadLaunches(withMeta = false) {
-  const baseUrl = process.env.SPACEX_API_URL || 'https://api.spacexdata.com/v5';
+  const apiUrl = process.env.SPACEX_API_URL || 'https://api.spacexdata.com/v5/launches';
   let fallbackUsed = false;
-  
   try {
-    // Параллельная загрузка всех эндпоинтов для получения больше данных
-    const [pastLaunches, upcomingLaunches, rockets, launchpads, payloads] = await Promise.all([
-      fetch(`${baseUrl}/launches/past`).then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch(`${baseUrl}/launches/upcoming`).then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch(`${baseUrl}/rockets`).then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch(`${baseUrl}/launchpads`).then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch(`${baseUrl}/payloads`).then(r => r.ok ? r.json() : []).catch(() => [])
-    ]);
-
-    // Объединяем все запуски
-    const allLaunches = [...(Array.isArray(pastLaunches) ? pastLaunches : []), ...(Array.isArray(upcomingLaunches) ? upcomingLaunches : [])];
-    
-    if (!allLaunches.length) {
-      throw new Error('No launches fetched');
-    }
-
-    // Обогащаем данными о ракетах, космодромах, грузах
-    const enriched = allLaunches.map(launch => {
-      const rocket = Array.isArray(rockets) ? rockets.find(r => r.id === launch.rocket) : null;
-      const launchpad = Array.isArray(launchpads) ? launchpads.find(lp => lp.id === launch.launchpad) : null;
-      const launchPayloads = Array.isArray(payloads) && Array.isArray(launch.payloads) 
-        ? payloads.filter(p => launch.payloads.includes(p.id))
-        : [];
-
-      return {
-        ...launch,
-        rocket: rocket ? { id: rocket.id, name: rocket.name, type: rocket.type, active: rocket.active } : { name: launch.rocket || 'Unknown' },
-        launchpad: launchpad ? { id: launchpad.id, name: launchpad.name, full_name: launchpad.full_name } : {},
-        payloads: launchPayloads,
-        payloads_count: launchPayloads.length
-      };
-    });
-
-    // Берём последние 150 для демонстрации (достаточно для ETL)
-    const finalLaunches = enriched.slice(-150);
-    
+    const response = await fetch(apiUrl);
+    if (!response.ok) throw new Error(`SpaceX API ${response.status}`);
+    const launches = await response.json();
+    const finalLaunches = Array.isArray(launches) ? launches.slice(-10) : (fallbackUsed = true, fallbackLaunches());
     if (withMeta) {
       return {
         launches: finalLaunches,
-        fallbackUsed: false,
-        sourceUrl: baseUrl,
+        fallbackUsed,
+        sourceUrl: apiUrl,
         fetchedAt: new Date().toISOString()
       };
     }
@@ -55,8 +22,8 @@ export async function loadLaunches(withMeta = false) {
     if (withMeta) {
       return {
         launches,
-        fallbackUsed: true,
-        sourceUrl: baseUrl,
+        fallbackUsed,
+        sourceUrl: apiUrl,
         fetchedAt: new Date().toISOString()
       };
     }
