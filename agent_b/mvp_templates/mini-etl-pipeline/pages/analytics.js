@@ -1,39 +1,43 @@
 import Link from 'next/link';
-import { loadLaunches } from '../src/lib/spacex';
+import { loadUsers } from '../src/lib/randomuser';
 
-export default function Analytics({ launches }) {
+export default function Analytics({ users }) {
   return (
     <main style={container}>
       <header style={{ marginBottom: 24 }}>
         <Link href="/" style={{ color: '#38bdf8', textDecoration: 'none' }}>← Назад</Link>
-        <h1 style={{ margin: '12px 0 0', fontSize: 32 }}>📈 Analytics — SpaceX Launches</h1>
+        <h1 style={{ margin: '12px 0 0', fontSize: 32 }}>📈 Analytics — Users Data</h1>
         <p style={{ color: '#94a3b8', marginTop: 6 }}>Демонстрация шага Transform: агрегируем данные перед загрузкой.</p>
       </header>
 
       <section style={card}>
-        <h2 style={{ marginTop: 0 }}>Launches overview</h2>
+        <h2 style={{ marginTop: 0 }}>Users overview</h2>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th style={th}>Mission</th>
-              <th style={th}>Date</th>
-              <th style={th}>Success</th>
-              <th style={th}>Rocket</th>
+              <th style={th}>Name</th>
+              <th style={th}>Email</th>
+              <th style={th}>Country</th>
+              <th style={th}>Registered</th>
             </tr>
           </thead>
           <tbody>
-            {launches.map((launch) => (
-              <tr key={launch.id}>
-                <td style={td}>
-                  <Link href={`/launch/${launch.id}`} style={{ color: '#38bdf8', textDecoration: 'none' }}>
-                    {launch.name}
-                  </Link>
-                </td>
-                <td style={td}>{new Date(launch.date_utc).toLocaleString()}</td>
-                <td style={td}>{launch.success ? '✅' : '❌'}</td>
-                <td style={td}>{launch.rocket}</td>
+            {Array.isArray(users) && users.length > 0 ? (
+              users.slice(0, 50).map((user, idx) => (
+                <tr key={user?.id?.value || user?.login?.uuid || `user-${idx}`}>
+                  <td style={td}>
+                    {user?.name?.first} {user?.name?.last}
+                  </td>
+                  <td style={td}>{user?.email || 'N/A'}</td>
+                  <td style={td}>{user?.location?.country || 'N/A'}</td>
+                  <td style={td}>{user?.registered?.date ? new Date(user.registered.date).toLocaleString() : 'N/A'}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="4" style={{ ...td, textAlign: 'center', color: '#94a3b8' }}>Нет данных для отображения</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </section>
@@ -51,12 +55,21 @@ export default function Analytics({ launches }) {
 }
 
 export async function getServerSideProps() {
-  const launches = await loadLaunches();
-  return {
-    props: {
-      launches
-    }
-  };
+  try {
+    const users = await loadUsers();
+    return {
+      props: {
+        users: Array.isArray(users) ? users : []
+      }
+    };
+  } catch (error) {
+    console.error('[Analytics] getServerSideProps error:', error);
+    return {
+      props: {
+        users: []
+      }
+    };
+  }
 }
 
 const container = {

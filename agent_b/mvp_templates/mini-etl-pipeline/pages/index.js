@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
 import etlFallback from '../src/mock-data/etl.json';
 import { loadUsers, buildMetrics } from '../src/lib/randomuser';
@@ -38,9 +38,21 @@ export default function MiniETL({
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
   const [animationStarted, setAnimationStarted] = useState(false);
+  const isMounted = useRef(true);
+  const animationTimers = useRef([]);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      // Cleanup all timers on unmount
+      animationTimers.current.forEach(timer => clearTimeout(timer));
+      animationTimers.current = [];
+    };
+  }, []);
 
   const startAnimation = () => {
-    if (animationStarted) return;
+    if (animationStarted || !isMounted.current) return;
     setAnimationStarted(true);
     const statuses = steps.map(() => 'pending');
     const logs = [
@@ -48,33 +60,49 @@ export default function MiniETL({
       `Transform ▸ Оставлено ${metrics.rows_out} валидных записей, удалено ${metrics.dedup_removed}`,
       `Load ▸ Данные готовы. Последний пользователь: ${metrics.lastUser || 'n/a'}`
     ];
-    const timers = [];
 
+    // Clear previous timers
+    animationTimers.current.forEach(timer => clearTimeout(timer));
+    animationTimers.current = [];
+
+    if (!isMounted.current) return;
     setStepStatuses(statuses);
     setLogLines([]);
 
-    timers.push(setTimeout(() => {
-      setStepStatuses((prev) => prev.map((_, idx) => (idx === 0 ? 'active' : idx > 0 ? 'pending' : _)));
-      setLogLines([logs[0]]);
-    }, 200));
+    const timer1 = setTimeout(() => {
+      if (isMounted.current) {
+        setStepStatuses((prev) => prev.map((_, idx) => (idx === 0 ? 'active' : idx > 0 ? 'pending' : _)));
+        setLogLines([logs[0]]);
+      }
+    }, 200);
+    animationTimers.current.push(timer1);
 
-    timers.push(setTimeout(() => {
-      setStepStatuses((prev) => prev.map((_, idx) => (idx === 0 ? 'done' : idx === 1 ? 'active' : 'pending')));
-      setLogLines(logs.slice(0, 2));
-    }, 1200));
+    const timer2 = setTimeout(() => {
+      if (isMounted.current) {
+        setStepStatuses((prev) => prev.map((_, idx) => (idx === 0 ? 'done' : idx === 1 ? 'active' : 'pending')));
+        setLogLines(logs.slice(0, 2));
+      }
+    }, 1200);
+    animationTimers.current.push(timer2);
 
-    timers.push(setTimeout(() => {
-      setStepStatuses((prev) => prev.map((_, idx) => (idx < 2 ? 'done' : 'active')));
-      setLogLines(logs);
-    }, 2200));
+    const timer3 = setTimeout(() => {
+      if (isMounted.current) {
+        setStepStatuses((prev) => prev.map((_, idx) => (idx < 2 ? 'done' : 'active')));
+        setLogLines(logs);
+      }
+    }, 2200);
+    animationTimers.current.push(timer3);
 
-    timers.push(setTimeout(() => {
-      setStepStatuses((prev) => prev.map(() => 'done'));
-    }, 3200));
+    const timer4 = setTimeout(() => {
+      if (isMounted.current) {
+        setStepStatuses((prev) => prev.map(() => 'done'));
+      }
+    }, 3200);
+    animationTimers.current.push(timer4);
   };
 
   const handleRestart = async () => {
-    if (isProcessing) return;
+    if (isProcessing || !isMounted.current) return;
     setIsProcessing(true);
     setAnimationStarted(false);
     try {
@@ -83,17 +111,31 @@ export default function MiniETL({
         throw new Error(`HTTP ${response.status}`);
       }
       const payload = await response.json();
-      setUsers(payload.users);
-      setMetrics(payload.metrics);
-      setSourceUrl(payload.sourceUrl);
-      setFallbackUsed(payload.fallbackUsed);
-      setFetchedAt(payload.fetchedAt);
-      setLogLines((prev) => [...prev, '🔁 Конвейер перезапущен']);
-      setTimeout(() => startAnimation(), 100);
+      
+      // Only update state if component is still mounted
+      if (isMounted.current) {
+        setUsers(payload.users);
+        setMetrics(payload.metrics);
+        setSourceUrl(payload.sourceUrl);
+        setFallbackUsed(payload.fallbackUsed);
+        setFetchedAt(payload.fetchedAt);
+        setLogLines((prev) => [...prev, '🔁 Конвейер перезапущен']);
+        
+        const restartTimer = setTimeout(() => {
+          if (isMounted.current) {
+            startAnimation();
+          }
+        }, 100);
+        animationTimers.current.push(restartTimer);
+      }
     } catch (error) {
-      setLogLines((prev) => [...prev, `⚠️ Ошибка перезапуска: ${error}`]);
+      if (isMounted.current) {
+        setLogLines((prev) => [...prev, `⚠️ Ошибка перезапуска: ${error}`]);
+      }
     } finally {
-      setIsProcessing(false);
+      if (isMounted.current) {
+        setIsProcessing(false);
+      }
     }
   };
 
