@@ -1,83 +1,58 @@
 import Block from './Block';
 
-const canvasStyle = {
-  flex: 1,
-  padding: '40px',
-  background: '#0b1120',
-  minHeight: 'calc(100vh - 56px)',
-  overflow: 'auto'
+const containerStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 24,
+  padding: 24,
+  background: '#0f172a',
+  borderRadius: 16,
+  border: '1px solid rgba(56,189,248,0.2)',
+  minHeight: 400
 };
 
-const pipelineStyle = {
+const blocksContainerStyle = {
   display: 'flex',
-  alignItems: 'center',
-  gap: '40px',
+  gap: 24,
   justifyContent: 'center',
   flexWrap: 'wrap',
-  maxWidth: '1200px',
-  margin: '0 auto'
+  alignItems: 'flex-start'
 };
 
-const connectorStyle = {
-  width: '60px',
-  height: '2px',
-  background: 'linear-gradient(90deg, rgba(56,189,248,0.5) 0%, rgba(56,189,248,0.1) 100%)',
-  position: 'relative'
+const headerStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 8
 };
 
-const connectorArrowStyle = {
-  position: 'absolute',
-  right: '-8px',
-  top: '-4px',
-  width: 0,
-  height: 0,
-  borderLeft: '8px solid rgba(56,189,248,0.5)',
-  borderTop: '4px solid transparent',
-  borderBottom: '4px solid transparent'
-};
-
-export default function Canvas({ 
-  blocks = [], 
-  onBlockClick,
-  activeBlockId = null
-}) {
+export default function Canvas({ blocks, onBlockRun, metrics }) {
   return (
-    <div style={canvasStyle}>
-      <div style={pipelineStyle}>
-        {blocks.map((block, index) => (
-          <div key={block.id} style={{ display: 'flex', alignItems: 'center' }}>
-            <Block
-              type={block.type}
-              name={block.name}
-              description={block.description}
-              status={block.status}
-              isActive={activeBlockId === block.id}
-              onClick={() => onBlockClick && onBlockClick(block.id)}
-              data={block.preview}
-            />
-            
-            {index < blocks.length - 1 && (
-              <div style={connectorStyle}>
-                <div style={connectorArrowStyle}></div>
-              </div>
-            )}
+    <div style={containerStyle}>
+      <div style={headerStyle}>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#f8fafc' }}>
+          ETL Pipeline Canvas
+        </h2>
+        {metrics && (
+          <div style={{ display: 'flex', gap: 16, fontSize: 14, color: '#94a3b8' }}>
+            <span>In: <strong>{metrics.rows_in || 0}</strong></span>
+            <span>Out: <strong>{metrics.rows_out || 0}</strong></span>
+            <span>Removed: <strong>{metrics.dedup_removed || 0}</strong></span>
           </div>
-        ))}
+        )}
       </div>
       
-      {blocks.length === 0 && (
-        <div style={{
-          textAlign: 'center',
-          color: '#64748b',
-          marginTop: '100px',
-          fontSize: '16px'
-        }}>
-          <p>No pipeline blocks configured</p>
-          <p style={{ fontSize: '14px', marginTop: '8px' }}>
-            Configure your ETL pipeline in the Inspector
-          </p>
-        </div>
-      )}
+      <div style={blocksContainerStyle}>
+        {blocks.map((block) => (
+          <Block
+            key={block.step}
+            step={block.step}
+            status={block.status}
+            data={block.data}
+            onRun={() => onBlockRun && onBlockRun(block.step)}
+          />
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,52 +1,42 @@
 import { useState, useEffect, useRef } from 'react';
-import Sidebar from '../src/components/Sidebar';
-import Toolbar from '../src/components/Toolbar';
 import Canvas from '../src/components/Canvas';
-import PropertiesPanel from '../src/components/PropertiesPanel';
 import LogPanel from '../src/components/LogPanel';
+import { runPipeline, ETL_STEPS, STEP_STATUS } from '../src/lib/pipeline';
 
-const defaultBlocks = [
-  {
-    id: 'extract-1',
-    type: 'extract',
-    name: 'Fetch Products',
-    description: 'Extract products from DummyJSON API',
-    status: 'pending',
-    config: {},
-    preview: null
-  },
-  {
-    id: 'transform-1',
-    type: 'transform',
-    name: 'Filter & Sort',
-    description: 'Filter and sort products by price',
-    status: 'pending',
-    config: {
-      sortBy: 'price',
-      sortDirection: 'asc'
-    },
-    preview: null
-  },
-  {
-    id: 'load-1',
-    type: 'load',
-    name: 'Export Results',
-    description: 'Load transformed data to output',
-    status: 'pending',
-    config: {
-      target: 'console'
-    },
-    preview: null
-  }
-];
+const containerStyle = {
+  fontFamily: 'Inter, sans-serif',
+  padding: '24px 32px',
+  background: '#0b1120',
+  color: '#f8fafc',
+  minHeight: '100vh'
+};
 
-export default function CanvasPage() {
-  const [blocks, setBlocks] = useState(defaultBlocks);
-  const [activeBlockId, setActiveBlockId] = useState(null);
-  const [showLogs, setShowLogs] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
-  const [status, setStatus] = useState('idle');
+const headerStyle = {
+  marginBottom: 24,
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 16
+};
+
+const cardStyle = {
+  background: '#111c33',
+  borderRadius: 16,
+  padding: 24,
+  marginBottom: 24,
+  border: '1px solid rgba(56,189,248,0.25)',
+  boxShadow: '0 20px 28px rgba(8, 47, 73, 0.45)'
+};
+
+export default function MiniETL() {
+  const [blocks, setBlocks] = useState([
+    { step: ETL_STEPS.EXTRACT, status: STEP_STATUS.PENDING, data: null },
+    { step: ETL_STEPS.TRANSFORM, status: STEP_STATUS.PENDING, data: null },
+    { step: ETL_STEPS.LOAD, status: STEP_STATUS.PENDING, data: null }
+  ]);
   const [logs, setLogs] = useState([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const [metrics, setMetrics] = useState(null);
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -56,65 +46,79 @@ export default function CanvasPage() {
     };
   }, []);
 
-  const handleBlockClick = (blockId) => {
-    setActiveBlockId(blockId === activeBlockId ? null : blockId);
-  };
-
-  const handleBlockUpdate = (updatedBlock) => {
+  const updateBlock = (step, updates) => {
     if (!isMounted.current) return;
-    setBlocks(prev => prev.map(b => b.id === updatedBlock.id ? updatedBlock : b));
+    setBlocks(prev => prev.map(block => 
+      block.step === step ? { ...block, ...updates } : block
+    ));
   };
 
-  const handleRun = async () => {
+  const addLog = (log) => {
+    if (!isMounted.current) return;
+    setLogs(prev => [...prev, log]);
+  };
+
+  const handleRunPipeline = async () => {
     if (isRunning || !isMounted.current) return;
 
     setIsRunning(true);
-    setStatus('running');
     setLogs([]);
-    setActiveBlockId(null);
-
-    // Reset all block statuses
-    setBlocks(prev => prev.map(b => ({ ...b, status: 'pending', preview: null })));
+    
+    // Reset all blocks
+    blocks.forEach(block => {
+      updateBlock(block.step, { status: STEP_STATUS.PENDING, data: null });
+    });
 
     try {
-      const response = await fetch('/api/run-preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pipeline: blocks })
-      });
-
-      const result = await response.json();
+      const result = await runPipeline();
 
       if (!isMounted.current) return;
 
-      if (result.success) {
-        setStatus('success');
-        
-        // Update block statuses and previews
-        setBlocks(prev => prev.map((block) => {
-          const log = result.logs.find(l => l.type === block.type);
-          const preview = Array.isArray(result.data) && result.data.length > 0 
-            ? result.data.slice(0, 3) 
-            : null;
-          return {
-            ...block,
-            status: log?.status === 'success' ? 'success' : log?.status === 'error' ? 'error' : 'pending',
-            preview
-          };
-        }));
-      } else {
-        setStatus('error');
+      // Update blocks with results
+      if (result.results.extract) {
+        updateBlock(ETL_STEPS.EXTRACT, { 
+          status: STEP_STATUS.SUCCESS, 
+          data: result.results.extract 
+        });
+      }
+      if (result.results.transform) {
+        updateBlock(ETL_STEPS.TRANSFORM, { 
+          status: STEP_STATUS.SUCCESS, 
+          data: result.results.transform 
+        });
+      }
+      if (result.results.load) {
+        updateBlock(ETL_STEPS.LOAD, { 
+          status: STEP_STATUS.SUCCESS, 
+          data: result.results.transform // Use transformed data for load preview
+        });
       }
 
-      setLogs(result.logs || []);
+      // Update metrics
+      if (result.results.extract && result.results.transform) {
+        setMetrics({
+          rows_in: result.results.extract.length,
+          rows_out: result.results.transform.length,
+          dedup_removed: result.results.extract.length - result.results.transform.length
+        });
+      }
+
+      // Add logs
+      result.logs.forEach(log => addLog(log));
+
+      if (!result.success) {
+        const errorBlock = result.logs.find(l => l.status === STEP_STATUS.ERROR);
+        if (errorBlock) {
+          updateBlock(errorBlock.step, { status: STEP_STATUS.ERROR });
+        }
+      }
     } catch (error) {
       if (isMounted.current) {
-        setStatus('error');
-        setLogs([{
-          timestamp: new Date().toISOString(),
-          level: 'error',
-          message: `Pipeline execution failed: ${error.message}`
-        }]);
+        addLog({ 
+          step: 'system', 
+          status: STEP_STATUS.ERROR, 
+          message: `Pipeline execution failed: ${error.message}` 
+        });
       }
     } finally {
       if (isMounted.current) {
@@ -123,64 +127,99 @@ export default function CanvasPage() {
     }
   };
 
-  const handleSave = () => {
-    // In production, this would save to backend/database
-    const pipelineConfig = {
-      blocks: blocks.map(b => ({
-        id: b.id,
-        type: b.type,
-        name: b.name,
-        description: b.description,
-        config: b.config
-      })),
-      savedAt: new Date().toISOString()
-    };
-    
-    console.log('Saving pipeline:', pipelineConfig);
-    // You could also show a toast notification here
-    alert('Pipeline configuration saved!');
+  const handleRunBlock = async (step) => {
+    if (isRunning || !isMounted.current) return;
+
+    updateBlock(step, { status: STEP_STATUS.RUNNING });
+    addLog({ step, status: STEP_STATUS.RUNNING, message: `Running ${step}...` });
+
+    try {
+      let response;
+      if (step === ETL_STEPS.EXTRACT) {
+        response = await fetch('/api/fetch');
+      } else if (step === ETL_STEPS.TRANSFORM) {
+        const extractBlock = blocks.find(b => b.step === ETL_STEPS.EXTRACT);
+        if (!extractBlock?.data) {
+          throw new Error('Extract must be run first');
+        }
+        response = await fetch('/api/transform', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ products: extractBlock.data })
+        });
+      } else if (step === ETL_STEPS.LOAD) {
+        const transformBlock = blocks.find(b => b.step === ETL_STEPS.TRANSFORM);
+        if (!transformBlock?.data) {
+          throw new Error('Transform must be run first');
+        }
+        response = await fetch('/api/load', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ products: transformBlock.data })
+        });
+      }
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (!isMounted.current) return;
+
+      if (step === ETL_STEPS.EXTRACT) {
+        updateBlock(step, { status: STEP_STATUS.SUCCESS, data: data.products });
+      } else {
+        updateBlock(step, { status: STEP_STATUS.SUCCESS, data: data.products || data.result });
+      }
+
+      addLog({ step, status: STEP_STATUS.SUCCESS, message: `${step} completed successfully` });
+    } catch (error) {
+      if (isMounted.current) {
+        updateBlock(step, { status: STEP_STATUS.ERROR });
+        addLog({ step, status: STEP_STATUS.ERROR, message: `${step} failed: ${error.message}` });
+      }
+    }
   };
 
-  const activeBlock = blocks.find(b => b.id === activeBlockId);
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0b1120' }}>
-      <Sidebar currentPage="canvas" />
-      
-      <div style={{ marginLeft: '240px', display: 'flex', flexDirection: 'column', flex: 1 }}>
-        <Toolbar
-          onRun={handleRun}
-          onSave={handleSave}
-          onToggleLogs={() => setShowLogs(!showLogs)}
-          isRunning={isRunning}
-          showLogs={showLogs}
-          status={status}
-        />
-        
-        <div style={{ display: 'flex', flex: 1, position: 'relative' }}>
-          <div style={{ flex: 1, marginRight: activeBlock ? '320px' : '0' }}>
-            <Canvas
-              blocks={blocks}
-              onBlockClick={handleBlockClick}
-              activeBlockId={activeBlockId}
-            />
-          </div>
-          
-          {activeBlock && (
-            <PropertiesPanel
-              block={activeBlock}
-              onUpdate={handleBlockUpdate}
-            />
-          )}
+    <main style={containerStyle}>
+      <header style={headerStyle}>
+        <div>
+          <h1 style={{ fontSize: 36, margin: 0 }}>🔄 Mini‑ETL Pipeline</h1>
+          <p style={{ color: '#94a3b8', marginTop: 8 }}>
+            Extract products from DummyJSON API, transform and load them.
+          </p>
         </div>
-      </div>
+        <button
+          onClick={handleRunPipeline}
+          disabled={isRunning}
+          style={{
+            padding: '12px 24px',
+            borderRadius: 12,
+            background: isRunning ? '#0f172a' : 'linear-gradient(135deg,#38bdf8,#0ea5e9)',
+            border: 'none',
+            color: isRunning ? '#475569' : '#0b1120',
+            fontWeight: 700,
+            cursor: isRunning ? 'wait' : 'pointer',
+            fontSize: 16,
+            minWidth: 180,
+            minHeight: 48
+          }}
+        >
+          {isRunning ? 'Running...' : '▶ Run Full Pipeline'}
+        </button>
+      </header>
 
-      {showLogs && (
-        <LogPanel
-          logs={logs}
-          onClose={() => setShowLogs(false)}
+      <section style={cardStyle}>
+        <Canvas 
+          blocks={blocks} 
+          onBlockRun={handleRunBlock}
+          metrics={metrics}
         />
-      )}
-    </div>
+      </section>
+
+      <section style={cardStyle}>
+        <h2 style={{ marginTop: 0, fontSize: 20, fontWeight: 700 }}>📝 Pipeline Logs</h2>
+        <LogPanel logs={logs} />
+      </section>
+    </main>
   );
 }

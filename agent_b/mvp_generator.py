@@ -453,14 +453,10 @@ class MVPGenerator:
             log_agent_action("Agent B", f"⚠️ Unable to determine Vercel project id for {project_name}, skipping env configuration")
             return
 
-        randomuser_url = Config.RANDOMUSER_API_URL
-        if not randomuser_url:
-            log_agent_action("Agent B", "ℹ️ RANDOMUSER_API_URL not set in environment; skipping Vercel env injection")
-            return
-
+        dummyjson_url = getattr(Config, 'DUMMYJSON_API_URL', None) or 'https://dummyjson.com/products?limit=100'
         try:
-            self._set_vercel_env_var(project_id, "RANDOMUSER_API_URL", randomuser_url)
-            log_agent_action("Agent B", f"🔐 Vercel env configured for {project_name} (RANDOMUSER_API_URL)")
+            self._set_vercel_env_var(project_id, "DUMMYJSON_API_URL", dummyjson_url)
+            log_agent_action("Agent B", f"🔐 Vercel env configured for {project_name} (DUMMYJSON_API_URL)")
         except Exception as error:
             log_agent_action("Agent B", f"❌ Failed to configure Vercel env vars: {error}")
 

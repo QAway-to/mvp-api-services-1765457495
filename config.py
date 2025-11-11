@@ -60,6 +60,7 @@ class Config:
     FAKESTORE_API_URL = os.getenv("FAKESTORE_API_URL", "https://fakestoreapi.com/products")
     QUOTES_API_URL = os.getenv("QUOTES_API_URL", "http://quotes.toscrape.com/")
     RANDOMUSER_API_URL = os.getenv("RANDOMUSER_API_URL", "https://randomuser.me/api/?results=500")
+    DUMMYJSON_API_URL = os.getenv("DUMMYJSON_API_URL", "https://dummyjson.com/products?limit=100")
 
     # Search limits
     MAX_PROJECTS_PER_SESSION: int = int(os.getenv('MAX_PROJECTS_PER_SESSION', '5'))

@@ -1,106 +1,67 @@
-const panelStyle = {
-  position: 'fixed',
-  bottom: 0,
-  left: 0,
-  right: 0,
-  height: '300px',
-  background: '#0b1120',
-  borderTop: '1px solid rgba(56,189,248,0.25)',
+const containerStyle = {
+  background: '#0f172a',
+  borderRadius: 12,
+  padding: 16,
+  border: '1px solid rgba(56,189,248,0.2)',
+  maxHeight: 300,
+  overflow: 'auto',
+  fontFamily: 'JetBrains Mono, monospace',
+  fontSize: 13
+};
+
+const logItemStyle = {
+  padding: '6px 0',
+  borderBottom: '1px solid rgba(148,163,184,0.1)',
   display: 'flex',
-  flexDirection: 'column',
-  zIndex: 20
+  gap: 12,
+  alignItems: 'flex-start'
 };
 
-const headerStyle = {
-  padding: '12px 24px',
-  background: '#111c33',
-  borderBottom: '1px solid rgba(56,189,248,0.25)',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center'
+const timestampStyle = {
+  color: '#64748b',
+  fontSize: 11,
+  minWidth: 80
 };
 
-const titleStyle = {
-  fontSize: '14px',
-  fontWeight: 600,
-  color: '#f8fafc',
-  margin: 0
+const getStatusColor = (status) => {
+  const colors = {
+    running: '#3b82f6',
+    success: '#22c55e',
+    error: '#ef4444',
+    pending: '#94a3b8'
+  };
+  return colors[status] || colors.pending;
 };
 
-const closeButtonStyle = {
-  background: 'none',
-  border: 'none',
-  color: '#94a3b8',
-  cursor: 'pointer',
-  fontSize: '18px',
-  padding: '4px 8px'
-};
+export default function LogPanel({ logs }) {
+  if (!logs || logs.length === 0) {
+    return (
+      <div style={containerStyle}>
+        <div style={{ color: '#64748b', fontStyle: 'italic' }}>
+          No logs yet. Run the pipeline to see activity.
+        </div>
+      </div>
+    );
+  }
 
-const contentStyle = {
-  flex: 1,
-  overflowY: 'auto',
-  padding: '16px 24px',
-  fontFamily: 'monospace',
-  fontSize: '12px',
-  lineHeight: '1.6'
-};
-
-const logEntryStyle = {
-  marginBottom: '8px',
-  padding: '4px 0'
-};
-
-const logLevels = {
-  info: { color: '#94a3b8' },
-  warn: { color: '#fbbf24' },
-  error: { color: '#ef4444' },
-  success: { color: '#22c55e' }
-};
-
-export default function LogPanel({ 
-  logs = [], 
-  onClose 
-}) {
   return (
-    <div style={panelStyle}>
-      <div style={headerStyle}>
-        <h3 style={titleStyle}>Execution Logs</h3>
-        <button onClick={onClose} style={closeButtonStyle}>
-          ✕
-        </button>
+    <div style={containerStyle}>
+      <div style={{ marginBottom: 12, color: '#94a3b8', fontSize: 12, fontWeight: 600 }}>
+        Pipeline Logs ({logs.length})
       </div>
-      
-      <div style={contentStyle}>
-        {logs.length === 0 ? (
-          <div style={{ color: '#64748b', textAlign: 'center', marginTop: '40px' }}>
-            No logs yet. Run the pipeline to see execution logs.
-          </div>
-        ) : (
-          logs.map((log, index) => {
-            const levelStyle = logLevels[log.level] || logLevels.info;
-            const time = new Date(log.timestamp).toLocaleTimeString();
-            
-            return (
-              <div key={index} style={logEntryStyle}>
-                <span style={{ color: '#64748b' }}>{time}</span>
-                {' '}
-                <span style={{ color: levelStyle.color, fontWeight: 500 }}>
-                  [{log.level.toUpperCase()}]
-                </span>
-                {' '}
-                <span style={{ color: '#f8fafc' }}>
-                  {log.message}
-                </span>
-                {log.data && (
-                  <div style={{ marginLeft: '20px', marginTop: '4px', color: '#94a3b8' }}>
-                    {JSON.stringify(log.data, null, 2)}
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
+      {logs.map((log, idx) => (
+        <div key={idx} style={logItemStyle}>
+          <span style={timestampStyle}>
+            {new Date().toLocaleTimeString()}
+          </span>
+          <span style={{ 
+            color: getStatusColor(log.status),
+            fontWeight: log.status === 'error' ? 600 : 400
+          }}>
+            [{log.step?.toUpperCase() || 'SYSTEM'}] {log.message || log}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
