@@ -206,8 +206,7 @@ export default function MiniETL({
           {!logLines.length && <span style={{ color: '#475569' }}>Нажмите "Запустить анимацию" для просмотра процесса ETL.</span>}
         </div>
         <p style={{ color: '#94a3b8', marginTop: 12 }}>
-          Посмотреть подробный аналитический отчёт можно на вкладке{' '}
-          <Link href="/analytics" style={{ color: '#38bdf8' }}>Analytics</Link>.
+          Данные обрабатываются в реальном времени через ETL pipeline.
         </p>
       </section>
 
