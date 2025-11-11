@@ -135,6 +135,7 @@ class MVPGenerator:
             "package.json",
             "pages/index.js",
             "src/lib/randomuser.js",
+            "next.config.js",  # Required for Next.js to resolve modules correctly
         ]
         missing_files = []
         for file_rel in critical_files:
@@ -359,6 +360,20 @@ class MVPGenerator:
                     continue
         
         log_agent_action("Agent B", f"✅ Upload complete: {uploaded_count} files uploaded, {skipped_count} skipped, {error_count} errors")
+        
+        # Verify critical files were uploaded to GitHub
+        critical_uploaded = []
+        for file_rel in ["src/lib/randomuser.js", "pages/index.js", "package.json", "next.config.js"]:
+            check_url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{file_rel}"
+            check_resp = requests.get(check_url, headers=headers, params={"ref": branch}, timeout=Config.REQUEST_TIMEOUT)
+            if check_resp.status_code == 200:
+                critical_uploaded.append(file_rel)
+                log_agent_action("Agent B", f"✅ Verified {file_rel} exists in GitHub")
+            else:
+                log_agent_action("Agent B", f"⚠️ WARNING: {file_rel} NOT found in GitHub (status: {check_resp.status_code})")
+        
+        if len(critical_uploaded) < 4:
+            log_agent_action("Agent B", f"⚠️ Only {len(critical_uploaded)}/4 critical files verified in GitHub repository")
 
     def _list_contents(self, repo_name: str, headers: Dict[str, str], branch: str, path: str = "") -> Optional[List[Dict[str, Any]]]:
         url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{path}"
