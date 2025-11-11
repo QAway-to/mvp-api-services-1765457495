@@ -130,6 +130,23 @@ class MVPGenerator:
             shutil.rmtree(project_path)
         shutil.copytree(template_path, project_path)
 
+        # Verify critical files were copied
+        critical_files = [
+            "package.json",
+            "pages/index.js",
+            "src/lib/randomuser.js",
+        ]
+        missing_files = []
+        for file_rel in critical_files:
+            file_path = project_path / file_rel
+            if not file_path.exists():
+                missing_files.append(file_rel)
+        
+        if missing_files:
+            log_agent_action("Agent B", f"⚠️ Warning: Missing files after copy: {', '.join(missing_files)}")
+        else:
+            log_agent_action("Agent B", f"✅ All critical files copied successfully")
+
         # Customize project
         await self._customize_project(project_path, project_name, description)
 
@@ -281,34 +298,64 @@ class MVPGenerator:
         branch: str,
         project_name: str,
     ) -> None:
+        uploaded_count = 0
+        skipped_count = 0
+        error_count = 0
+        
         for file_path in project_path.rglob('*'):
             if file_path.is_dir():
                 continue
 
             parts = file_path.relative_to(project_path).parts
-            if parts and parts[0] in {'.git', '.next', 'node_modules'}:
+            if parts and parts[0] in {'.git', '.next', 'node_modules', '__pycache__', '.venv'}:
+                skipped_count += 1
                 continue
 
             if file_path.is_file():
-                relative_path = file_path.relative_to(project_path).as_posix()
-                url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{relative_path}"
+                try:
+                    relative_path = file_path.relative_to(project_path).as_posix()
+                    
+                    # Skip binary files that might cause issues
+                    if file_path.suffix in {'.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot'}:
+                        skipped_count += 1
+                        continue
+                    
+                    url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{relative_path}"
 
-                existing = requests.get(url, headers=headers, params={"ref": branch}, timeout=Config.REQUEST_TIMEOUT)
-                sha = existing.json().get("sha") if existing.status_code == 200 else None
+                    existing = requests.get(url, headers=headers, params={"ref": branch}, timeout=Config.REQUEST_TIMEOUT)
+                    sha = existing.json().get("sha") if existing.status_code == 200 else None
 
-                content_bytes = file_path.read_bytes()
-                encoded = base64.b64encode(content_bytes).decode()
+                    # Read file content
+                    try:
+                        content_bytes = file_path.read_bytes()
+                    except Exception as e:
+                        log_agent_action("Agent B", f"⚠️ Failed to read {relative_path}: {e}")
+                        error_count += 1
+                        continue
+                    
+                    encoded = base64.b64encode(content_bytes).decode()
 
-                data = {
-                    "message": f"Update MVP files from {project_name}",
-                    "content": encoded,
-                    "branch": branch,
-                }
-                if sha:
-                    data["sha"] = sha
+                    data = {
+                        "message": f"Update MVP files from {project_name}",
+                        "content": encoded,
+                        "branch": branch,
+                    }
+                    if sha:
+                        data["sha"] = sha
 
-                put_resp = requests.put(url, headers=headers, json=data, timeout=Config.REQUEST_TIMEOUT)
-                put_resp.raise_for_status()
+                    put_resp = requests.put(url, headers=headers, json=data, timeout=Config.REQUEST_TIMEOUT)
+                    if put_resp.status_code >= 400:
+                        self._raise_for_status_verbose(put_resp, f"Upload {relative_path}")
+                    else:
+                        uploaded_count += 1
+                        if uploaded_count % 10 == 0:
+                            log_agent_action("Agent B", f"📤 Uploaded {uploaded_count} files...")
+                except Exception as e:
+                    log_agent_action("Agent B", f"❌ Error uploading {relative_path}: {e}")
+                    error_count += 1
+                    continue
+        
+        log_agent_action("Agent B", f"✅ Upload complete: {uploaded_count} files uploaded, {skipped_count} skipped, {error_count} errors")
 
     def _list_contents(self, repo_name: str, headers: Dict[str, str], branch: str, path: str = "") -> Optional[List[Dict[str, Any]]]:
         url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{path}"
