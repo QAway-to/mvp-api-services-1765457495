@@ -453,14 +453,14 @@ class MVPGenerator:
             log_agent_action("Agent B", f"⚠️ Unable to determine Vercel project id for {project_name}, skipping env configuration")
             return
 
-        spacex_url = Config.SPACEX_API_URL
-        if not spacex_url:
-            log_agent_action("Agent B", "ℹ️ SPACEX_API_URL not set in environment; skipping Vercel env injection")
+        random_user_url = Config.RANDOM_USER_API_URL
+        if not random_user_url:
+            log_agent_action("Agent B", "ℹ️ RANDOM_USER_API_URL not set in environment; skipping Vercel env injection")
             return
 
         try:
-            self._set_vercel_env_var(project_id, "SPACEX_API_URL", spacex_url)
-            log_agent_action("Agent B", f"🔐 Vercel env configured for {project_name} (SPACEX_API_URL)")
+            self._set_vercel_env_var(project_id, "RANDOM_USER_API_URL", random_user_url)
+            log_agent_action("Agent B", f"🔐 Vercel env configured for {project_name} (RANDOM_USER_API_URL)")
         except Exception as error:
             log_agent_action("Agent B", f"❌ Failed to configure Vercel env vars: {error}")
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import etlFallback from '../src/mock-data/etl.json';
-import { loadLaunches, buildMetrics } from '../src/lib/spacex';
+import { loadUsers, buildMetrics } from '../src/lib/users';
 
 const container = {
   fontFamily: 'Inter, sans-serif',
@@ -24,28 +24,33 @@ const card = {
 
 export default function MiniETL({
   initialMetrics,
-  initialLaunches,
+  initialUsers,
   sourceUrl: initialSource,
   fallbackUsed: initialFallback,
   fetchedAt: initialFetchedAt
 }) {
   const steps = useMemo(() => etlFallback.pipeline, []);
-  const [launches, setLaunches] = useState(initialLaunches);
+  const [users, setUsers] = useState(initialUsers);
   const [metrics, setMetrics] = useState(initialMetrics);
   const [sourceUrl, setSourceUrl] = useState(initialSource);
   const [fallbackUsed, setFallbackUsed] = useState(initialFallback);
   const [fetchedAt, setFetchedAt] = useState(initialFetchedAt);
-  const [stepStatuses, setStepStatuses] = useState(() => steps.map((_, idx) => (idx === 0 ? 'active' : 'pending')));
+  const [stepStatuses, setStepStatuses] = useState(() => steps.map(() => 'pending'));
   const [logLines, setLogLines] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
+  const [animationStarted, setAnimationStarted] = useState(false);
 
-  useEffect(() => {
+  // Убрали автозапуск - анимация запускается только при перезапуске
+  const startAnimation = () => {
+    if (animationStarted) return;
+    setAnimationStarted(true);
+    
     const statuses = steps.map(() => 'pending');
     const logs = [
-      `Extract ▸ Получено ${launches.length} запусков (${fallbackUsed ? 'демо-данные' : extractDomain(sourceUrl)})`,
-      `Transform ▸ Оставлено ${metrics.rows_out} успешных миссий, удалено ${metrics.dedup_removed}`,
-      `Load ▸ Данные готовы. Последняя миссия: ${metrics.lastMission || 'n/a'}`
+      `Extract ▸ Получено ${users.length} пользователей (${fallbackUsed ? 'демо-данные' : extractDomain(sourceUrl)})`,
+      `Transform ▸ Оставлено ${metrics.rows_out} валидных записей, удалено ${metrics.dedup_removed}`,
+      `Load ▸ Данные готовы. Последняя запись: ${metrics.lastRecord || 'n/a'}`
     ];
     const timers = [];
 
@@ -70,25 +75,26 @@ export default function MiniETL({
     timers.push(setTimeout(() => {
       setStepStatuses((prev) => prev.map(() => 'done'));
     }, 3200));
-
-    return () => timers.forEach(clearTimeout);
-  }, [launches, metrics, fallbackUsed, sourceUrl, steps]);
+  };
 
   const handleRestart = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
+    setAnimationStarted(false);
     try {
       const response = await fetch('/api/etl/restart');
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
       const payload = await response.json();
-      setLaunches(payload.launches);
+      setUsers(payload.users);
       setMetrics(payload.metrics);
       setSourceUrl(payload.sourceUrl);
       setFallbackUsed(payload.fallbackUsed);
       setFetchedAt(payload.fetchedAt);
       setLogLines((prev) => [...prev, '🔁 Конвейер перезапущен']);
+      // Запускаем анимацию после обновления данных
+      setTimeout(() => startAnimation(), 100);
     } catch (error) {
       setLogLines((prev) => [...prev, `⚠️ Ошибка перезапуска: ${error}`]);
     } finally {
@@ -97,24 +103,31 @@ export default function MiniETL({
   };
 
   const handleExport = () => {
-    const headers = ['id', 'name', 'date_utc', 'success', 'upcoming', 'rocket', 'launchpad'];
+    const headers = ['id', 'name', 'email', 'phone', 'location', 'age', 'gender', 'country'];
     const csvRows = [headers.join(',')];
-    launches.forEach((launch) => {
-      const row = headers
-        .map((key) => formatCsvValue(key === 'date_utc' ? new Date(launch[key]).toISOString() : launch[key]))
-        .join(',');
+    users.forEach((user) => {
+      const row = [
+        formatCsvValue(user.id),
+        formatCsvValue(user.name),
+        formatCsvValue(user.email),
+        formatCsvValue(user.phone),
+        formatCsvValue(`${user.location?.city || ''}, ${user.location?.country || ''}`),
+        formatCsvValue(user.age),
+        formatCsvValue(user.gender),
+        formatCsvValue(user.nat || user.location?.country)
+      ].join(',');
       csvRows.push(row);
     });
     const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `mini-etl-${Date.now()}.csv`);
+    link.setAttribute('download', `mini-etl-users-${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-    setLogLines((prev) => [...prev, `📤 Экспортировано ${launches.length} строк в CSV`]);
+    setLogLines((prev) => [...prev, `📤 Экспортировано ${users.length} строк в CSV`]);
   };
 
   const isLive = !fallbackUsed;
@@ -125,7 +138,7 @@ export default function MiniETL({
         <div style={{ flex: 1, minWidth: 280 }}>
           <h1 style={{ fontSize: 28, margin: 0 }}>🔄 Mini‑ETL Pipeline</h1>
           <p style={{ color: '#94a3b8', marginTop: 6, fontSize: 14 }}>
-            Proof-of-Concept: вытягиваем реальные данные из SpaceX API, прогоняем через шаги Extract → Transform → Load и показываем метрики.
+            Proof-of-Concept: вытягиваем реальные данные из Random User API, прогоняем через шаги Extract → Transform → Load и показываем метрики.
           </p>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
             <StatusBadge live={isLive} />
@@ -165,7 +178,7 @@ export default function MiniETL({
           <Metric label="Rows in" value={metrics.rows_in} max={metrics.rows_in} />
           <Metric label="Rows out" value={metrics.rows_out} max={metrics.rows_in} />
           <Metric label="Removed" value={metrics.dedup_removed} max={metrics.rows_in} />
-          <Metric label="Upcoming" value={metrics.upcoming} max={metrics.rows_in} />
+          <Metric label="Countries" value={metrics.countries || 0} max={50} />
         </div>
       </section>
 
@@ -196,65 +209,63 @@ export default function MiniETL({
 
       <section style={{ ...card }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>🚀 Миссии ({launches.length})</h2>
-          <span style={{ color: '#64748b', fontSize: 12 }}>Данные из SpaceX API</span>
+          <h2 style={{ margin: 0, fontSize: 18 }}>👥 Пользователи ({users.length})</h2>
+          <span style={{ color: '#64748b', fontSize: 12 }}>Данные из Random User API</span>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(148,163,184,0.2)' }}>
-                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Миссия</th>
-                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Дата</th>
-                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Ракета</th>
-                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Статус</th>
-                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Грузы</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', width: '200px' }}>Имя</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', width: '220px' }}>Email</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', width: '150px' }}>Телефон</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', width: '180px' }}>Местоположение</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', width: '80px' }}>Возраст</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', width: '100px' }}>Статус</th>
               </tr>
             </thead>
             <tbody>
-              {launches
-                .slice()
-                .reverse()
+              {users
                 .slice(0, 20)
-                .map((launch) => (
-                  <tr key={launch.id} style={{ borderBottom: '1px solid rgba(148,163,184,0.08)', cursor: 'pointer' }} onClick={() => window.location.href = `/launch/${launch.id}`}>
-                    <td style={{ padding: '10px 12px', color: '#e2e8f0' }}>
-                      <Link href={`/launch/${launch.id}`} style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 500 }}>
-                        {launch.name || 'Unknown'}
-                      </Link>
+                .map((user) => (
+                  <tr key={user.id} style={{ borderBottom: '1px solid rgba(148,163,184,0.08)' }}>
+                    <td style={{ padding: '10px 12px', color: '#e2e8f0', width: '200px' }}>
+                      {user.name || 'Unknown'}
                     </td>
-                    <td style={{ padding: '10px 12px', color: '#cbd5f5', fontSize: 12 }}>
-                      {new Date(launch.date_utc).toLocaleDateString()}
+                    <td style={{ padding: '10px 12px', color: '#cbd5f5', fontSize: 12, width: '220px' }}>
+                      {user.email || '—'}
                     </td>
-                    <td style={{ padding: '10px 12px', color: '#cbd5f5', fontSize: 12 }}>
-                      {launch.rocket?.name || launch.rocket || 'N/A'}
+                    <td style={{ padding: '10px 12px', color: '#cbd5f5', fontSize: 12, width: '150px' }}>
+                      {user.phone || '—'}
                     </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {launch.success ? (
-                        <span style={{ color: '#22c55e', fontSize: 12 }}>✅ Success</span>
-                      ) : launch.upcoming ? (
-                        <span style={{ color: '#fbbf24', fontSize: 12 }}>🕒 Upcoming</span>
+                    <td style={{ padding: '10px 12px', color: '#cbd5f5', fontSize: 12, width: '180px' }}>
+                      {user.location?.city || ''}, {user.location?.country || ''}
+                    </td>
+                    <td style={{ padding: '10px 12px', color: '#cbd5f5', fontSize: 12, width: '80px' }}>
+                      {user.age || '—'}
+                    </td>
+                    <td style={{ padding: '10px 12px', width: '100px' }}>
+                      {user.valid ? (
+                        <span style={{ color: '#22c55e', fontSize: 12 }}>✅ Valid</span>
                       ) : (
-                        <span style={{ color: '#ef4444', fontSize: 12 }}>⚠️ Failed</span>
+                        <span style={{ color: '#ef4444', fontSize: 12 }}>⚠️ Invalid</span>
                       )}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: '#cbd5f5', fontSize: 12 }}>
-                      {launch.payloads_count || launch.payloads?.length || 0}
                     </td>
                   </tr>
                 ))}
             </tbody>
           </table>
         </div>
-        {launches.length > 20 && (
+        {users.length > 20 && (
           <p style={{ color: '#64748b', marginTop: 12, fontSize: 12, textAlign: 'center' }}>
-            Показано 20 из {launches.length} миссий. <Link href="/analytics" style={{ color: '#38bdf8' }}>Смотреть все</Link>
+            Показано 20 из {users.length} пользователей. <Link href="/analytics" style={{ color: '#38bdf8' }}>Смотреть все</Link>
           </p>
         )}
       </section>
 
       {showSourceModal && (
         <Modal onClose={() => setShowSourceModal(false)} title="Raw JSON payload">
-          <pre style={{ maxHeight: 320, overflow: 'auto', margin: 0 }}>{JSON.stringify(launches, null, 2)}</pre>
+          <pre style={{ maxHeight: 320, overflow: 'auto', margin: 0 }}>{JSON.stringify(users.slice(0, 10), null, 2)}</pre>
         </Modal>
       )}
     </main>
@@ -262,13 +273,13 @@ export default function MiniETL({
 }
 
 export async function getServerSideProps() {
-  const meta = await loadLaunches(true);
-  const metrics = meta.launches.length ? buildMetrics(meta.launches) : etlFallback.metrics;
+  const meta = await loadUsers(true);
+  const metrics = meta.users.length ? buildMetrics(meta.users) : etlFallback.metrics;
 
   return {
     props: {
       initialMetrics: metrics,
-      initialLaunches: meta.launches,
+      initialUsers: meta.users,
       sourceUrl: meta.sourceUrl,
       fallbackUsed: meta.fallbackUsed,
       fetchedAt: meta.fetchedAt

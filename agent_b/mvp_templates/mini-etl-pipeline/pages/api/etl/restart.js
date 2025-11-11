@@ -1,5 +1,5 @@
 import etlFallback from '../../../src/mock-data/etl.json';
-import { loadLaunches, buildMetrics } from '../../../src/lib/spacex';
+import { loadUsers, buildMetrics } from '../../../src/lib/users';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -8,11 +8,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const meta = await loadLaunches(true);
-    const metrics = meta.launches.length ? buildMetrics(meta.launches) : etlFallback.metrics;
+    const meta = await loadUsers(true);
+    const metrics = meta.users.length ? buildMetrics(meta.users) : etlFallback.metrics;
 
     return res.status(200).json({
-      launches: meta.launches,
+      users: meta.users,
       metrics,
       fallbackUsed: meta.fallbackUsed,
       sourceUrl: meta.sourceUrl,

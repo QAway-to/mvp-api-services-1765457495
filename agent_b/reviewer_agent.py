@@ -59,11 +59,48 @@ def review_code(file_name: str, code: str) -> Dict[str, Any]:
 
 def build_review_prompt(file_name: str, code: str) -> str:
     """Build the code review prompt"""
+    
+    # Check if this is a UI component
+    is_ui_component = any(ext in file_name.lower() for ext in ['.js', '.jsx', '.tsx', 'pages/', 'components/'])
+    
+    ui_review_section = ""
+    if is_ui_component:
+        ui_review_section = """
+CRITICAL UI STRUCTURE REQUIREMENTS (MUST CHECK):
+1. Navigation Panel: Every page MUST have a navigation panel with:
+   - "Назад" (Back) or "← Назад" link/button
+   - "Главная" (Home) or link to "/" 
+   - Consistent navigation across all pages
+   
+2. Fixed Dimensions: All UI blocks/elements MUST have fixed widths/heights:
+   - Buttons: fixed width (e.g., minWidth, width in pixels)
+   - Cards/sections: fixed or max-width constraints
+   - Tables: fixed column widths (width: 'XXXpx' in style)
+   - NO elements should change size after click/interaction
+   - Use fixed dimensions in inline styles or CSS
+   
+3. Layout Stability:
+   - Elements should not shift or resize on hover/click
+   - Use fixed positioning or constraints
+   - Prevent layout shifts (CLS - Cumulative Layout Shift)
+   
+4. Consistency:
+   - Same navigation structure on all pages
+   - Same button sizes and styles
+   - Same card/section dimensions
+
+REJECT if:
+- Missing navigation panel on any page
+- Elements without fixed dimensions that could resize
+- Buttons/cards that change size on interaction
+- Inconsistent navigation structure
+"""
+    
     return f"""
-You are a strict senior Python code reviewer. Review the following code for quality, correctness, and best practices.
+You are a strict senior code reviewer. Review the following code for quality, correctness, and best practices.
 
 File: {file_name}
-
+{ui_review_section}
 Respond ONLY with valid JSON in this exact format:
 {{
   "status": "approve",
@@ -79,9 +116,10 @@ or
 
 Guidelines:
 - "approve" only if code is production-ready with no major issues
-- "reject" if there are bugs, security issues, poor practices, or incomplete implementation
+- "reject" if there are bugs, security issues, poor practices, incomplete implementation, or UI structure violations
 - Comments should be specific, actionable, and concise
 - Focus on: syntax errors, logic errors, security vulnerabilities, performance issues, code style, documentation
+{("UI Structure: " + ui_review_section) if is_ui_component else ""}
 
 Code to review:
 {code}
