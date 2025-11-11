@@ -75,7 +75,7 @@ class AgentA:
         except Exception as e:
             error_msg = str(e)[:500]
             log_agent_action("Agent A", f"❌ Browser setup failed: {error_msg}")
-                raise Exception(f"Could not setup Chrome driver: {error_msg}")
+            raise Exception(f"Could not setup Chrome driver: {error_msg}")
 
         try:
             stealth(self.driver,
@@ -378,8 +378,8 @@ class AgentA:
                                         description = description[desc_start:].strip()
                                 except Exception:
                                     pass
-                                except Exception:
-                                    pass
+                        except Exception:
+                            pass
                             
                         # Get budget
                         budget = ""
@@ -431,8 +431,8 @@ class AgentA:
                         hired = 0
                         try:
                             page_text = ""
-                        try:
-                            page_text = self.driver.page_source
+                            try:
+                                page_text = self.driver.page_source
                             except Exception:
                                 page_text = ""
 
@@ -456,35 +456,35 @@ class AgentA:
                                     continue
 
                             if proposals == 0 and page_text:
-                            proposals_patterns = [
+                                proposals_patterns = [
                                     r'откликов[:\s]+(\d+)',
                                     r'предложений[:\s]+(\d+)',
-                                r'(\d+)\s+отклик',
-                                r'(\d+)\s+откликов',
+                                    r'(\d+)\s+отклик',
+                                    r'(\d+)\s+откликов',
                                     r'(\d+)\s+предложен',
                                     r'(\d+)\s+предложений'
-                            ]
-                            for pattern in proposals_patterns:
-                                match = re.search(pattern, page_text, re.IGNORECASE)
-                                if match:
-                                    proposals = int(match.group(1))
-                                    break
+                                ]
+                                for pattern in proposals_patterns:
+                                    match = re.search(pattern, page_text, re.IGNORECASE)
+                                    if match:
+                                        proposals = int(match.group(1))
+                                        break
                             
                             # Hired
                             if page_text:
-                            hired_patterns = [
-                                r'(\d+)\s+исполнител',
-                                r'нанят[:\s]+(\d+)',
-                                r'исполнитель.*нанят',
-                                r'нанято[:\s]+(\d+)'
-                            ]
-                            for pattern in hired_patterns:
-                                match = re.search(pattern, page_text, re.IGNORECASE)
-                                if match:
+                                hired_patterns = [
+                                    r'(\d+)\s+исполнител',
+                                    r'нанят[:\s]+(\d+)',
+                                    r'исполнитель.*нанят',
+                                    r'нанято[:\s]+(\d+)'
+                                ]
+                                for pattern in hired_patterns:
+                                    match = re.search(pattern, page_text, re.IGNORECASE)
+                                    if match:
                                         hired = int(match.group(1)) if match.lastindex else 1
-                                                break
-                                except Exception:
-                                    pass
+                                        break
+                        except Exception:
+                            pass
 
                         # Create project data
                         project_data = {
