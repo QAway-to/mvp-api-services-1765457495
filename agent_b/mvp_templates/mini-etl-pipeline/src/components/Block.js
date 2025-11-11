@@ -1,46 +1,115 @@
-export default function Block({ block, onClick, onMouseDown, isDragging }) {
-  const typeColors = {
-    extract: { bg: 'rgba(34,211,238,0.2)', border: '#22d3ee', icon: '📥' },
-    transform: { bg: 'rgba(251,191,36,0.2)', border: '#fbbf24', icon: '⚙️' },
-    load: { bg: 'rgba(34,197,94,0.2)', border: '#22c55e', icon: '📤' }
-  };
+const blockStyle = {
+  background: '#111c33',
+  border: '2px solid rgba(56,189,248,0.25)',
+  borderRadius: '12px',
+  padding: '20px',
+  minWidth: '200px',
+  cursor: 'pointer',
+  transition: 'all 0.2s',
+  position: 'relative'
+};
 
-  const colors = typeColors[block.type] || typeColors.extract;
-  const status = block.status || 'idle';
+const activeBlockStyle = {
+  ...blockStyle,
+  borderColor: '#38bdf8',
+  boxShadow: '0 0 20px rgba(56,189,248,0.3)'
+};
+
+const blockHeaderStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  marginBottom: '12px'
+};
+
+const blockIconStyle = {
+  fontSize: '24px'
+};
+
+const blockTitleStyle = {
+  fontSize: '16px',
+  fontWeight: 600,
+  color: '#f8fafc',
+  margin: 0
+};
+
+const blockStatusStyle = {
+  marginLeft: 'auto',
+  fontSize: '12px',
+  padding: '4px 8px',
+  borderRadius: '4px',
+  fontWeight: 500
+};
+
+const blockBodyStyle = {
+  fontSize: '13px',
+  color: '#94a3b8',
+  lineHeight: '1.6'
+};
+
+const statusColors = {
+  pending: { background: 'rgba(148,163,184,0.1)', color: '#94a3b8' },
+  active: { background: 'rgba(56,189,248,0.2)', color: '#38bdf8' },
+  success: { background: 'rgba(34,197,94,0.1)', color: '#22c55e' },
+  error: { background: 'rgba(239,68,68,0.1)', color: '#ef4444' }
+};
+
+const blockIcons = {
+  extract: '📥',
+  transform: '🔄',
+  load: '📤'
+};
+
+export default function Block({ 
+  type, 
+  name, 
+  description, 
+  status = 'pending',
+  isActive = false,
+  onClick,
+  data = null
+}) {
+  const currentStyle = isActive ? activeBlockStyle : blockStyle;
+  const statusStyle = { ...blockStatusStyle, ...statusColors[status] || statusColors.pending };
 
   return (
-    <div
-      style={{
-        ...blockStyle,
-        left: block.x || 0,
-        top: block.y || 0,
-        background: colors.bg,
-        borderColor: colors.border,
-        opacity: isDragging ? 0.8 : 1,
-        transform: isDragging ? 'scale(1.05)' : 'scale(1)',
-        cursor: isDragging ? 'grabbing' : 'pointer'
-      }}
+    <div 
+      style={currentStyle}
       onClick={onClick}
-      onMouseDown={onMouseDown}
+      onMouseEnter={(e) => {
+        if (!isActive) {
+          e.currentTarget.style.borderColor = 'rgba(56,189,248,0.5)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) {
+          e.currentTarget.style.borderColor = 'rgba(56,189,248,0.25)';
+        }
+      }}
     >
-      <div style={headerStyle}>
-        <span style={iconStyle}>{colors.icon}</span>
-        <span style={titleStyle}>{block.type.toUpperCase()}</span>
-        {status !== 'idle' && (
-          <span style={statusStyle[status]}>
-            {status === 'running' ? '⏳' : status === 'success' ? '✅' : '❌'}
-          </span>
-        )}
+      <div style={blockHeaderStyle}>
+        <span style={blockIconStyle}>{blockIcons[type] || '📦'}</span>
+        <h3 style={blockTitleStyle}>{name}</h3>
+        <span style={statusStyle}>
+          {status === 'pending' && '⏸️'}
+          {status === 'active' && '⏳'}
+          {status === 'success' && '✅'}
+          {status === 'error' && '❌'}
+        </span>
       </div>
-      <div style={bodyStyle}>
-        <div style={labelStyle}>{block.label || block.id}</div>
-        {block.metrics && (
-          <div style={metricsStyle}>
-            {block.metrics.rowsProcessed && (
-              <span>{block.metrics.rowsProcessed} rows</span>
-            )}
-            {block.metrics.duration && (
-              <span>{block.metrics.duration}ms</span>
+      
+      <div style={blockBodyStyle}>
+        <p style={{ margin: '0 0 8px 0' }}>{description}</p>
+        
+        {data && (
+          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(56,189,248,0.1)' }}>
+            <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Preview:</div>
+            {Array.isArray(data) && data.length > 0 ? (
+              <div style={{ fontSize: '12px', color: '#38bdf8' }}>
+                {data.length} records
+              </div>
+            ) : (
+              <div style={{ fontSize: '12px', color: '#94a3b8' }}>No data</div>
             )}
           </div>
         )}
@@ -48,61 +117,4 @@ export default function Block({ block, onClick, onMouseDown, isDragging }) {
     </div>
   );
 }
-
-const blockStyle = {
-  position: 'absolute',
-  width: 200,
-  minHeight: 100,
-  borderRadius: 12,
-  border: '2px solid',
-  padding: 16,
-  cursor: 'pointer',
-  transition: 'all 0.2s',
-  zIndex: 2,
-  boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-};
-
-const headerStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  marginBottom: 8
-};
-
-const iconStyle = {
-  fontSize: 20
-};
-
-const titleStyle = {
-  flex: 1,
-  fontWeight: 700,
-  fontSize: 14,
-  color: '#f8fafc',
-  textTransform: 'uppercase',
-  letterSpacing: 0.5
-};
-
-const statusStyle = {
-  running: { fontSize: 14 },
-  success: { fontSize: 14 },
-  error: { fontSize: 14 }
-};
-
-const bodyStyle = {
-  fontSize: 12,
-  color: '#cbd5f5'
-};
-
-const labelStyle = {
-  marginBottom: 8,
-  fontWeight: 500
-};
-
-const metricsStyle = {
-  display: 'flex',
-  gap: 12,
-  fontSize: 11,
-  color: '#94a3b8',
-  marginTop: 8
-};
 

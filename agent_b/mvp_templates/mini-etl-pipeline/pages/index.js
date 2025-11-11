@@ -1,115 +1,121 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Sidebar from '../src/components/Sidebar';
 import Toolbar from '../src/components/Toolbar';
 import Canvas from '../src/components/Canvas';
 import PropertiesPanel from '../src/components/PropertiesPanel';
 import LogPanel from '../src/components/LogPanel';
-import { logger } from '../src/lib/logger';
 
-export default function PipelineCanvas() {
-  const [pipeline, setPipeline] = useState({
-    blocks: [
-      { id: 'extract-1', type: 'extract', label: 'Fetch Products', x: 100, y: 200, config: { sourceUrl: 'https://dummyjson.com/products?limit=100' }, status: 'idle' },
-      { id: 'transform-1', type: 'transform', label: 'Filter & Aggregate', x: 400, y: 200, config: { filters: [], aggregations: [] }, status: 'idle' },
-      { id: 'load-1', type: 'load', label: 'Output Result', x: 700, y: 200, config: { target: 'preview', format: 'json' }, status: 'idle' }
-    ],
-    connections: [
-      { from: 'extract-1', to: 'transform-1' },
-      { from: 'transform-1', to: 'load-1' }
-    ]
-  });
-  const [selectedBlock, setSelectedBlock] = useState(null);
-  const [logsVisible, setLogsVisible] = useState(false);
+const defaultBlocks = [
+  {
+    id: 'extract-1',
+    type: 'extract',
+    name: 'Fetch Products',
+    description: 'Extract products from DummyJSON API',
+    status: 'pending',
+    config: {},
+    preview: null
+  },
+  {
+    id: 'transform-1',
+    type: 'transform',
+    name: 'Filter & Sort',
+    description: 'Filter and sort products by price',
+    status: 'pending',
+    config: {
+      sortBy: 'price',
+      sortDirection: 'asc'
+    },
+    preview: null
+  },
+  {
+    id: 'load-1',
+    type: 'load',
+    name: 'Export Results',
+    description: 'Load transformed data to output',
+    status: 'pending',
+    config: {
+      target: 'console'
+    },
+    preview: null
+  }
+];
+
+export default function CanvasPage() {
+  const [blocks, setBlocks] = useState(defaultBlocks);
+  const [activeBlockId, setActiveBlockId] = useState(null);
+  const [showLogs, setShowLogs] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [status, setStatus] = useState('idle');
+  const [logs, setLogs] = useState([]);
   const isMounted = useRef(true);
 
   useEffect(() => {
     isMounted.current = true;
-    logger.clear();
-    logger.info('Pipeline canvas initialized');
     return () => {
       isMounted.current = false;
     };
   }, []);
 
   const handleBlockClick = (blockId) => {
-    const block = pipeline.blocks.find(b => b.id === blockId);
-    setSelectedBlock(block);
-    logger.info(`Block selected: ${blockId}`, { type: block?.type });
+    setActiveBlockId(blockId === activeBlockId ? null : blockId);
   };
 
-  const handleBlockUpdate = (blockId, updates) => {
+  const handleBlockUpdate = (updatedBlock) => {
     if (!isMounted.current) return;
-    setPipeline(prev => ({
-      ...prev,
-      blocks: prev.blocks.map(b => b.id === blockId ? { ...b, ...updates } : b)
-    }));
+    setBlocks(prev => prev.map(b => b.id === updatedBlock.id ? updatedBlock : b));
   };
 
   const handleRun = async () => {
     if (isRunning || !isMounted.current) return;
-    setIsRunning(true);
-    logger.info('Pipeline execution started');
 
-    // Reset block statuses
-    setPipeline(prev => ({
-      ...prev,
-      blocks: prev.blocks.map(b => ({ ...b, status: 'idle', metrics: null }))
-    }));
+    setIsRunning(true);
+    setStatus('running');
+    setLogs([]);
+    setActiveBlockId(null);
+
+    // Reset all block statuses
+    setBlocks(prev => prev.map(b => ({ ...b, status: 'pending', preview: null })));
 
     try {
-      // Update extract block status
-      setPipeline(prev => ({
-        ...prev,
-        blocks: prev.blocks.map(b => b.type === 'extract' ? { ...b, status: 'running' } : b)
-      }));
-      logger.info('Running Extract step...');
-
       const response = await fetch('/api/run-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pipeline })
+        body: JSON.stringify({ pipeline: blocks })
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
 
       const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.error || 'Pipeline execution failed');
+
+      if (!isMounted.current) return;
+
+      if (result.success) {
+        setStatus('success');
+        
+        // Update block statuses and previews
+        setBlocks(prev => prev.map((block) => {
+          const log = result.logs.find(l => l.type === block.type);
+          const preview = Array.isArray(result.data) && result.data.length > 0 
+            ? result.data.slice(0, 3) 
+            : null;
+          return {
+            ...block,
+            status: log?.status === 'success' ? 'success' : log?.status === 'error' ? 'error' : 'pending',
+            preview
+          };
+        }));
+      } else {
+        setStatus('error');
       }
 
-      // Update block statuses and metrics
-      result.results.forEach((stepResult, idx) => {
-        const blockType = ['extract', 'transform', 'load'][idx];
-        setPipeline(prev => ({
-          ...prev,
-          blocks: prev.blocks.map(b => 
-            b.type === blockType 
-              ? { 
-                  ...b, 
-                  status: stepResult.success ? 'success' : 'error',
-                  metrics: {
-                    rowsProcessed: stepResult.rowsProcessed || 0,
-                    duration: stepResult.duration || 0
-                  }
-                } 
-              : b
-          )
-        }));
-        logger.success(`${blockType} step completed`, { rowsProcessed: stepResult.rowsProcessed });
-      });
-
-      logger.success('Pipeline execution completed successfully', { 
-        totalRows: result.finalData?.length || 0 
-      });
+      setLogs(result.logs || []);
     } catch (error) {
-      logger.error('Pipeline execution failed', { error: error.message });
-      setPipeline(prev => ({
-        ...prev,
-        blocks: prev.blocks.map(b => ({ ...b, status: 'error' }))
-      }));
+      if (isMounted.current) {
+        setStatus('error');
+        setLogs([{
+          timestamp: new Date().toISOString(),
+          level: 'error',
+          message: `Pipeline execution failed: ${error.message}`
+        }]);
+      }
     } finally {
       if (isMounted.current) {
         setIsRunning(false);
@@ -118,63 +124,63 @@ export default function PipelineCanvas() {
   };
 
   const handleSave = () => {
-    logger.info('Pipeline saved', { blocks: pipeline.blocks.length });
-    // In a real app, this would save to a backend
-    alert('Pipeline saved! (PoC - not persisted)');
+    // In production, this would save to backend/database
+    const pipelineConfig = {
+      blocks: blocks.map(b => ({
+        id: b.id,
+        type: b.type,
+        name: b.name,
+        description: b.description,
+        config: b.config
+      })),
+      savedAt: new Date().toISOString()
+    };
+    
+    console.log('Saving pipeline:', pipelineConfig);
+    // You could also show a toast notification here
+    alert('Pipeline configuration saved!');
   };
 
-  const handleToggleLogs = () => {
-    setLogsVisible(prev => !prev);
-  };
-
-  const handlePropertiesUpdate = (blockId, updates) => {
-    handleBlockUpdate(blockId, updates);
-    logger.info(`Block ${blockId} updated`, updates);
-  };
+  const activeBlock = blocks.find(b => b.id === activeBlockId);
 
   return (
-    <div style={containerStyle}>
-      <Sidebar currentPage="/" />
-      <div style={getMainContentStyle(!!selectedBlock)}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0b1120' }}>
+      <Sidebar currentPage="canvas" />
+      
+      <div style={{ marginLeft: '240px', display: 'flex', flexDirection: 'column', flex: 1 }}>
         <Toolbar
           onRun={handleRun}
           onSave={handleSave}
-          onToggleLogs={handleToggleLogs}
+          onToggleLogs={() => setShowLogs(!showLogs)}
           isRunning={isRunning}
-          logsVisible={logsVisible}
+          showLogs={showLogs}
+          status={status}
         />
-        <Canvas
-          pipeline={pipeline}
-          onBlockClick={handleBlockClick}
-          onBlockUpdate={handleBlockUpdate}
-        />
-        <LogPanel logs={logger.getLogs()} visible={logsVisible} />
+        
+        <div style={{ display: 'flex', flex: 1, position: 'relative' }}>
+          <div style={{ flex: 1, marginRight: activeBlock ? '320px' : '0' }}>
+            <Canvas
+              blocks={blocks}
+              onBlockClick={handleBlockClick}
+              activeBlockId={activeBlockId}
+            />
+          </div>
+          
+          {activeBlock && (
+            <PropertiesPanel
+              block={activeBlock}
+              onUpdate={handleBlockUpdate}
+            />
+          )}
+        </div>
       </div>
-      {selectedBlock && (
-        <PropertiesPanel
-          block={selectedBlock}
-          onUpdate={handlePropertiesUpdate}
-          onClose={() => setSelectedBlock(null)}
+
+      {showLogs && (
+        <LogPanel
+          logs={logs}
+          onClose={() => setShowLogs(false)}
         />
       )}
     </div>
   );
 }
-
-const containerStyle = {
-  display: 'flex',
-  height: '100vh',
-  background: '#0b1120',
-  color: '#f8fafc',
-  fontFamily: 'Inter, sans-serif',
-  overflow: 'hidden'
-};
-
-const getMainContentStyle = (hasSelectedBlock) => ({
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  marginLeft: 240,
-  marginRight: hasSelectedBlock ? 320 : 0,
-  transition: 'margin-right 0.3s'
-});

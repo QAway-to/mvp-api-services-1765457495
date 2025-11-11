@@ -9,7 +9,8 @@
       "rating": 4.69,
       "stock": 94,
       "brand": "Apple",
-      "category": "smartphones"
+      "category": "smartphones",
+      "thumbnail": "https://cdn.dummyjson.com/products/images/smartphones/iPhone%209/thumbnail.jpg"
     },
     {
       "id": 2,
@@ -20,7 +21,8 @@
       "rating": 4.44,
       "stock": 34,
       "brand": "Apple",
-      "category": "smartphones"
+      "category": "smartphones",
+      "thumbnail": "https://cdn.dummyjson.com/products/images/smartphones/iPhone%20X/thumbnail.jpg"
     },
     {
       "id": 3,
@@ -31,7 +33,8 @@
       "rating": 4.09,
       "stock": 36,
       "brand": "Samsung",
-      "category": "smartphones"
+      "category": "smartphones",
+      "thumbnail": "https://cdn.dummyjson.com/products/images/smartphones/Samsung%20Universe%209/thumbnail.jpg"
     },
     {
       "id": 4,
@@ -42,7 +45,8 @@
       "rating": 4.3,
       "stock": 123,
       "brand": "OPPO",
-      "category": "smartphones"
+      "category": "smartphones",
+      "thumbnail": "https://cdn.dummyjson.com/products/images/smartphones/OPPOF19/thumbnail.jpg"
     },
     {
       "id": 5,
@@ -53,11 +57,9 @@
       "rating": 4.09,
       "stock": 32,
       "brand": "Huawei",
-      "category": "smartphones"
+      "category": "smartphones",
+      "thumbnail": "https://cdn.dummyjson.com/products/images/smartphones/Huawei%20P30/thumbnail.jpg"
     }
-  ],
-  "total": 5,
-  "skip": 0,
-  "limit": 5
+  ]
 }
 

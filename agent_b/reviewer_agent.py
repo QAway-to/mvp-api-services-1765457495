@@ -65,27 +65,8 @@ def build_review_prompt(file_name: str, code: str) -> str:
     ui_guidelines = ""
     nextjs_issues = ""
     
-    is_etl_app = 'etl' in file_name.lower() or 'pipeline' in file_name.lower()
-    
     if is_ui_file:
-        etl_specific = ""
-        if is_etl_app:
-            etl_specific = """
-ETL APPLICATION UI REQUIREMENTS (CRITICAL):
-- Dashboard layout: MUST have compact header (12-16px padding, not 24-32px)
-- Metrics cards: MUST be in grid layout (2-4 columns), compact design (16px padding, not 24px)
-- Transformation panel: MUST have action buttons (Extract, Transform, Load) with fixed dimensions (minWidth: 120px, minHeight: 36px)
-- Data preview: MUST be a table with proper headers, NOT large cards or excessive spacing
-- Log output: MUST be compact terminal-style (12px font, dark background, maxHeight: 200px)
-- NO large icons or emojis in main UI (only small status indicators)
-- NO excessive empty space - use padding 12-16px, not 24-32px
-- Font sizes: Headers 14-20px (not 32-36px), body text 12-14px (not 16-18px)
-- Color scheme: Light background (#f5f7fa), white cards, subtle borders (#e0e0e0)
-- Analytics page: MUST be separate route (/analytics) with table view of all data
-- REJECT if: Large padding (>20px), huge icons, excessive whitespace, oversized text
-"""
-        
-        ui_guidelines = f"""
+        ui_guidelines = """
 UI/UX STRUCTURE REQUIREMENTS (CRITICAL):
 - Navigation: ALL pages MUST have a navigation bar/panel with at least "Back" and "Home" links
 - Button consistency: ALL buttons MUST have fixed dimensions (minWidth, minHeight, or fixed width/height in styles)
@@ -96,7 +77,6 @@ UI/UX STRUCTURE REQUIREMENTS (CRITICAL):
 - Loading states: Show loading indicators for async operations
 - Error handling: Display user-friendly error messages
 - Accessibility: Use semantic HTML, proper ARIA labels where needed
-{etl_specific}
 """
     
     if is_nextjs_file:

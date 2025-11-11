@@ -1,106 +1,72 @@
 import Link from 'next/link';
 
-export default function Sidebar({ currentPage }) {
-  const navItems = [
-    { href: '/', label: 'Pipeline Canvas', icon: '🔄' },
-    { href: '/inspector', label: 'Block Inspector', icon: '🔍' }
-  ];
-
-  return (
-    <aside style={sidebarStyle}>
-      <div style={headerStyle}>
-        <h2 style={titleStyle}>ETL Pipeline</h2>
-        <p style={subtitleStyle}>Visual Data Pipeline</p>
-      </div>
-      <nav style={navStyle}>
-        {navItems.map(item => (
-          <Link
-            key={item.href}
-            href={item.href}
-            style={{
-              ...navItemStyle,
-              ...(currentPage === item.href ? activeNavItemStyle : {})
-            }}
-          >
-            <span style={iconStyle}>{item.icon}</span>
-            <span>{item.label}</span>
-          </Link>
-        ))}
-      </nav>
-      <div style={footerStyle}>
-        <p style={footerTextStyle}>PoC Version 1.0</p>
-      </div>
-    </aside>
-  );
-}
-
 const sidebarStyle = {
-  width: 240,
+  width: '240px',
   background: '#111c33',
   borderRight: '1px solid rgba(56,189,248,0.25)',
-  display: 'flex',
-  flexDirection: 'column',
+  padding: '20px 0',
   height: '100vh',
   position: 'fixed',
   left: 0,
   top: 0,
-  zIndex: 10
-};
-
-const headerStyle = {
-  padding: '24px 20px',
-  borderBottom: '1px solid rgba(56,189,248,0.15)'
-};
-
-const titleStyle = {
-  margin: 0,
-  fontSize: 20,
-  fontWeight: 700,
-  color: '#f8fafc'
-};
-
-const subtitleStyle = {
-  margin: '4px 0 0',
-  fontSize: 12,
-  color: '#94a3b8'
-};
-
-const navStyle = {
-  flex: 1,
-  padding: '16px 0',
   overflowY: 'auto'
 };
 
 const navItemStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 12,
-  padding: '12px 20px',
-  color: '#cbd5f5',
+  display: 'block',
+  padding: '12px 24px',
+  color: '#94a3b8',
   textDecoration: 'none',
-  fontSize: 14,
-  transition: 'all 0.2s'
+  fontSize: '14px',
+  transition: 'all 0.2s',
+  borderLeft: '3px solid transparent'
 };
 
 const activeNavItemStyle = {
-  background: 'rgba(56,189,248,0.15)',
+  ...navItemStyle,
   color: '#38bdf8',
-  borderLeft: '3px solid #38bdf8'
+  background: 'rgba(56,189,248,0.1)',
+  borderLeftColor: '#38bdf8'
 };
 
-const iconStyle = {
-  fontSize: 18
+const sectionStyle = {
+  marginBottom: '32px'
 };
 
-const footerStyle = {
-  padding: '16px 20px',
-  borderTop: '1px solid rgba(56,189,248,0.15)'
-};
-
-const footerTextStyle = {
-  margin: 0,
-  fontSize: 11,
+const sectionTitleStyle = {
+  padding: '0 24px 8px',
+  fontSize: '12px',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
   color: '#64748b',
-  textAlign: 'center'
+  fontWeight: 600
 };
+
+export default function Sidebar({ currentPage = 'canvas' }) {
+  return (
+    <aside style={sidebarStyle}>
+      <div style={sectionStyle}>
+        <div style={sectionTitleStyle}>Pipeline</div>
+        <Link href="/" style={currentPage === 'canvas' ? activeNavItemStyle : navItemStyle}>
+          🎨 Canvas
+        </Link>
+        <Link href="/inspector" style={currentPage === 'inspector' ? activeNavItemStyle : navItemStyle}>
+          ⚙️ Inspector
+        </Link>
+      </div>
+      
+      <div style={sectionStyle}>
+        <div style={sectionTitleStyle}>Documentation</div>
+        <a 
+          href="https://dummyjson.com/docs/products" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={navItemStyle}
+        >
+          📚 API Docs
+        </a>
+      </div>
+    </aside>
+  );
+}
 

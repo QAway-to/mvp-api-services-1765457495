@@ -1,7 +1,7 @@
 * {
-  box-sizing: border-box;
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
 }
 
 body {
@@ -19,13 +19,31 @@ code {
     monospace;
 }
 
+a {
+  color: #38bdf8;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #7dd3fc;
+}
+
+button {
+  font-family: inherit;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #111c33;
 }
 
 ::-webkit-scrollbar-thumb {

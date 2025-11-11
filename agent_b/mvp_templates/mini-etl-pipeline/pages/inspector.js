@@ -1,321 +1,212 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Sidebar from '../src/components/Sidebar';
-import { previewData, sortData, aggregateData, getDataStats } from '../src/lib/dataUtils';
-import { logger } from '../src/lib/logger';
+import Toolbar from '../src/components/Toolbar';
+import PropertiesPanel from '../src/components/PropertiesPanel';
 
-export default function Inspector() {
-  const [data, setData] = useState([]);
-  const [preview, setPreview] = useState([]);
-  const [sortField, setSortField] = useState('');
-  const [sortDirection, setSortDirection] = useState('asc');
-  const [aggregateField, setAggregateField] = useState('');
-  const [aggregated, setAggregated] = useState(null);
-  const [stats, setStats] = useState(null);
+const blockTypes = [
+  { value: 'extract', label: 'Extract', icon: '📥' },
+  { value: 'transform', label: 'Transform', icon: '🔄' },
+  { value: 'load', label: 'Load', icon: '📤' }
+];
+
+export default function InspectorPage() {
+  const [blocks, setBlocks] = useState([]);
+  const [activeBlockId, setActiveBlockId] = useState(null);
+  const [isRunning, setIsRunning] = useState(false);
   const isMounted = useRef(true);
 
   useEffect(() => {
     isMounted.current = true;
-    loadSampleData();
+    // Load saved blocks from localStorage or use defaults
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('etl-pipeline-blocks') : null;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setBlocks(parsed);
+      } catch (e) {
+        console.error('Failed to load saved blocks:', e);
+      }
+    }
     return () => {
       isMounted.current = false;
     };
   }, []);
 
-  const loadSampleData = async () => {
-    try {
-      const response = await fetch('/api/fetch-source', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceUrl: 'https://dummyjson.com/products?limit=100' })
-      });
-      const result = await response.json();
-      if (result.success && isMounted.current) {
-        setData(result.data);
-        setPreview(previewData(result.data, 10));
-        setStats(getDataStats(result.data));
-        logger.info('Sample data loaded', { rows: result.data.length });
+  const handleAddBlock = (type) => {
+    if (!isMounted.current) return;
+    const newBlock = {
+      id: `${type}-${Date.now()}`,
+      type,
+      name: `${blockTypes.find(t => t.value === type)?.label} Block`,
+      description: `Configure ${type} step`,
+      status: 'pending',
+      config: {},
+      preview: null
+    };
+    setBlocks(prev => [...prev, newBlock]);
+    setActiveBlockId(newBlock.id);
+  };
+
+  const handleBlockUpdate = (updatedBlock) => {
+    if (!isMounted.current) return;
+    setBlocks(prev => {
+      const updated = prev.map(b => b.id === updatedBlock.id ? updatedBlock : b);
+      // Save to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('etl-pipeline-blocks', JSON.stringify(updated));
       }
-    } catch (error) {
-      logger.error('Failed to load sample data', { error: error.message });
+      return updated;
+    });
+  };
+
+  const handleDeleteBlock = (blockId) => {
+    if (!isMounted.current) return;
+    setBlocks(prev => {
+      const filtered = prev.filter(b => b.id !== blockId);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('etl-pipeline-blocks', JSON.stringify(filtered));
+      }
+      return filtered;
+    });
+    if (activeBlockId === blockId) {
+      setActiveBlockId(null);
     }
   };
 
-  const handleSort = () => {
-    if (!sortField) return;
-    const sorted = sortData(data, sortField, sortDirection);
-    if (isMounted.current) {
-      setData(sorted);
-      setPreview(previewData(sorted, 10));
-      logger.info('Data sorted', { field: sortField, direction: sortDirection });
+  const handleSave = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('etl-pipeline-blocks', JSON.stringify(blocks));
+      alert('Pipeline configuration saved!');
     }
   };
 
-  const handleAggregate = () => {
-    if (!aggregateField) return;
-    const agg = aggregateData(data, aggregateField);
-    if (isMounted.current) {
-      setAggregated(agg);
-      logger.info('Data aggregated', { field: aggregateField, groups: Object.keys(agg).length });
-    }
-  };
+  const activeBlock = blocks.find(b => b.id === activeBlockId);
 
   return (
-    <div style={containerStyle}>
-      <Sidebar currentPage="/inspector" />
-      <div style={mainContentStyle}>
-        <header style={headerStyle}>
-          <h1 style={titleStyle}>Block Inspector</h1>
-          <p style={subtitleStyle}>Preview, sort, and aggregate data</p>
-        </header>
-
-        <div style={contentStyle}>
-          <section style={sectionStyle}>
-            <h2 style={sectionTitleStyle}>Data Statistics</h2>
-            {stats && (
-              <div style={statsGridStyle}>
-                <div style={statCardStyle}>
-                  <div style={statLabelStyle}>Total Rows</div>
-                  <div style={statValueStyle}>{stats.count}</div>
-                </div>
-                <div style={statCardStyle}>
-                  <div style={statLabelStyle}>Fields</div>
-                  <div style={statValueStyle}>{stats.fields.length}</div>
-                </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0b1120' }}>
+      <Sidebar currentPage="inspector" />
+      
+      <div style={{ marginLeft: '240px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <Toolbar
+          onRun={() => {}}
+          onSave={handleSave}
+          onToggleLogs={() => {}}
+          isRunning={isRunning}
+          showLogs={false}
+          status={null}
+        />
+        
+        <div style={{ display: 'flex', flex: 1, padding: '24px', gap: '24px' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ marginBottom: '24px' }}>
+              <h2 style={{ color: '#f8fafc', fontSize: '20px', marginBottom: '16px' }}>
+                Pipeline Blocks
+              </h2>
+              
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+                {blockTypes.map(type => (
+                  <button
+                    key={type.value}
+                    onClick={() => handleAddBlock(type.value)}
+                    style={{
+                      padding: '12px 20px',
+                      background: 'rgba(56,189,248,0.1)',
+                      border: '1px solid rgba(56,189,248,0.3)',
+                      borderRadius: '8px',
+                      color: '#38bdf8',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <span>{type.icon}</span>
+                    <span>Add {type.label}</span>
+                  </button>
+                ))}
               </div>
-            )}
-          </section>
-
-          <section style={sectionStyle}>
-            <h2 style={sectionTitleStyle}>Sort Data</h2>
-            <div style={controlsStyle}>
-              <select
-                value={sortField}
-                onChange={(e) => setSortField(e.target.value)}
-                style={selectStyle}
-              >
-                <option value="">Select field...</option>
-                {stats?.fields.map(field => (
-                  <option key={field} value={field}>{field}</option>
-                ))}
-              </select>
-              <select
-                value={sortDirection}
-                onChange={(e) => setSortDirection(e.target.value)}
-                style={selectStyle}
-              >
-                <option value="asc">Ascending</option>
-                <option value="desc">Descending</option>
-              </select>
-              <button onClick={handleSort} style={buttonStyle}>
-                Sort
-              </button>
             </div>
-          </section>
 
-          <section style={sectionStyle}>
-            <h2 style={sectionTitleStyle}>Aggregate Data</h2>
-            <div style={controlsStyle}>
-              <select
-                value={aggregateField}
-                onChange={(e) => setAggregateField(e.target.value)}
-                style={selectStyle}
-              >
-                <option value="">Select field...</option>
-                {stats?.fields.map(field => (
-                  <option key={field} value={field}>{field}</option>
-                ))}
-              </select>
-              <button onClick={handleAggregate} style={buttonStyle}>
-                Aggregate
-              </button>
-            </div>
-            {aggregated && (
-              <div style={aggregatedStyle}>
-                {Object.entries(aggregated).map(([key, value]) => (
-                  <div key={key} style={groupStyle}>
-                    <strong>{key}:</strong> {value.count} items
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {blocks.length === 0 ? (
+                <div style={{
+                  padding: '40px',
+                  textAlign: 'center',
+                  color: '#64748b',
+                  background: '#111c33',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(56,189,248,0.25)'
+                }}>
+                  <p>No blocks configured</p>
+                  <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                    Click the buttons above to add ETL blocks
+                  </p>
+                </div>
+              ) : (
+                blocks.map((block, index) => (
+                  <div
+                    key={block.id}
+                    onClick={() => setActiveBlockId(block.id === activeBlockId ? null : block.id)}
+                    style={{
+                      padding: '16px 20px',
+                      background: activeBlockId === block.id ? 'rgba(56,189,248,0.1)' : '#111c33',
+                      border: `2px solid ${activeBlockId === block.id ? '#38bdf8' : 'rgba(56,189,248,0.25)'}`,
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '20px' }}>
+                        {blockTypes.find(t => t.value === block.type)?.icon || '📦'}
+                      </span>
+                      <div>
+                        <div style={{ color: '#f8fafc', fontWeight: 500, fontSize: '14px' }}>
+                          {block.name}
+                        </div>
+                        <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>
+                          {block.description}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteBlock(block.id);
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        background: 'rgba(239,68,68,0.1)',
+                        border: '1px solid rgba(239,68,68,0.3)',
+                        borderRadius: '6px',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                      }}
+                    >
+                      Delete
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section style={sectionStyle}>
-            <h2 style={sectionTitleStyle}>Data Preview (10 rows)</h2>
-            <div style={tableContainerStyle}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    {stats?.fields.slice(0, 5).map(field => (
-                      <th key={field} style={thStyle}>{field}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.map((row, idx) => (
-                    <tr key={idx}>
-                      {stats?.fields.slice(0, 5).map(field => (
-                        <td key={field} style={tdStyle}>
-                          {typeof row[field] === 'object' 
-                            ? JSON.stringify(row[field]).slice(0, 50) 
-                            : String(row[field] || '').slice(0, 50)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))
+              )}
             </div>
-          </section>
+          </div>
+
+          {activeBlock && (
+            <PropertiesPanel
+              block={activeBlock}
+              onUpdate={handleBlockUpdate}
+            />
+          )}
         </div>
       </div>
     </div>
   );
 }
-
-const containerStyle = {
-  display: 'flex',
-  minHeight: '100vh',
-  background: '#0b1120',
-  color: '#f8fafc',
-  fontFamily: 'Inter, sans-serif'
-};
-
-const mainContentStyle = {
-  flex: 1,
-  marginLeft: 240,
-  padding: '24px 32px'
-};
-
-const headerStyle = {
-  marginBottom: 32
-};
-
-const titleStyle = {
-  margin: 0,
-  fontSize: 32,
-  fontWeight: 700,
-  color: '#f8fafc'
-};
-
-const subtitleStyle = {
-  margin: '8px 0 0',
-  fontSize: 16,
-  color: '#94a3b8'
-};
-
-const contentStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 24
-};
-
-const sectionStyle = {
-  background: '#111c33',
-  borderRadius: 16,
-  padding: 24,
-  border: '1px solid rgba(56,189,248,0.25)'
-};
-
-const sectionTitleStyle = {
-  margin: '0 0 16px',
-  fontSize: 20,
-  fontWeight: 700,
-  color: '#f8fafc'
-};
-
-const statsGridStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-  gap: 16
-};
-
-const statCardStyle = {
-  background: '#0f172a',
-  padding: 16,
-  borderRadius: 12,
-  border: '1px solid rgba(56,189,248,0.2)'
-};
-
-const statLabelStyle = {
-  fontSize: 12,
-  color: '#94a3b8',
-  marginBottom: 8
-};
-
-const statValueStyle = {
-  fontSize: 24,
-  fontWeight: 700,
-  color: '#38bdf8'
-};
-
-const controlsStyle = {
-  display: 'flex',
-  gap: 12,
-  alignItems: 'center'
-};
-
-const selectStyle = {
-  padding: '8px 12px',
-  borderRadius: 8,
-  border: '1px solid rgba(56,189,248,0.3)',
-  background: '#0f172a',
-  color: '#f8fafc',
-  fontSize: 14
-};
-
-const buttonStyle = {
-  padding: '8px 16px',
-  borderRadius: 8,
-  border: 'none',
-  background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)',
-  color: '#0b1120',
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: 'pointer',
-  minWidth: 120,
-  minHeight: 36
-};
-
-const aggregatedStyle = {
-  marginTop: 16,
-  padding: 16,
-  background: '#0f172a',
-  borderRadius: 12,
-  maxHeight: 300,
-  overflowY: 'auto'
-};
-
-const groupStyle = {
-  padding: '8px 0',
-  borderBottom: '1px solid rgba(56,189,248,0.1)',
-  color: '#cbd5f5'
-};
-
-const tableContainerStyle = {
-  overflowX: 'auto',
-  marginTop: 16
-};
-
-const tableStyle = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: 13
-};
-
-const thStyle = {
-  padding: '12px 16px',
-  textAlign: 'left',
-  fontWeight: 600,
-  color: '#94a3b8',
-  borderBottom: '1px solid rgba(56,189,248,0.2)',
-  textTransform: 'uppercase',
-  fontSize: 12
-};
-
-const tdStyle = {
-  padding: '12px 16px',
-  borderBottom: '1px solid rgba(56,189,248,0.08)',
-  color: '#e2e8f0'
-};
 
