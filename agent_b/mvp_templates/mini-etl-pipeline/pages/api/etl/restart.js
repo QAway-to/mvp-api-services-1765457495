@@ -1,5 +1,5 @@
 import etlFallback from '../../../src/mock-data/etl.json';
-import { loadUsers, buildMetrics } from '../../../src/lib/users';
+import { loadUsers, buildMetrics } from '../../../src/lib/randomuser';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

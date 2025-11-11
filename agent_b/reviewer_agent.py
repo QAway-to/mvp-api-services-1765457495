@@ -59,51 +59,28 @@ def review_code(file_name: str, code: str) -> Dict[str, Any]:
 
 def build_review_prompt(file_name: str, code: str) -> str:
     """Build the code review prompt"""
+    is_ui_file = any(ext in file_name.lower() for ext in ['.js', '.jsx', '.tsx', '.html', '.css'])
     
-    # Check if this is a UI component
-    is_ui_component = any(ext in file_name.lower() for ext in ['.js', '.jsx', '.tsx', 'pages/', 'components/'])
-    
-    ui_review_section = ""
-    if is_ui_component:
-        ui_review_section = """
-CRITICAL UI STRUCTURE REQUIREMENTS (MUST CHECK):
-1. Navigation Panel: Every page MUST have a navigation panel with:
-   - "Назад" (Back) or "← Назад" link/button
-   - "Главная" (Home) or link to "/" 
-   - Consistent navigation across all pages
-   
-2. Fixed Dimensions for Buttons ONLY:
-   - Buttons (button elements): MUST have fixed width (e.g., minWidth, width in pixels)
-   - Buttons should NOT change size after click/interaction
-   - Other elements (cards, sections, tables, divs) can be adaptive/responsive
-   - Cards/sections: can use max-width constraints, but don't require fixed widths
-   - Tables: column widths can be adaptive (auto, percentage, or minmax)
-   - Layout containers: should be responsive and adaptive
-   
-3. Layout Stability:
-   - Buttons should not shift or resize on hover/click
-   - Other elements can adapt to content, but should avoid sudden layout shifts
-   - Use responsive design patterns (grid, flexbox with wrap)
-   - Prevent major layout shifts (CLS - Cumulative Layout Shift) for buttons
-   
-4. Consistency:
-   - Same navigation structure on all pages
-   - Same button sizes and styles across pages
-   - Cards/sections can vary in size based on content (adaptive)
-
-REJECT if:
-- Missing navigation panel on any page
-- Buttons without fixed dimensions that change size on interaction
-- Buttons that resize after click/hover
-- Inconsistent navigation structure
-- Buttons causing layout shifts
+    ui_guidelines = ""
+    if is_ui_file:
+        ui_guidelines = """
+UI/UX STRUCTURE REQUIREMENTS (CRITICAL):
+- Navigation: ALL pages MUST have a navigation bar/panel with at least "Back" and "Home" links
+- Button consistency: ALL buttons MUST have fixed dimensions (minWidth, minHeight, or fixed width/height in styles)
+- Layout: Use grid/flexbox layouts to minimize empty spaces (padding 16-20px, not 24-32px)
+- Responsive: Mobile-first approach with responsive breakpoints
+- Interactive elements: All buttons/links MUST have hover states and visual feedback
+- Empty states: Handle empty data gracefully with informative messages
+- Loading states: Show loading indicators for async operations
+- Error handling: Display user-friendly error messages
+- Accessibility: Use semantic HTML, proper ARIA labels where needed
 """
     
     return f"""
 You are a strict senior code reviewer. Review the following code for quality, correctness, and best practices.
 
 File: {file_name}
-{ui_review_section}
+{ui_guidelines}
 Respond ONLY with valid JSON in this exact format:
 {{
   "status": "approve",
@@ -122,7 +99,7 @@ Guidelines:
 - "reject" if there are bugs, security issues, poor practices, incomplete implementation, or UI structure violations
 - Comments should be specific, actionable, and concise
 - Focus on: syntax errors, logic errors, security vulnerabilities, performance issues, code style, documentation
-{("UI Structure: " + ui_review_section) if is_ui_component else ""}
+{("- UI structure violations (missing navigation, inconsistent button sizes, poor layout)" if is_ui_file else "")}
 
 Code to review:
 {code}

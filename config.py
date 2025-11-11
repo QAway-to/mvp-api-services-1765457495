@@ -59,8 +59,7 @@ class Config:
     NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
     FAKESTORE_API_URL = os.getenv("FAKESTORE_API_URL", "https://fakestoreapi.com/products")
     QUOTES_API_URL = os.getenv("QUOTES_API_URL", "http://quotes.toscrape.com/")
-    SPACEX_API_URL = os.getenv("SPACEX_API_URL", "https://api.spacexdata.com/v5/launches")
-    RANDOM_USER_API_URL = os.getenv("RANDOM_USER_API_URL", "https://randomuser.me/api/?results=500")
+    RANDOMUSER_API_URL = os.getenv("RANDOMUSER_API_URL", "https://randomuser.me/api/?results=500")
 
     # Search limits
     MAX_PROJECTS_PER_SESSION: int = int(os.getenv('MAX_PROJECTS_PER_SESSION', '5'))
