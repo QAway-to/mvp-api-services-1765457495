@@ -60,8 +60,11 @@ def review_code(file_name: str, code: str) -> Dict[str, Any]:
 def build_review_prompt(file_name: str, code: str) -> str:
     """Build the code review prompt"""
     is_ui_file = any(ext in file_name.lower() for ext in ['.js', '.jsx', '.tsx', '.html', '.css'])
+    is_nextjs_file = 'pages' in file_name.lower() or 'components' in file_name.lower() or file_name.endswith(('.js', '.jsx', '.tsx'))
     
     ui_guidelines = ""
+    nextjs_issues = ""
+    
     if is_ui_file:
         ui_guidelines = """
 UI/UX STRUCTURE REQUIREMENTS (CRITICAL):
@@ -76,11 +79,58 @@ UI/UX STRUCTURE REQUIREMENTS (CRITICAL):
 - Accessibility: Use semantic HTML, proper ARIA labels where needed
 """
     
+    if is_nextjs_file:
+        nextjs_issues = """
+NEXT.JS / REACT CRITICAL ISSUES (MUST CHECK - Known production bugs):
+
+1. REACT ERROR #31 - Invalid Component Type (CRITICAL):
+   - ALWAYS verify imports/exports match: default export requires default import, named export requires named import
+   - Check that imported components are actually functions/components, not objects or undefined
+   - Example: If file exports "export const MyComponent = ...", import MUST be "import { MyComponent } from ..."
+   - Example: If file exports "export default MyComponent", import MUST be "import MyComponent from ..."
+   - REJECT if: import MyComponent from './file' but file has named export, or vice versa
+   - REJECT if: component is undefined or an object when used in JSX
+
+2. GETSERVER SIDEPROPS / SERVER-SIDE RENDERING (CRITICAL):
+   - getServerSideProps MUST always return valid props object with all required fields
+   - ALL props from getServerSideProps MUST have safe defaults (use || [] for arrays, || {} for objects, || '' for strings)
+   - Component MUST handle undefined/null props gracefully with default values in useState initialization
+   - Example: useState(initialUsers || []) not useState(initialUsers)
+   - REJECT if: props used without null/undefined checks
+   - REJECT if: getServerSideProps doesn't have try/catch with fallback return
+
+3. FETCH IN SERVER CONTEXT (CRITICAL):
+   - In getServerSideProps, fetch() may not be available in all Node.js versions
+   - MUST use try/catch around fetch calls
+   - MUST provide fallback data if fetch fails
+   - Consider using node-fetch or checking typeof fetch !== 'undefined'
+   - REJECT if: fetch used without error handling in getServerSideProps
+
+4. JSON IMPORTS (CRITICAL):
+   - JSON imports MUST use default import: import data from './file.json'
+   - MUST check if imported JSON exists and has expected structure
+   - REJECT if: JSON imported incorrectly or used without existence checks
+
+5. ARRAY/OBJECT SAFETY (CRITICAL):
+   - ALWAYS use Array.isArray() before calling .map(), .slice(), .filter() on data
+   - ALWAYS check object existence before accessing nested properties (use optional chaining ?.)
+   - Example: users?.length, user?.name?.first, Array.isArray(users) && users.map(...)
+   - REJECT if: array methods called on potentially undefined/null values
+   - REJECT if: nested property access without optional chaining or existence checks
+
+6. STATE INITIALIZATION (CRITICAL):
+   - useState MUST initialize with safe defaults: useState(prop || defaultValue)
+   - NEVER use useState(undefined) or useState(null) without fallback
+   - Example: useState(initialUsers || []), useState(initialMetrics || {})
+   - REJECT if: state initialized with potentially undefined props without defaults
+"""
+    
     return f"""
 You are a strict senior code reviewer. Review the following code for quality, correctness, and best practices.
 
 File: {file_name}
 {ui_guidelines}
+{nextjs_issues}
 Respond ONLY with valid JSON in this exact format:
 {{
   "status": "approve",
@@ -96,10 +146,11 @@ or
 
 Guidelines:
 - "approve" only if code is production-ready with no major issues
-- "reject" if there are bugs, security issues, poor practices, incomplete implementation, or UI structure violations
+- "reject" if there are bugs, security issues, poor practices, incomplete implementation, UI structure violations, or Next.js/React critical issues
 - Comments should be specific, actionable, and concise
 - Focus on: syntax errors, logic errors, security vulnerabilities, performance issues, code style, documentation
 {("- UI structure violations (missing navigation, inconsistent button sizes, poor layout)" if is_ui_file else "")}
+{("- Next.js/React critical issues (import/export mismatches, unsafe props, server-side rendering problems)" if is_nextjs_file else "")}
 
 Code to review:
 {code}
