@@ -72,28 +72,31 @@ CRITICAL UI STRUCTURE REQUIREMENTS (MUST CHECK):
    - "Главная" (Home) or link to "/" 
    - Consistent navigation across all pages
    
-2. Fixed Dimensions: All UI blocks/elements MUST have fixed widths/heights:
-   - Buttons: fixed width (e.g., minWidth, width in pixels)
-   - Cards/sections: fixed or max-width constraints
-   - Tables: fixed column widths (width: 'XXXpx' in style)
-   - NO elements should change size after click/interaction
-   - Use fixed dimensions in inline styles or CSS
+2. Fixed Dimensions for Buttons ONLY:
+   - Buttons (button elements): MUST have fixed width (e.g., minWidth, width in pixels)
+   - Buttons should NOT change size after click/interaction
+   - Other elements (cards, sections, tables, divs) can be adaptive/responsive
+   - Cards/sections: can use max-width constraints, but don't require fixed widths
+   - Tables: column widths can be adaptive (auto, percentage, or minmax)
+   - Layout containers: should be responsive and adaptive
    
 3. Layout Stability:
-   - Elements should not shift or resize on hover/click
-   - Use fixed positioning or constraints
-   - Prevent layout shifts (CLS - Cumulative Layout Shift)
+   - Buttons should not shift or resize on hover/click
+   - Other elements can adapt to content, but should avoid sudden layout shifts
+   - Use responsive design patterns (grid, flexbox with wrap)
+   - Prevent major layout shifts (CLS - Cumulative Layout Shift) for buttons
    
 4. Consistency:
    - Same navigation structure on all pages
-   - Same button sizes and styles
-   - Same card/section dimensions
+   - Same button sizes and styles across pages
+   - Cards/sections can vary in size based on content (adaptive)
 
 REJECT if:
 - Missing navigation panel on any page
-- Elements without fixed dimensions that could resize
-- Buttons/cards that change size on interaction
+- Buttons without fixed dimensions that change size on interaction
+- Buttons that resize after click/hover
 - Inconsistent navigation structure
+- Buttons causing layout shifts
 """
     
     return f"""

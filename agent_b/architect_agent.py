@@ -230,6 +230,8 @@ def generate_project_structure(architect, project_description: str) -> Dict[str,
 
     Keep modules limited (max 8 per phase) and focused on core functionality.
     For UI components (React/Next.js), ensure compact, information-dense layouts with minimal empty spaces.
+    IMPORTANT: Buttons must have fixed dimensions (minWidth or width in pixels) and should NOT change size on interaction.
+    Other elements (cards, sections, tables) can be adaptive/responsive.
     """
 
     for attempt in range(Config.MAX_RETRIES):
