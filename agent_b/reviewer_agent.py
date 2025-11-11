@@ -123,29 +123,6 @@ NEXT.JS / REACT CRITICAL ISSUES (MUST CHECK - Known production bugs):
    - NEVER use useState(undefined) or useState(null) without fallback
    - Example: useState(initialUsers || []), useState(initialMetrics || {})
    - REJECT if: state initialized with potentially undefined props without defaults
-
-7. UNMOUNTED COMPONENT UPDATES (CRITICAL - React Error #31):
-   - ALL useEffect hooks MUST return cleanup functions for timers, subscriptions, and async operations
-   - ALL setTimeout/setInterval MUST be cleared in cleanup: return () => { clearTimeout(timerId); }
-   - ALL async operations (fetch, promises) MUST check if component is mounted before setState
-   - Use useRef to track mounted state: const isMounted = useRef(true); useEffect(() => { return () => { isMounted.current = false; }; }, []);
-   - Before setState in async: if (isMounted.current) { setState(...); }
-   - REJECT if: setTimeout/setInterval without cleanup function
-   - REJECT if: fetch/async operations without mounted check before setState
-   - REJECT if: useEffect without cleanup for timers, subscriptions, or event listeners
-   - Example CORRECT:
-     useEffect(() => {
-       const timer = setTimeout(() => setCount(c => c + 1), 1000);
-       return () => clearTimeout(timer);
-     }, []);
-   - Example CORRECT:
-     const isMounted = useRef(true);
-     useEffect(() => {
-       fetch('/api/data').then(data => {
-         if (isMounted.current) setData(data);
-       });
-       return () => { isMounted.current = false; };
-     }, []);
 """
     
     return f"""

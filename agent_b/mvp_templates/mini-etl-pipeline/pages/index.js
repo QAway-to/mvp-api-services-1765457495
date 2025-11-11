@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
-import Canvas from '../src/components/Canvas';
-import LogPanel from '../src/components/LogPanel';
-import { runPipeline, ETL_STEPS, STEP_STATUS } from '../src/lib/pipeline';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import etlFallback from '../src/mock-data/etl.json';
+import { loadUsers, buildMetrics } from '../src/lib/randomuser';
 
-const containerStyle = {
+const container = {
   fontFamily: 'Inter, sans-serif',
   padding: '24px 32px',
   background: '#0b1120',
@@ -11,15 +11,7 @@ const containerStyle = {
   minHeight: '100vh'
 };
 
-const headerStyle = {
-  marginBottom: 24,
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  gap: 16
-};
-
-const cardStyle = {
+const card = {
   background: '#111c33',
   borderRadius: 16,
   padding: 24,
@@ -28,198 +20,396 @@ const cardStyle = {
   boxShadow: '0 20px 28px rgba(8, 47, 73, 0.45)'
 };
 
-export default function MiniETL() {
-  const [blocks, setBlocks] = useState([
-    { step: ETL_STEPS.EXTRACT, status: STEP_STATUS.PENDING, data: null },
-    { step: ETL_STEPS.TRANSFORM, status: STEP_STATUS.PENDING, data: null },
-    { step: ETL_STEPS.LOAD, status: STEP_STATUS.PENDING, data: null }
-  ]);
-  const [logs, setLogs] = useState([]);
-  const [isRunning, setIsRunning] = useState(false);
-  const [metrics, setMetrics] = useState(null);
-  const isMounted = useRef(true);
+export default function MiniETL({
+  initialMetrics,
+  initialUsers,
+  sourceUrl: initialSource,
+  fallbackUsed: initialFallback,
+  fetchedAt: initialFetchedAt
+}) {
+  const steps = useMemo(() => etlFallback.pipeline, []);
+  const [users, setUsers] = useState(initialUsers);
+  const [metrics, setMetrics] = useState(initialMetrics);
+  const [sourceUrl, setSourceUrl] = useState(initialSource);
+  const [fallbackUsed, setFallbackUsed] = useState(initialFallback);
+  const [fetchedAt, setFetchedAt] = useState(initialFetchedAt);
+  const [stepStatuses, setStepStatuses] = useState(() => steps.map(() => 'pending'));
+  const [logLines, setLogLines] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showSourceModal, setShowSourceModal] = useState(false);
+  const [animationStarted, setAnimationStarted] = useState(false);
 
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
+  const startAnimation = () => {
+    if (animationStarted) return;
+    setAnimationStarted(true);
+    const statuses = steps.map(() => 'pending');
+    const logs = [
+      `Extract ▸ Получено ${users.length} пользователей (${fallbackUsed ? 'демо-данные' : extractDomain(sourceUrl)})`,
+      `Transform ▸ Оставлено ${metrics.rows_out} валидных записей, удалено ${metrics.dedup_removed}`,
+      `Load ▸ Данные готовы. Последний пользователь: ${metrics.lastUser || 'n/a'}`
+    ];
+    const timers = [];
 
-  const updateBlock = (step, updates) => {
-    if (!isMounted.current) return;
-    setBlocks(prev => prev.map(block => 
-      block.step === step ? { ...block, ...updates } : block
-    ));
+    setStepStatuses(statuses);
+    setLogLines([]);
+
+    timers.push(setTimeout(() => {
+      setStepStatuses((prev) => prev.map((_, idx) => (idx === 0 ? 'active' : idx > 0 ? 'pending' : _)));
+      setLogLines([logs[0]]);
+    }, 200));
+
+    timers.push(setTimeout(() => {
+      setStepStatuses((prev) => prev.map((_, idx) => (idx === 0 ? 'done' : idx === 1 ? 'active' : 'pending')));
+      setLogLines(logs.slice(0, 2));
+    }, 1200));
+
+    timers.push(setTimeout(() => {
+      setStepStatuses((prev) => prev.map((_, idx) => (idx < 2 ? 'done' : 'active')));
+      setLogLines(logs);
+    }, 2200));
+
+    timers.push(setTimeout(() => {
+      setStepStatuses((prev) => prev.map(() => 'done'));
+    }, 3200));
   };
 
-  const addLog = (log) => {
-    if (!isMounted.current) return;
-    setLogs(prev => [...prev, log]);
-  };
-
-  const handleRunPipeline = async () => {
-    if (isRunning || !isMounted.current) return;
-
-    setIsRunning(true);
-    setLogs([]);
-    
-    // Reset all blocks
-    blocks.forEach(block => {
-      updateBlock(block.step, { status: STEP_STATUS.PENDING, data: null });
-    });
-
+  const handleRestart = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    setAnimationStarted(false);
     try {
-      const result = await runPipeline();
-
-      if (!isMounted.current) return;
-
-      // Update blocks with results
-      if (result.results.extract) {
-        updateBlock(ETL_STEPS.EXTRACT, { 
-          status: STEP_STATUS.SUCCESS, 
-          data: result.results.extract 
-        });
+      const response = await fetch('/api/etl/restart');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
-      if (result.results.transform) {
-        updateBlock(ETL_STEPS.TRANSFORM, { 
-          status: STEP_STATUS.SUCCESS, 
-          data: result.results.transform 
-        });
-      }
-      if (result.results.load) {
-        updateBlock(ETL_STEPS.LOAD, { 
-          status: STEP_STATUS.SUCCESS, 
-          data: result.results.transform // Use transformed data for load preview
-        });
-      }
-
-      // Update metrics
-      if (result.results.extract && result.results.transform) {
-        setMetrics({
-          rows_in: result.results.extract.length,
-          rows_out: result.results.transform.length,
-          dedup_removed: result.results.extract.length - result.results.transform.length
-        });
-      }
-
-      // Add logs
-      result.logs.forEach(log => addLog(log));
-
-      if (!result.success) {
-        const errorBlock = result.logs.find(l => l.status === STEP_STATUS.ERROR);
-        if (errorBlock) {
-          updateBlock(errorBlock.step, { status: STEP_STATUS.ERROR });
-        }
-      }
+      const payload = await response.json();
+      setUsers(payload.users);
+      setMetrics(payload.metrics);
+      setSourceUrl(payload.sourceUrl);
+      setFallbackUsed(payload.fallbackUsed);
+      setFetchedAt(payload.fetchedAt);
+      setLogLines((prev) => [...prev, '🔁 Конвейер перезапущен']);
+      setTimeout(() => startAnimation(), 100);
     } catch (error) {
-      if (isMounted.current) {
-        addLog({ 
-          step: 'system', 
-          status: STEP_STATUS.ERROR, 
-          message: `Pipeline execution failed: ${error.message}` 
-        });
-      }
+      setLogLines((prev) => [...prev, `⚠️ Ошибка перезапуска: ${error}`]);
     } finally {
-      if (isMounted.current) {
-        setIsRunning(false);
-      }
+      setIsProcessing(false);
     }
   };
 
-  const handleRunBlock = async (step) => {
-    if (isRunning || !isMounted.current) return;
-
-    updateBlock(step, { status: STEP_STATUS.RUNNING });
-    addLog({ step, status: STEP_STATUS.RUNNING, message: `Running ${step}...` });
-
-    try {
-      let response;
-      if (step === ETL_STEPS.EXTRACT) {
-        response = await fetch('/api/fetch');
-      } else if (step === ETL_STEPS.TRANSFORM) {
-        const extractBlock = blocks.find(b => b.step === ETL_STEPS.EXTRACT);
-        if (!extractBlock?.data) {
-          throw new Error('Extract must be run first');
-        }
-        response = await fetch('/api/transform', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ products: extractBlock.data })
-        });
-      } else if (step === ETL_STEPS.LOAD) {
-        const transformBlock = blocks.find(b => b.step === ETL_STEPS.TRANSFORM);
-        if (!transformBlock?.data) {
-          throw new Error('Transform must be run first');
-        }
-        response = await fetch('/api/load', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ products: transformBlock.data })
-        });
-      }
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-
-      if (!isMounted.current) return;
-
-      if (step === ETL_STEPS.EXTRACT) {
-        updateBlock(step, { status: STEP_STATUS.SUCCESS, data: data.products });
-      } else {
-        updateBlock(step, { status: STEP_STATUS.SUCCESS, data: data.products || data.result });
-      }
-
-      addLog({ step, status: STEP_STATUS.SUCCESS, message: `${step} completed successfully` });
-    } catch (error) {
-      if (isMounted.current) {
-        updateBlock(step, { status: STEP_STATUS.ERROR });
-        addLog({ step, status: STEP_STATUS.ERROR, message: `${step} failed: ${error.message}` });
-      }
-    }
+  const handleExport = () => {
+    const headers = ['id', 'name_first', 'name_last', 'email', 'phone', 'country', 'city', 'registered_date'];
+    const csvRows = [headers.join(',')];
+    users.forEach((user) => {
+      const row = [
+        formatCsvValue(user.id?.value || user.login?.uuid || ''),
+        formatCsvValue(user.name?.first || ''),
+        formatCsvValue(user.name?.last || ''),
+        formatCsvValue(user.email || ''),
+        formatCsvValue(user.phone || ''),
+        formatCsvValue(user.location?.country || ''),
+        formatCsvValue(user.location?.city || ''),
+        formatCsvValue(user.registered?.date ? new Date(user.registered.date).toISOString() : '')
+      ].join(',');
+      csvRows.push(row);
+    });
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `mini-etl-users-${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    setLogLines((prev) => [...prev, `📤 Экспортировано ${users.length} строк в CSV`]);
   };
+
+  const isLive = !fallbackUsed;
 
   return (
-    <main style={containerStyle}>
-      <header style={headerStyle}>
+    <main style={container}>
+      <header style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 36, margin: 0 }}>🔄 Mini‑ETL Pipeline</h1>
           <p style={{ color: '#94a3b8', marginTop: 8 }}>
-            Extract products from DummyJSON API, transform and load them.
+            Proof-of-Concept: вытягиваем реальные данные из Random User API, прогоняем через шаги Extract → Transform → Load и показываем метрики.
           </p>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 12 }}>
+            <StatusBadge live={isLive} />
+            <span style={{ color: '#64748b', fontSize: 14 }}>
+              Источник: {extractDomain(sourceUrl)} · Обновлено: {new Date(fetchedAt).toLocaleString()}
+            </span>
+          </div>
         </div>
         <button
-          onClick={handleRunPipeline}
-          disabled={isRunning}
+          onClick={handleRestart}
+          disabled={isProcessing}
           style={{
-            padding: '12px 24px',
+            padding: '10px 18px',
             borderRadius: 12,
-            background: isRunning ? '#0f172a' : 'linear-gradient(135deg,#38bdf8,#0ea5e9)',
+            background: isProcessing ? '#0f172a' : 'linear-gradient(135deg,#38bdf8,#0ea5e9)',
             border: 'none',
-            color: isRunning ? '#475569' : '#0b1120',
+            color: isProcessing ? '#475569' : '#0b1120',
             fontWeight: 700,
-            cursor: isRunning ? 'wait' : 'pointer',
-            fontSize: 16,
-            minWidth: 180,
-            minHeight: 48
+            cursor: isProcessing ? 'wait' : 'pointer',
+            minWidth: 180
           }}
         >
-          {isRunning ? 'Running...' : '▶ Run Full Pipeline'}
+          {isProcessing ? 'Перезапуск...' : 'Перезапустить конвейер'}
         </button>
       </header>
 
-      <section style={cardStyle}>
-        <Canvas 
-          blocks={blocks} 
-          onBlockRun={handleRunBlock}
-          metrics={metrics}
-        />
+      <section style={{ ...card, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        {steps.map((step, idx) => (
+          <PipelinePill key={step} step={step} index={idx} status={stepStatuses[idx]} />
+        ))}
       </section>
 
-      <section style={cardStyle}>
-        <h2 style={{ marginTop: 0, fontSize: 20, fontWeight: 700 }}>📝 Pipeline Logs</h2>
-        <LogPanel logs={logs} />
+      <section style={{ ...card }}>
+        <h2 style={{ marginTop: 0 }}>📊 Metrics</h2>
+        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+          <Metric label="Rows in (users fetched)" value={metrics.rows_in} />
+          <Metric label="Rows out (valid)" value={metrics.rows_out} />
+          <Metric label="Removed (invalid)" value={metrics.dedup_removed} />
+          <Metric label="Countries" value={metrics.countries || 0} />
+        </div>
       </section>
+
+      <section style={{ ...card }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 style={{ marginTop: 0 }}>📝 Live Log</h2>
+          {!animationStarted && (
+            <button
+              onClick={startAnimation}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                background: '#1d293a',
+                border: '1px solid rgba(56,189,248,0.3)',
+                color: '#e2e8f0',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              ▶ Запустить анимацию
+            </button>
+          )}
+        </div>
+        <div style={{ background: '#0f172a', borderRadius: 12, padding: 16, fontFamily: 'JetBrains Mono, monospace', fontSize: 13, minHeight: 96 }}>
+          {logLines.map((line, idx) => (
+            <div key={idx} style={{ color: '#cbd5f5' }}>
+              {line}
+            </div>
+          ))}
+          {!logLines.length && <span style={{ color: '#475569' }}>Нажмите "Запустить анимацию" для просмотра процесса ETL.</span>}
+        </div>
+        <p style={{ color: '#94a3b8', marginTop: 12 }}>
+          Посмотреть подробный аналитический отчёт можно на вкладке{' '}
+          <Link href="/analytics" style={{ color: '#38bdf8' }}>Analytics</Link>.
+        </p>
+      </section>
+
+      <section style={{ ...card, marginTop: 24 }}>
+        <h2 style={{ marginTop: 0 }}>👥 Пользователи</h2>
+        <p style={{ color: '#94a3b8' }}>
+          Тянем данные напрямую с публичного Random User API. Показано {users.length} записей.
+        </p>
+        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', marginTop: 16 }}>
+          {users.slice(0, 20).map((user, idx) => (
+            <div key={user.id?.value || user.login?.uuid || idx} style={{ background: '#0f172a', borderRadius: 12, padding: 16, border: '1px solid rgba(56,189,248,0.2)' }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 8 }}>
+                <img src={user.picture?.thumbnail || 'https://via.placeholder.com/48'} alt="" style={{ width: 48, height: 48, borderRadius: '50%' }} />
+                <div>
+                  <div style={{ fontWeight: 600, color: '#f8fafc' }}>{user.name?.first} {user.name?.last}</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>{user.email}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 13, color: '#cbd5f5', marginTop: 8 }}>
+                <div>📍 {user.location?.city}, {user.location?.country}</div>
+                <div>📞 {user.phone}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {users.length > 20 && (
+          <p style={{ color: '#94a3b8', marginTop: 16, textAlign: 'center' }}>
+            ... и ещё {users.length - 20} записей
+          </p>
+        )}
+      </section>
+
+      <section style={{ ...card, marginTop: 24 }}>
+        <h2 style={{ marginTop: 0 }}>⚙️ Управление</h2>
+        <p style={{ color: '#94a3b8' }}>
+          Кнопки ниже демонстрируют перезапуск/откат. В проде интеграция с Airflow, Prefect, dbt Cloud.
+        </p>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <SecondaryButton onClick={() => setShowSourceModal(true)}>Посмотреть исходный файл</SecondaryButton>
+          <SecondaryButton onClick={handleExport}>Экспортировать отчёт (CSV)</SecondaryButton>
+        </div>
+      </section>
+
+      {showSourceModal && (
+        <Modal onClose={() => setShowSourceModal(false)} title="Raw JSON payload">
+          <pre style={{ maxHeight: 320, overflow: 'auto', margin: 0 }}>{JSON.stringify(users.slice(0, 10), null, 2)}</pre>
+        </Modal>
+      )}
     </main>
   );
 }
+
+export async function getServerSideProps() {
+  const meta = await loadUsers(true);
+  const metrics = meta.users.length ? buildMetrics(meta.users) : etlFallback.metrics;
+
+  return {
+    props: {
+      initialMetrics: metrics,
+      initialUsers: meta.users,
+      sourceUrl: meta.sourceUrl,
+      fallbackUsed: meta.fallbackUsed,
+      fetchedAt: meta.fetchedAt
+    }
+  };
+}
+
+function Metric({ label, value }) {
+  return (
+    <div style={{ background: '#0f172a', borderRadius: 12, padding: 16 }}>
+      <p style={{ margin: 0, color: '#64748b', fontSize: 14 }}>{label}</p>
+      <p style={{ margin: '6px 0 0', fontSize: 24, fontWeight: 700 }}>{value}</p>
+    </div>
+  );
+}
+
+function PipelinePill({ step, index, status }) {
+  const palette = {
+    pending: { background: '#1f2a44', color: '#64748b', border: '1px solid rgba(148,163,184,0.3)' },
+    active: { background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)', color: '#0b1120', border: 'none' },
+    done: { background: 'linear-gradient(135deg,#22d3ee,#14b8a6)', color: '#022c22', border: 'none' }
+  };
+
+  return (
+    <div
+      style={{
+        padding: '10px 18px',
+        borderRadius: 12,
+        fontWeight: 700,
+        transition: 'all 0.3s ease',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        ...palette[status]
+      }}
+    >
+      <span style={{ opacity: 0.7 }}>{index + 1}.</span> {step.toUpperCase()}
+    </div>
+  );
+}
+
+function StatusBadge({ live }) {
+  const color = live ? '#22c55e' : '#f97316';
+  const label = live ? 'LIVE API' : 'DEMO DATA';
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '4px 12px',
+        borderRadius: 999,
+        background: `${color}1A`,
+        color
+      }}
+    >
+      <span style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
+      {label}
+    </span>
+  );
+}
+
+function SecondaryButton({ children, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '10px 18px',
+        borderRadius: 12,
+        background: '#1d293a',
+        border: '1px solid rgba(56,189,248,0.3)',
+        color: '#e2e8f0',
+        fontWeight: 600,
+        cursor: 'pointer'
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Modal({ children, title, onClose }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15,23,42,0.72)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        zIndex: 50
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          background: '#111c33',
+          borderRadius: 16,
+          padding: 24,
+          maxWidth: 720,
+          width: '100%',
+          color: '#f8fafc',
+          boxShadow: '0 25px 60px rgba(8,47,73,0.6)'
+        }}
+      >
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0 }}>{title}</h3>
+          <button
+            onClick={onClose}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: '#94a3b8',
+              fontSize: 24,
+              cursor: 'pointer',
+              lineHeight: 1
+            }}
+          >
+            ×
+          </button>
+        </header>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function extractDomain(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname;
+  } catch {
+    return url;
+  }
+}
+
+function formatCsvValue(value) {
+  if (value === undefined || value === null) return '';
+  const stringValue = String(value).replace(/"/g, '""');
+  return `"${stringValue}"`;
+}
+
