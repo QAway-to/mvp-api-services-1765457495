@@ -170,6 +170,41 @@ function Metric({ label, value, max = 100 }) {
 </table>
 ```
 
+### Правильная кнопка с фиксированными размерами
+```javascript
+// ✅ ПРАВИЛЬНО: фиксированная ширина, не меняется при hover/click
+<button
+  onClick={handleAction}
+  style={{
+    padding: '8px 16px',
+    borderRadius: 10,
+    background: '#38bdf8',
+    border: 'none',
+    color: '#0b1120',
+    fontWeight: 700,
+    cursor: 'pointer',
+    minWidth: 160,  // Фиксированная минимальная ширина
+    width: '160px', // Или фиксированная ширина
+    transition: 'opacity 0.2s ease' // Только opacity, НЕ размеры
+  }}
+  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+  onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+>
+  Действие
+</button>
+
+// ❌ НЕПРАВИЛЬНО: кнопка без фиксированной ширины
+<button style={{ padding: '8px 16px' }}>Действие</button>
+
+// ❌ НЕПРАВИЛЬНО: кнопка меняет размер при hover
+<button 
+  style={{ padding: '8px 16px' }}
+  onMouseEnter={(e) => e.currentTarget.style.padding = '10px 20px'} // Изменение размера!
+>
+  Действие
+</button>
+```
+
 ---
 
 **Помни:** Цель — показать максимум функциональности в минимальном пространстве, создавая впечатление готового продукта на 60-80%.
