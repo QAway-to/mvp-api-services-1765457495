@@ -88,6 +88,16 @@ def truncate_text(text: str, max_length: int) -> str:
 def build_code_generation_prompt(path: str, purpose: str, context: str, feedback: str) -> str:
     """Build the code generation prompt"""
     feedback_section = f"Incorporate reviewer feedback:\n{feedback}\n\n" if feedback else ""
+    
+    # Check if this is a UI component (React/Next.js)
+    ui_guidelines = ""
+    if any(ext in path.lower() for ext in ['.js', '.jsx', '.tsx', 'pages/', 'components/']):
+        try:
+            guidelines_path = Path(__file__).parent / "ui_design_guidelines.md"
+            if guidelines_path.exists():
+                ui_guidelines = f"\n\nIMPORTANT - UI Design Guidelines (MUST FOLLOW):\n{guidelines_path.read_text(encoding='utf-8')}\n\nWhen generating UI components, strictly adhere to these guidelines for ergonomic, information-dense interfaces.\n"
+        except Exception:
+            pass
 
     return f"""
 You are a senior Python developer specializing in clean, maintainable code.
@@ -96,7 +106,7 @@ File: {path}
 Purpose: {purpose}
 Project Context: {context}
 
-{feedback_section}Requirements:
+{feedback_section}{ui_guidelines}Requirements:
 - Output only valid Python code (no markdown, no explanations)
 - Follow PEP8 standards and clean architecture principles
 - Use type hints where appropriate

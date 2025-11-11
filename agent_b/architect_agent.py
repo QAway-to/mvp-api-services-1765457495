@@ -198,11 +198,20 @@ def generate_project_structure(architect, project_description: str) -> Dict[str,
     """Generate project structure using AI"""
     logger.info("🧩 Генерация архитектуры проекта...")
 
+    # Load UI guidelines if available
+    ui_guidelines = ""
+    try:
+        guidelines_path = Path(__file__).parent / "ui_design_guidelines.md"
+        if guidelines_path.exists():
+            ui_guidelines = f"\n\nUI Design Guidelines (for UI components):\n{guidelines_path.read_text(encoding='utf-8')[:2000]}...\n\nWhen designing UI components, ensure they follow these ergonomic principles.\n"
+    except Exception:
+        pass
+
     plan_prompt = f"""
     You are a senior software architect.
     Design a modular Python project based on this description:
     "{project_description}"
-
+    {ui_guidelines}
     Return JSON only with this structure:
     {{
       "project_type": "Python application",
@@ -219,6 +228,7 @@ def generate_project_structure(architect, project_description: str) -> Dict[str,
     }}
 
     Keep modules limited (max 8 per phase) and focused on core functionality.
+    For UI components (React/Next.js), ensure compact, information-dense layouts with minimal empty spaces.
     """
 
     for attempt in range(Config.MAX_RETRIES):

@@ -5,17 +5,19 @@ import { loadLaunches, buildMetrics } from '../src/lib/spacex';
 
 const container = {
   fontFamily: 'Inter, sans-serif',
-  padding: '24px 32px',
+  padding: '16px 20px',
   background: '#0b1120',
   color: '#f8fafc',
-  minHeight: '100vh'
+  minHeight: '100vh',
+  maxWidth: 1400,
+  margin: '0 auto'
 };
 
 const card = {
   background: '#111c33',
-  borderRadius: 16,
-  padding: 24,
-  marginBottom: 24,
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 16,
   border: '1px solid rgba(56,189,248,0.25)',
   boxShadow: '0 20px 28px rgba(8, 47, 73, 0.45)'
 };
@@ -119,15 +121,15 @@ export default function MiniETL({
 
   return (
     <main style={container}>
-      <header style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-        <div>
-          <h1 style={{ fontSize: 36, margin: 0 }}>🔄 Mini‑ETL Pipeline</h1>
-          <p style={{ color: '#94a3b8', marginTop: 8 }}>
+      <header style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 280 }}>
+          <h1 style={{ fontSize: 28, margin: 0 }}>🔄 Mini‑ETL Pipeline</h1>
+          <p style={{ color: '#94a3b8', marginTop: 6, fontSize: 14 }}>
             Proof-of-Concept: вытягиваем реальные данные из SpaceX API, прогоняем через шаги Extract → Transform → Load и показываем метрики.
           </p>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 12 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
             <StatusBadge live={isLive} />
-            <span style={{ color: '#64748b', fontSize: 14 }}>
+            <span style={{ color: '#64748b', fontSize: 12 }}>
               Источник: {extractDomain(sourceUrl)} · Обновлено: {new Date(fetchedAt).toLocaleString()}
             </span>
           </div>
@@ -136,14 +138,15 @@ export default function MiniETL({
           onClick={handleRestart}
           disabled={isProcessing}
           style={{
-            padding: '10px 18px',
-            borderRadius: 12,
+            padding: '8px 16px',
+            borderRadius: 10,
             background: isProcessing ? '#0f172a' : 'linear-gradient(135deg,#38bdf8,#0ea5e9)',
             border: 'none',
             color: isProcessing ? '#475569' : '#0b1120',
             fontWeight: 700,
             cursor: isProcessing ? 'wait' : 'pointer',
-            minWidth: 180
+            minWidth: 160,
+            fontSize: 13
           }}
         >
           {isProcessing ? 'Перезапуск...' : 'Перезапустить конвейер'}
@@ -157,60 +160,96 @@ export default function MiniETL({
       </section>
 
       <section style={{ ...card }}>
-        <h2 style={{ marginTop: 0 }}>📊 Metrics</h2>
-        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-          <Metric label="Rows in (launches fetched)" value={metrics.rows_in} />
-          <Metric label="Rows out (successful)" value={metrics.rows_out} />
-          <Metric label="Removed (failed)" value={metrics.dedup_removed} />
-          <Metric label="Upcoming launches" value={metrics.upcoming} />
+        <h2 style={{ marginTop: 0, fontSize: 18, marginBottom: 12 }}>📊 Metrics</h2>
+        <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+          <Metric label="Rows in" value={metrics.rows_in} max={metrics.rows_in} />
+          <Metric label="Rows out" value={metrics.rows_out} max={metrics.rows_in} />
+          <Metric label="Removed" value={metrics.dedup_removed} max={metrics.rows_in} />
+          <Metric label="Upcoming" value={metrics.upcoming} max={metrics.rows_in} />
         </div>
       </section>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <section style={{ ...card }}>
+          <h2 style={{ marginTop: 0, fontSize: 18, marginBottom: 10 }}>📝 Live Log</h2>
+          <div style={{ background: '#0f172a', borderRadius: 10, padding: 12, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, minHeight: 80, maxHeight: 120, overflowY: 'auto' }}>
+            {logLines.map((line, idx) => (
+              <div key={idx} style={{ color: '#cbd5f5', marginBottom: 4 }}>
+                {line}
+              </div>
+            ))}
+            {!logLines.length && <span style={{ color: '#475569' }}>Лог обновляется автоматически...</span>}
+          </div>
+        </section>
+
+        <section style={{ ...card }}>
+          <h2 style={{ marginTop: 0, fontSize: 18, marginBottom: 10 }}>⚙️ Управление</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <SecondaryButton onClick={() => setShowSourceModal(true)}>Посмотреть исходный файл</SecondaryButton>
+            <SecondaryButton onClick={handleExport}>Экспортировать отчёт (CSV)</SecondaryButton>
+          </div>
+          <p style={{ color: '#94a3b8', marginTop: 10, fontSize: 12 }}>
+            <Link href="/analytics" style={{ color: '#38bdf8' }}>Analytics</Link> для подробного отчёта
+          </p>
+        </section>
+      </div>
 
       <section style={{ ...card }}>
-        <h2 style={{ marginTop: 0 }}>📝 Live Log</h2>
-        <div style={{ background: '#0f172a', borderRadius: 12, padding: 16, fontFamily: 'JetBrains Mono, monospace', fontSize: 13, minHeight: 96 }}>
-          {logLines.map((line, idx) => (
-            <div key={idx} style={{ color: '#cbd5f5' }}>
-              {line}
-            </div>
-          ))}
-          {!logLines.length && <span style={{ color: '#475569' }}>Лог обновляется автоматически при каждом запуске.</span>}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>🚀 Миссии ({launches.length})</h2>
+          <span style={{ color: '#64748b', fontSize: 12 }}>Данные из SpaceX API</span>
         </div>
-        <p style={{ color: '#94a3b8', marginTop: 12 }}>
-          Посмотреть подробный аналитический отчёт можно на вкладке{' '}
-          <Link href="/analytics" style={{ color: '#38bdf8' }}>Analytics</Link>.
-        </p>
-      </section>
-
-      <section style={{ ...card, marginTop: 24 }}>
-        <h2 style={{ marginTop: 0 }}>🚀 Последние миссии</h2>
-        <p style={{ color: '#94a3b8' }}>
-          Тянем данные напрямую с публичного SpaceX API. Нажмите на миссию, чтобы раскрыть детальную карточку.
-        </p>
-        <ul style={{ margin: 0, paddingLeft: 20, color: '#cbd5f5', lineHeight: 1.7 }}>
-          {launches
-            .slice()
-            .reverse()
-            .map((launch) => (
-              <li key={launch.id}>
-                <Link href={`/launch/${launch.id}`} style={{ color: '#38bdf8', textDecoration: 'none' }}>
-                  {launch.name}
-                </Link>{' '}
-                · {new Date(launch.date_utc).toLocaleString()} · {launch.success ? '✅ Success' : launch.upcoming ? '🕒 Upcoming' : '⚠️ Failed'}
-              </li>
-            ))}
-        </ul>
-      </section>
-
-      <section style={{ ...card, marginTop: 24 }}>
-        <h2 style={{ marginTop: 0 }}>⚙️ Управление</h2>
-        <p style={{ color: '#94a3b8' }}>
-          Кнопки ниже демонстрируют перезапуск/откат. В проде интеграция с Airflow, Prefect, dbt Cloud.
-        </p>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <SecondaryButton onClick={() => setShowSourceModal(true)}>Посмотреть исходный файл</SecondaryButton>
-          <SecondaryButton onClick={handleExport}>Экспортировать отчёт (CSV)</SecondaryButton>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(148,163,184,0.2)' }}>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Миссия</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Дата</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Ракета</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Статус</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: '#94a3b8', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Грузы</th>
+              </tr>
+            </thead>
+            <tbody>
+              {launches
+                .slice()
+                .reverse()
+                .slice(0, 20)
+                .map((launch) => (
+                  <tr key={launch.id} style={{ borderBottom: '1px solid rgba(148,163,184,0.08)', cursor: 'pointer' }} onClick={() => window.location.href = `/launch/${launch.id}`}>
+                    <td style={{ padding: '10px 12px', color: '#e2e8f0' }}>
+                      <Link href={`/launch/${launch.id}`} style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 500 }}>
+                        {launch.name || 'Unknown'}
+                      </Link>
+                    </td>
+                    <td style={{ padding: '10px 12px', color: '#cbd5f5', fontSize: 12 }}>
+                      {new Date(launch.date_utc).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '10px 12px', color: '#cbd5f5', fontSize: 12 }}>
+                      {launch.rocket?.name || launch.rocket || 'N/A'}
+                    </td>
+                    <td style={{ padding: '10px 12px' }}>
+                      {launch.success ? (
+                        <span style={{ color: '#22c55e', fontSize: 12 }}>✅ Success</span>
+                      ) : launch.upcoming ? (
+                        <span style={{ color: '#fbbf24', fontSize: 12 }}>🕒 Upcoming</span>
+                      ) : (
+                        <span style={{ color: '#ef4444', fontSize: 12 }}>⚠️ Failed</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px 12px', color: '#cbd5f5', fontSize: 12 }}>
+                      {launch.payloads_count || launch.payloads?.length || 0}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
         </div>
+        {launches.length > 20 && (
+          <p style={{ color: '#64748b', marginTop: 12, fontSize: 12, textAlign: 'center' }}>
+            Показано 20 из {launches.length} миссий. <Link href="/analytics" style={{ color: '#38bdf8' }}>Смотреть все</Link>
+          </p>
+        )}
       </section>
 
       {showSourceModal && (
@@ -237,11 +276,15 @@ export async function getServerSideProps() {
   };
 }
 
-function Metric({ label, value }) {
+function Metric({ label, value, max = 100 }) {
+  const percentage = max > 0 ? Math.min((value / max) * 100, 100) : 0;
   return (
-    <div style={{ background: '#0f172a', borderRadius: 12, padding: 16 }}>
-      <p style={{ margin: 0, color: '#64748b', fontSize: 14 }}>{label}</p>
-      <p style={{ margin: '6px 0 0', fontSize: 24, fontWeight: 700 }}>{value}</p>
+    <div style={{ background: '#0f172a', borderRadius: 10, padding: 12 }}>
+      <p style={{ margin: 0, color: '#64748b', fontSize: 12, marginBottom: 6 }}>{label}</p>
+      <p style={{ margin: 0, fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{value}</p>
+      <div style={{ background: '#1e293b', borderRadius: 4, height: 4, overflow: 'hidden' }}>
+        <div style={{ background: 'linear-gradient(90deg,#38bdf8,#0ea5e9)', height: '100%', width: `${percentage}%`, transition: 'width 0.3s ease' }} />
+      </div>
     </div>
   );
 }
