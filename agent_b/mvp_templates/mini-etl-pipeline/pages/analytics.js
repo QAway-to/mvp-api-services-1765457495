@@ -1,106 +1,249 @@
+import { useMemo } from 'react';
 import Link from 'next/link';
-import { loadUsers } from '../src/lib/randomuser';
+import { loadUsers, buildMetrics } from '../src/lib/randomuser';
 
-export default function Analytics({ users }) {
+const container = {
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  padding: '16px',
+  background: '#f5f7fa',
+  color: '#1a1a1a',
+  minHeight: '100vh'
+};
+
+const header = {
+  background: '#ffffff',
+  borderBottom: '1px solid #e0e0e0',
+  padding: '12px 16px',
+  marginBottom: '16px',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center'
+};
+
+const card = {
+  background: '#ffffff',
+  borderRadius: '8px',
+  padding: '16px',
+  border: '1px solid #e0e0e0',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  marginBottom: '16px'
+};
+
+const cardTitle = {
+  fontSize: '14px',
+  fontWeight: 600,
+  color: '#666',
+  marginBottom: '12px',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px'
+};
+
+const table = {
+  width: '100%',
+  borderCollapse: 'collapse',
+  fontSize: '13px'
+};
+
+const tableHeader = {
+  background: '#f8f9fa',
+  padding: '10px 12px',
+  textAlign: 'left',
+  fontWeight: 600,
+  color: '#666',
+  borderBottom: '2px solid #e0e0e0',
+  fontSize: '12px',
+  textTransform: 'uppercase'
+};
+
+const tableCell = {
+  padding: '10px 12px',
+  borderBottom: '1px solid #f0f0f0',
+  color: '#333'
+};
+
+const button = {
+  padding: '8px 16px',
+  borderRadius: '6px',
+  border: 'none',
+  fontSize: '14px',
+  fontWeight: 500,
+  cursor: 'pointer',
+  background: '#f0f0f0',
+  color: '#1a1a1a',
+  textDecoration: 'none',
+  display: 'inline-block',
+  minWidth: '120px',
+  minHeight: '36px'
+};
+
+const statsGrid = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+  gap: '16px',
+  marginBottom: '16px'
+};
+
+const statCard = {
+  ...card,
+  marginBottom: 0
+};
+
+const statValue = {
+  fontSize: '24px',
+  fontWeight: 700,
+  color: '#1a1a1a',
+  margin: '4px 0'
+};
+
+const statLabel = {
+  fontSize: '12px',
+  color: '#999',
+  marginTop: '4px'
+};
+
+export default function Analytics({ users, metrics }) {
+  const userArray = Array.isArray(users) ? users : [];
+  const countries = useMemo(() => {
+    const countryMap = new Map();
+    userArray.forEach(user => {
+      const country = user?.location?.country || 'Unknown';
+      countryMap.set(country, (countryMap.get(country) || 0) + 1);
+    });
+    return Array.from(countryMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+  }, [userArray]);
+
   return (
     <main style={container}>
-      <header style={{ marginBottom: 24 }}>
-        <Link href="/" style={{ color: '#38bdf8', textDecoration: 'none' }}>← Назад</Link>
-        <h1 style={{ margin: '12px 0 0', fontSize: 32 }}>📈 Analytics — Users Data</h1>
-        <p style={{ color: '#94a3b8', marginTop: 6 }}>Демонстрация шага Transform: агрегируем данные перед загрузкой.</p>
+      <header style={header}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>Analytics</h1>
+          <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#666' }}>
+            Data analysis and insights
+          </p>
+        </div>
+        <Link href="/" style={button}>
+          ← Back to Dashboard
+        </Link>
       </header>
 
-      <section style={card}>
-        <h2 style={{ marginTop: 0 }}>Users overview</h2>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div style={statsGrid}>
+        <div style={statCard}>
+          <div style={cardTitle}>Total Records</div>
+          <div style={statValue}>{metrics?.rows_in || userArray.length || 0}</div>
+          <div style={statLabel}>Fetched from source</div>
+        </div>
+        <div style={statCard}>
+          <div style={cardTitle}>Valid Records</div>
+          <div style={statValue}>{metrics?.rows_out || userArray.length || 0}</div>
+          <div style={statLabel}>After transformation</div>
+        </div>
+        <div style={statCard}>
+          <div style={cardTitle}>Removed</div>
+          <div style={statValue}>{metrics?.dedup_removed || 0}</div>
+          <div style={statLabel}>Duplicates/invalid</div>
+        </div>
+        <div style={statCard}>
+          <div style={cardTitle}>Countries</div>
+          <div style={statValue}>{metrics?.countries || countries.length || 0}</div>
+          <div style={statLabel}>Unique countries</div>
+        </div>
+      </div>
+
+      <div style={card}>
+        <div style={cardTitle}>Top Countries</div>
+        <table style={table}>
           <thead>
             <tr>
-              <th style={th}>Name</th>
-              <th style={th}>Email</th>
-              <th style={th}>Country</th>
-              <th style={th}>Registered</th>
+              <th style={tableHeader}>Country</th>
+              <th style={tableHeader}>Users</th>
+              <th style={tableHeader}>Percentage</th>
             </tr>
           </thead>
           <tbody>
-            {Array.isArray(users) && users.length > 0 ? (
-              users.slice(0, 50).map((user, idx) => (
-                <tr key={user?.id?.value || user?.login?.uuid || `user-${idx}`}>
-                  <td style={td}>
-                    {user?.name?.first} {user?.name?.last}
+            {countries.length > 0 ? (
+              countries.map(([country, count], idx) => (
+                <tr key={idx}>
+                  <td style={tableCell}>{country}</td>
+                  <td style={tableCell}>{count}</td>
+                  <td style={tableCell}>
+                    {((count / userArray.length) * 100).toFixed(1)}%
                   </td>
-                  <td style={td}>{user?.email || 'N/A'}</td>
-                  <td style={td}>{user?.location?.country || 'N/A'}</td>
-                  <td style={td}>{user?.registered?.date ? new Date(user.registered.date).toLocaleString() : 'N/A'}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="4" style={{ ...td, textAlign: 'center', color: '#94a3b8' }}>Нет данных для отображения</td>
+                <td colSpan="3" style={{ ...tableCell, textAlign: 'center', color: '#999' }}>
+                  No data available
+                </td>
               </tr>
             )}
           </tbody>
         </table>
-      </section>
+      </div>
 
-      <section style={card}>
-        <h2 style={{ marginTop: 0 }}>Что будет в полной версии</h2>
-        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7, color: '#94a3b8' }}>
-          <li>Интеграция с ClickHouse / BigQuery для аналитики и виджетов</li>
-          <li>Задачи на Airflow/Prefect для регулярного обновления данных</li>
-          <li>Инкрементальная загрузка + дедупликация на уровне dbt</li>
-        </ul>
-      </section>
+      <div style={card}>
+        <div style={cardTitle}>All Records</div>
+        <table style={table}>
+          <thead>
+            <tr>
+              <th style={tableHeader}>Name</th>
+              <th style={tableHeader}>Email</th>
+              <th style={tableHeader}>Country</th>
+              <th style={tableHeader}>City</th>
+              <th style={tableHeader}>Phone</th>
+              <th style={tableHeader}>Registered</th>
+            </tr>
+          </thead>
+          <tbody>
+            {userArray.length > 0 ? (
+              userArray.map((user, idx) => (
+                <tr key={user?.id?.value || user?.login?.uuid || idx}>
+                  <td style={tableCell}>{user?.name?.first} {user?.name?.last}</td>
+                  <td style={tableCell}>{user?.email || 'N/A'}</td>
+                  <td style={tableCell}>{user?.location?.country || 'N/A'}</td>
+                  <td style={tableCell}>{user?.location?.city || 'N/A'}</td>
+                  <td style={tableCell}>{user?.phone || 'N/A'}</td>
+                  <td style={tableCell}>
+                    {user?.registered?.date ? new Date(user.registered.date).toLocaleDateString() : 'N/A'}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="6" style={{ ...tableCell, textAlign: 'center', color: '#999' }}>
+                  No data available
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </main>
   );
 }
 
+
 export async function getServerSideProps() {
   try {
     const users = await loadUsers();
+    const userArray = Array.isArray(users) ? users : [];
+    const metrics = userArray.length > 0 ? buildMetrics(userArray) : { rows_in: 0, rows_out: 0, dedup_removed: 0, countries: 0 };
+    
     return {
       props: {
-        users: Array.isArray(users) ? users : []
+        users: userArray,
+        metrics
       }
     };
   } catch (error) {
     console.error('[Analytics] getServerSideProps error:', error);
     return {
       props: {
-        users: []
+        users: [],
+        metrics: { rows_in: 0, rows_out: 0, dedup_removed: 0, countries: 0 }
       }
     };
   }
 }
-
-const container = {
-  fontFamily: 'Inter, sans-serif',
-  padding: '24px 32px',
-  background: '#0b1120',
-  color: '#f8fafc',
-  minHeight: '100vh'
-};
-
-const card = {
-  background: '#111c33',
-  borderRadius: 16,
-  padding: 24,
-  border: '1px solid rgba(56,189,248,0.25)',
-  boxShadow: '0 20px 28px rgba(8, 47, 73, 0.45)',
-  marginBottom: 24
-};
-
-const th = {
-  textAlign: 'left',
-  padding: '12px 16px',
-  textTransform: 'uppercase',
-  fontSize: 12,
-  color: '#94a3b8',
-  borderBottom: '1px solid rgba(148,163,184,0.2)'
-};
-
-const td = {
-  padding: '12px 16px',
-  borderBottom: '1px solid rgba(148,163,184,0.08)',
-  color: '#e2e8f0'
-};
-

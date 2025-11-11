@@ -1,23 +1,129 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
-import etlFallback from '../src/mock-data/etl.json';
 import { loadUsers, buildMetrics } from '../src/lib/randomuser';
 
 const container = {
-  fontFamily: 'Inter, sans-serif',
-  padding: '24px 32px',
-  background: '#0b1120',
-  color: '#f8fafc',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  padding: '16px',
+  background: '#f5f7fa',
+  color: '#1a1a1a',
   minHeight: '100vh'
 };
 
+const header = {
+  background: '#ffffff',
+  borderBottom: '1px solid #e0e0e0',
+  padding: '12px 16px',
+  marginBottom: '16px',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center'
+};
+
+const dashboardGrid = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: '16px',
+  marginBottom: '16px'
+};
+
 const card = {
-  background: '#111c33',
-  borderRadius: 16,
-  padding: 24,
-  marginBottom: 24,
-  border: '1px solid rgba(56,189,248,0.25)',
-  boxShadow: '0 20px 28px rgba(8, 47, 73, 0.45)'
+  background: '#ffffff',
+  borderRadius: '8px',
+  padding: '16px',
+  border: '1px solid #e0e0e0',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+};
+
+const cardTitle = {
+  fontSize: '14px',
+  fontWeight: 600,
+  color: '#666',
+  marginBottom: '12px',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px'
+};
+
+const metricValue = {
+  fontSize: '28px',
+  fontWeight: 700,
+  color: '#1a1a1a',
+  margin: '4px 0'
+};
+
+const metricLabel = {
+  fontSize: '12px',
+  color: '#999',
+  marginTop: '4px'
+};
+
+const transformPanel = {
+  ...card,
+  gridColumn: '1 / -1'
+};
+
+const button = {
+  padding: '8px 16px',
+  borderRadius: '6px',
+  border: 'none',
+  fontSize: '14px',
+  fontWeight: 500,
+  cursor: 'pointer',
+  transition: 'all 0.2s',
+  minWidth: '120px',
+  minHeight: '36px'
+};
+
+const buttonPrimary = {
+  ...button,
+  background: '#0066cc',
+  color: '#ffffff'
+};
+
+const buttonSecondary = {
+  ...button,
+  background: '#f0f0f0',
+  color: '#1a1a1a',
+  border: '1px solid #d0d0d0'
+};
+
+const previewTable = {
+  width: '100%',
+  borderCollapse: 'collapse',
+  fontSize: '13px'
+};
+
+const tableHeader = {
+  background: '#f8f9fa',
+  padding: '10px 12px',
+  textAlign: 'left',
+  fontWeight: 600,
+  color: '#666',
+  borderBottom: '2px solid #e0e0e0',
+  fontSize: '12px',
+  textTransform: 'uppercase'
+};
+
+const tableCell = {
+  padding: '10px 12px',
+  borderBottom: '1px solid #f0f0f0',
+  color: '#333'
+};
+
+const logContainer = {
+  background: '#1a1a1a',
+  borderRadius: '6px',
+  padding: '12px',
+  fontFamily: 'Monaco, "Courier New", monospace',
+  fontSize: '12px',
+  maxHeight: '200px',
+  overflowY: 'auto',
+  color: '#00ff00'
+};
+
+const logLine = {
+  margin: '2px 0',
+  lineHeight: '1.4'
 };
 
 export default function MiniETL({
@@ -27,110 +133,120 @@ export default function MiniETL({
   fallbackUsed: initialFallback,
   fetchedAt: initialFetchedAt
 }) {
-  const steps = useMemo(() => etlFallback.pipeline, []);
-  const [users, setUsers] = useState(initialUsers);
-  const [metrics, setMetrics] = useState(initialMetrics);
+  const [users, setUsers] = useState(() => Array.isArray(initialUsers) ? initialUsers : []);
+  const [metrics, setMetrics] = useState(() => initialMetrics || { rows_in: 0, rows_out: 0, dedup_removed: 0, countries: 0 });
   const [sourceUrl, setSourceUrl] = useState(initialSource);
   const [fallbackUsed, setFallbackUsed] = useState(initialFallback);
   const [fetchedAt, setFetchedAt] = useState(initialFetchedAt);
-  const [stepStatuses, setStepStatuses] = useState(() => steps.map(() => 'pending'));
   const [logLines, setLogLines] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showSourceModal, setShowSourceModal] = useState(false);
-  const [animationStarted, setAnimationStarted] = useState(false);
+  const [previewRows, setPreviewRows] = useState(10);
   const isMounted = useRef(true);
-  const animationTimers = useRef([]);
+  const logTimers = useRef([]);
 
   useEffect(() => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
-      // Cleanup all timers on unmount
-      animationTimers.current.forEach(timer => clearTimeout(timer));
-      animationTimers.current = [];
+      logTimers.current.forEach(timer => clearTimeout(timer));
+      logTimers.current = [];
     };
   }, []);
 
-  const startAnimation = () => {
-    if (animationStarted || !isMounted.current) return;
-    setAnimationStarted(true);
-    const statuses = steps.map(() => 'pending');
-    const logs = [
-      `Extract ▸ Получено ${users.length} пользователей (${fallbackUsed ? 'демо-данные' : extractDomain(sourceUrl)})`,
-      `Transform ▸ Оставлено ${metrics.rows_out} валидных записей, удалено ${metrics.dedup_removed}`,
-      `Load ▸ Данные готовы. Последний пользователь: ${metrics.lastUser || 'n/a'}`
-    ];
-
-    // Clear previous timers
-    animationTimers.current.forEach(timer => clearTimeout(timer));
-    animationTimers.current = [];
-
+  const addLog = (message) => {
     if (!isMounted.current) return;
-    setStepStatuses(statuses);
-    setLogLines([]);
+    setLogLines(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
+  };
 
+  const handleExtract = async () => {
+    if (isProcessing || !isMounted.current) return;
+    setIsProcessing(true);
+    setLogLines([]);
+    
+    addLog('Starting Extract phase...');
+    
     const timer1 = setTimeout(() => {
       if (isMounted.current) {
-        setStepStatuses((prev) => prev.map((_, idx) => (idx === 0 ? 'active' : idx > 0 ? 'pending' : _)));
-        setLogLines([logs[0]]);
+        addLog(`Extract: Fetched ${users.length} records from ${fallbackUsed ? 'demo data' : 'Random User API'}`);
       }
-    }, 200);
-    animationTimers.current.push(timer1);
+    }, 500);
+    logTimers.current.push(timer1);
 
     const timer2 = setTimeout(() => {
       if (isMounted.current) {
-        setStepStatuses((prev) => prev.map((_, idx) => (idx === 0 ? 'done' : idx === 1 ? 'active' : 'pending')));
-        setLogLines(logs.slice(0, 2));
+        setIsProcessing(false);
+        addLog('Extract completed successfully');
       }
-    }, 1200);
-    animationTimers.current.push(timer2);
+    }, 1500);
+    logTimers.current.push(timer2);
+  };
 
-    const timer3 = setTimeout(() => {
+  const handleTransform = async () => {
+    if (isProcessing || !isMounted.current) return;
+    setIsProcessing(true);
+    
+    addLog('Starting Transform phase...');
+    
+    const timer1 = setTimeout(() => {
       if (isMounted.current) {
-        setStepStatuses((prev) => prev.map((_, idx) => (idx < 2 ? 'done' : 'active')));
-        setLogLines(logs);
+        addLog(`Transform: Validated ${metrics.rows_out} records, removed ${metrics.dedup_removed} duplicates`);
       }
-    }, 2200);
-    animationTimers.current.push(timer3);
+    }, 500);
+    logTimers.current.push(timer1);
 
-    const timer4 = setTimeout(() => {
+    const timer2 = setTimeout(() => {
       if (isMounted.current) {
-        setStepStatuses((prev) => prev.map(() => 'done'));
+        setIsProcessing(false);
+        addLog('Transform completed successfully');
       }
-    }, 3200);
-    animationTimers.current.push(timer4);
+    }, 1500);
+    logTimers.current.push(timer2);
+  };
+
+  const handleLoad = async () => {
+    if (isProcessing || !isMounted.current) return;
+    setIsProcessing(true);
+    
+    addLog('Starting Load phase...');
+    
+    const timer1 = setTimeout(() => {
+      if (isMounted.current) {
+        addLog(`Load: Stored ${metrics.rows_out} records in destination`);
+      }
+    }, 500);
+    logTimers.current.push(timer1);
+
+    const timer2 = setTimeout(() => {
+      if (isMounted.current) {
+        setIsProcessing(false);
+        addLog('Load completed successfully');
+      }
+    }, 1500);
+    logTimers.current.push(timer2);
   };
 
   const handleRestart = async () => {
     if (isProcessing || !isMounted.current) return;
     setIsProcessing(true);
-    setAnimationStarted(false);
+    setLogLines([]);
+    
     try {
       const response = await fetch('/api/etl/restart');
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
       const payload = await response.json();
       
-      // Only update state if component is still mounted
       if (isMounted.current) {
-        setUsers(payload.users);
-        setMetrics(payload.metrics);
-        setSourceUrl(payload.sourceUrl);
-        setFallbackUsed(payload.fallbackUsed);
-        setFetchedAt(payload.fetchedAt);
-        setLogLines((prev) => [...prev, '🔁 Конвейер перезапущен']);
-        
-        const restartTimer = setTimeout(() => {
-          if (isMounted.current) {
-            startAnimation();
-          }
-        }, 100);
-        animationTimers.current.push(restartTimer);
+        setUsers(Array.isArray(payload.users) ? payload.users : []);
+        setMetrics(payload.metrics || metrics);
+        setSourceUrl(payload.sourceUrl || sourceUrl);
+        setFallbackUsed(payload.fallbackUsed ?? fallbackUsed);
+        setFetchedAt(payload.fetchedAt || fetchedAt);
+        addLog('Pipeline restarted with fresh data');
       }
     } catch (error) {
       if (isMounted.current) {
-        setLogLines((prev) => [...prev, `⚠️ Ошибка перезапуска: ${error}`]);
+        addLog(`Error: ${error.message}`);
       }
     } finally {
       if (isMounted.current) {
@@ -139,319 +255,149 @@ export default function MiniETL({
     }
   };
 
-  const handleExport = () => {
-    const headers = ['id', 'name_first', 'name_last', 'email', 'phone', 'country', 'city', 'registered_date'];
-    const csvRows = [headers.join(',')];
-    users.forEach((user) => {
-      const row = [
-        formatCsvValue(user.id?.value || user.login?.uuid || ''),
-        formatCsvValue(user.name?.first || ''),
-        formatCsvValue(user.name?.last || ''),
-        formatCsvValue(user.email || ''),
-        formatCsvValue(user.phone || ''),
-        formatCsvValue(user.location?.country || ''),
-        formatCsvValue(user.location?.city || ''),
-        formatCsvValue(user.registered?.date ? new Date(user.registered.date).toISOString() : '')
-      ].join(',');
-      csvRows.push(row);
-    });
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `mini-etl-users-${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    setLogLines((prev) => [...prev, `📤 Экспортировано ${users.length} строк в CSV`]);
-  };
-
-  const isLive = !fallbackUsed;
+  const displayUsers = Array.isArray(users) ? users.slice(0, previewRows) : [];
 
   return (
     <main style={container}>
-      <header style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+      <header style={header}>
         <div>
-          <h1 style={{ fontSize: 36, margin: 0 }}>🔄 Mini‑ETL Pipeline</h1>
-          <p style={{ color: '#94a3b8', marginTop: 8 }}>
-            Proof-of-Concept: вытягиваем реальные данные из Random User API, прогоняем через шаги Extract → Transform → Load и показываем метрики.
+          <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>ETL Pipeline</h1>
+          <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#666' }}>
+            {fallbackUsed ? 'Demo Mode' : 'Live API'} · {new Date(fetchedAt).toLocaleString()}
           </p>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 12 }}>
-            <StatusBadge live={isLive} />
-            <span style={{ color: '#64748b', fontSize: 14 }}>
-              Источник: {extractDomain(sourceUrl)} · Обновлено: {new Date(fetchedAt).toLocaleString()}
-            </span>
-          </div>
         </div>
-        <button
-          onClick={handleRestart}
-          disabled={isProcessing}
-          style={{
-            padding: '10px 18px',
-            borderRadius: 12,
-            background: isProcessing ? '#0f172a' : 'linear-gradient(135deg,#38bdf8,#0ea5e9)',
-            border: 'none',
-            color: isProcessing ? '#475569' : '#0b1120',
-            fontWeight: 700,
-            cursor: isProcessing ? 'wait' : 'pointer',
-            minWidth: 180
-          }}
-        >
-          {isProcessing ? 'Перезапуск...' : 'Перезапустить конвейер'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <Link href="/analytics" style={{ ...buttonSecondary, textDecoration: 'none', display: 'inline-block' }}>
+            Analytics
+          </Link>
+          <button onClick={handleRestart} disabled={isProcessing} style={buttonPrimary}>
+            {isProcessing ? 'Processing...' : 'Restart'}
+          </button>
+        </div>
       </header>
 
-      <section style={{ ...card, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        {steps.map((step, idx) => (
-          <PipelinePill key={step} step={step} index={idx} status={stepStatuses[idx]} />
-        ))}
-      </section>
-
-      <section style={{ ...card }}>
-        <h2 style={{ marginTop: 0 }}>📊 Metrics</h2>
-        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-          <Metric label="Rows in (users fetched)" value={metrics.rows_in} />
-          <Metric label="Rows out (valid)" value={metrics.rows_out} />
-          <Metric label="Removed (invalid)" value={metrics.dedup_removed} />
-          <Metric label="Countries" value={metrics.countries || 0} />
+      <div style={dashboardGrid}>
+        <div style={card}>
+          <div style={cardTitle}>Rows In</div>
+          <div style={metricValue}>{metrics.rows_in || 0}</div>
+          <div style={metricLabel}>Total records fetched</div>
         </div>
-      </section>
+        <div style={card}>
+          <div style={cardTitle}>Rows Out</div>
+          <div style={metricValue}>{metrics.rows_out || 0}</div>
+          <div style={metricLabel}>Valid records</div>
+        </div>
+        <div style={card}>
+          <div style={cardTitle}>Removed</div>
+          <div style={metricValue}>{metrics.dedup_removed || 0}</div>
+          <div style={metricLabel}>Duplicates/invalid</div>
+        </div>
+        <div style={card}>
+          <div style={cardTitle}>Countries</div>
+          <div style={metricValue}>{metrics.countries || 0}</div>
+          <div style={metricLabel}>Unique countries</div>
+        </div>
+      </div>
 
-      <section style={{ ...card }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2 style={{ marginTop: 0 }}>📝 Live Log</h2>
-          {!animationStarted && (
-            <button
-              onClick={startAnimation}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 8,
-                background: '#1d293a',
-                border: '1px solid rgba(56,189,248,0.3)',
-                color: '#e2e8f0',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              ▶ Запустить анимацию
-            </button>
+      <div style={transformPanel}>
+        <div style={cardTitle}>Transformation Pipeline</div>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          <button onClick={handleExtract} disabled={isProcessing} style={buttonPrimary}>
+            Extract
+          </button>
+          <button onClick={handleTransform} disabled={isProcessing} style={buttonPrimary}>
+            Transform
+          </button>
+          <button onClick={handleLoad} disabled={isProcessing} style={buttonPrimary}>
+            Load
+          </button>
+        </div>
+        <div style={logContainer}>
+          {logLines.length > 0 ? (
+            logLines.map((line, idx) => (
+              <div key={idx} style={logLine}>{line}</div>
+            ))
+          ) : (
+            <div style={{ ...logLine, color: '#666' }}>No operations yet. Click Extract, Transform, or Load to start.</div>
           )}
         </div>
-        <div style={{ background: '#0f172a', borderRadius: 12, padding: 16, fontFamily: 'JetBrains Mono, monospace', fontSize: 13, minHeight: 96 }}>
-          {logLines.map((line, idx) => (
-            <div key={idx} style={{ color: '#cbd5f5' }}>
-              {line}
-            </div>
-          ))}
-          {!logLines.length && <span style={{ color: '#475569' }}>Нажмите "Запустить анимацию" для просмотра процесса ETL.</span>}
-        </div>
-        <p style={{ color: '#94a3b8', marginTop: 12 }}>
-          Посмотреть подробный аналитический отчёт можно на вкладке{' '}
-          <Link href="/analytics" style={{ color: '#38bdf8' }}>Analytics</Link>.
-        </p>
-      </section>
+      </div>
 
-      <section style={{ ...card, marginTop: 24 }}>
-        <h2 style={{ marginTop: 0 }}>👥 Пользователи</h2>
-        <p style={{ color: '#94a3b8' }}>
-          Тянем данные напрямую с публичного Random User API. Показано {users.length} записей.
-        </p>
-        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', marginTop: 16 }}>
-          {users.slice(0, 20).map((user, idx) => (
-            <div key={user.id?.value || user.login?.uuid || idx} style={{ background: '#0f172a', borderRadius: 12, padding: 16, border: '1px solid rgba(56,189,248,0.2)' }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 8 }}>
-                <img src={user.picture?.thumbnail || 'https://via.placeholder.com/48'} alt="" style={{ width: 48, height: 48, borderRadius: '50%' }} />
-                <div>
-                  <div style={{ fontWeight: 600, color: '#f8fafc' }}>{user.name?.first} {user.name?.last}</div>
-                  <div style={{ fontSize: 12, color: '#94a3b8' }}>{user.email}</div>
-                </div>
-              </div>
-              <div style={{ fontSize: 13, color: '#cbd5f5', marginTop: 8 }}>
-                <div>📍 {user.location?.city}, {user.location?.country}</div>
-                <div>📞 {user.phone}</div>
-              </div>
-            </div>
-          ))}
+      <div style={card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div style={cardTitle}>Data Preview</div>
+          <select 
+            value={previewRows} 
+            onChange={(e) => setPreviewRows(Number(e.target.value))}
+            style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #d0d0d0', fontSize: '13px' }}
+          >
+            <option value={10}>10 rows</option>
+            <option value={25}>25 rows</option>
+            <option value={50}>50 rows</option>
+          </select>
         </div>
-        {users.length > 20 && (
-          <p style={{ color: '#94a3b8', marginTop: 16, textAlign: 'center' }}>
-            ... и ещё {users.length - 20} записей
-          </p>
-        )}
-      </section>
-
-      <section style={{ ...card, marginTop: 24 }}>
-        <h2 style={{ marginTop: 0 }}>⚙️ Управление</h2>
-        <p style={{ color: '#94a3b8' }}>
-          Кнопки ниже демонстрируют перезапуск/откат. В проде интеграция с Airflow, Prefect, dbt Cloud.
-        </p>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <SecondaryButton onClick={() => setShowSourceModal(true)}>Посмотреть исходный файл</SecondaryButton>
-          <SecondaryButton onClick={handleExport}>Экспортировать отчёт (CSV)</SecondaryButton>
-        </div>
-      </section>
-
-      {showSourceModal && (
-        <Modal onClose={() => setShowSourceModal(false)} title="Raw JSON payload">
-          <pre style={{ maxHeight: 320, overflow: 'auto', margin: 0 }}>{JSON.stringify(users.slice(0, 10), null, 2)}</pre>
-        </Modal>
-      )}
+        <table style={previewTable}>
+          <thead>
+            <tr>
+              <th style={tableHeader}>Name</th>
+              <th style={tableHeader}>Email</th>
+              <th style={tableHeader}>Country</th>
+              <th style={tableHeader}>Phone</th>
+              <th style={tableHeader}>Registered</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayUsers.length > 0 ? (
+              displayUsers.map((user, idx) => (
+                <tr key={user?.id?.value || user?.login?.uuid || idx}>
+                  <td style={tableCell}>{user?.name?.first} {user?.name?.last}</td>
+                  <td style={tableCell}>{user?.email || 'N/A'}</td>
+                  <td style={tableCell}>{user?.location?.country || 'N/A'}</td>
+                  <td style={tableCell}>{user?.phone || 'N/A'}</td>
+                  <td style={tableCell}>
+                    {user?.registered?.date ? new Date(user.registered.date).toLocaleDateString() : 'N/A'}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="5" style={{ ...tableCell, textAlign: 'center', color: '#999' }}>
+                  No data available
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </main>
   );
 }
 
 export async function getServerSideProps() {
-  const meta = await loadUsers(true);
-  const metrics = meta.users.length ? buildMetrics(meta.users) : etlFallback.metrics;
-
-  return {
-    props: {
-      initialMetrics: metrics,
-      initialUsers: meta.users,
-      sourceUrl: meta.sourceUrl,
-      fallbackUsed: meta.fallbackUsed,
-      fetchedAt: meta.fetchedAt
-    }
-  };
-}
-
-function Metric({ label, value }) {
-  return (
-    <div style={{ background: '#0f172a', borderRadius: 12, padding: 16 }}>
-      <p style={{ margin: 0, color: '#64748b', fontSize: 14 }}>{label}</p>
-      <p style={{ margin: '6px 0 0', fontSize: 24, fontWeight: 700 }}>{value}</p>
-    </div>
-  );
-}
-
-function PipelinePill({ step, index, status }) {
-  const palette = {
-    pending: { background: '#1f2a44', color: '#64748b', border: '1px solid rgba(148,163,184,0.3)' },
-    active: { background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)', color: '#0b1120', border: 'none' },
-    done: { background: 'linear-gradient(135deg,#22d3ee,#14b8a6)', color: '#022c22', border: 'none' }
-  };
-
-  return (
-    <div
-      style={{
-        padding: '10px 18px',
-        borderRadius: 12,
-        fontWeight: 700,
-        transition: 'all 0.3s ease',
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        ...palette[status]
-      }}
-    >
-      <span style={{ opacity: 0.7 }}>{index + 1}.</span> {step.toUpperCase()}
-    </div>
-  );
-}
-
-function StatusBadge({ live }) {
-  const color = live ? '#22c55e' : '#f97316';
-  const label = live ? 'LIVE API' : 'DEMO DATA';
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '4px 12px',
-        borderRadius: 999,
-        background: `${color}1A`,
-        color
-      }}
-    >
-      <span style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
-      {label}
-    </span>
-  );
-}
-
-function SecondaryButton({ children, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: '10px 18px',
-        borderRadius: 12,
-        background: '#1d293a',
-        border: '1px solid rgba(56,189,248,0.3)',
-        color: '#e2e8f0',
-        fontWeight: 600,
-        cursor: 'pointer'
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Modal({ children, title, onClose }) {
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(15,23,42,0.72)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-        zIndex: 50
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(event) => event.stopPropagation()}
-        style={{
-          background: '#111c33',
-          borderRadius: 16,
-          padding: 24,
-          maxWidth: 720,
-          width: '100%',
-          color: '#f8fafc',
-          boxShadow: '0 25px 60px rgba(8,47,73,0.6)'
-        }}
-      >
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ margin: 0 }}>{title}</h3>
-          <button
-            onClick={onClose}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: '#94a3b8',
-              fontSize: 24,
-              cursor: 'pointer',
-              lineHeight: 1
-            }}
-          >
-            ×
-          </button>
-        </header>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function extractDomain(url) {
   try {
-    const parsed = new URL(url);
-    return parsed.hostname;
-  } catch {
-    return url;
+    const meta = await loadUsers(true);
+    const users = Array.isArray(meta?.users) ? meta.users : [];
+    const metrics = users.length > 0 ? buildMetrics(users) : { rows_in: 0, rows_out: 0, dedup_removed: 0, countries: 0 };
+
+    return {
+      props: {
+        initialMetrics: metrics,
+        initialUsers: users,
+        sourceUrl: meta?.sourceUrl || '',
+        fallbackUsed: meta?.fallbackUsed ?? true,
+        fetchedAt: meta?.fetchedAt || new Date().toISOString()
+      }
+    };
+  } catch (error) {
+    console.error('[MiniETL] getServerSideProps error:', error);
+    return {
+      props: {
+        initialMetrics: { rows_in: 0, rows_out: 0, dedup_removed: 0, countries: 0 },
+        initialUsers: [],
+        sourceUrl: '',
+        fallbackUsed: true,
+        fetchedAt: new Date().toISOString()
+      }
+    };
   }
 }
-
-function formatCsvValue(value) {
-  if (value === undefined || value === null) return '';
-  const stringValue = String(value).replace(/"/g, '""');
-  return `"${stringValue}"`;
-}
-
