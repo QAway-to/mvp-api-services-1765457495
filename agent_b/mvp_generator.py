@@ -516,7 +516,7 @@ class MVPGenerator:
                             log_agent_action("Agent B", f"✅✅✅ VERIFIED: {relative_path} exists in GitHub after upload")
                         else:
                             log_agent_action("Agent B", f"⚠️⚠️⚠️ WARNING: {relative_path} NOT verified after upload (status: {verify_resp.status_code})")
-                    elif 'package.json' in relative_path or 'index.js' in relative_path or 'next.config.js' in relative_path:
+                    elif 'package.json' in relative_path or 'index.js' in relative_path or 'next.config.js' in relative_path or 'vercel.json' in relative_path:
                         log_agent_action("Agent B", f"✅ Uploaded critical file: {relative_path}")
                     
                     if uploaded_count % 10 == 0:
