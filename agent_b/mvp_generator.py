@@ -125,17 +125,47 @@ class MVPGenerator:
         if not template_path.exists():
             raise FileNotFoundError(f"Template {template_id} not found")
 
+        # Verify template files exist BEFORE copying
+        template_randomuser = template_path / "src" / "lib" / "randomuser.js"
+        if template_randomuser.exists():
+            file_size = template_randomuser.stat().st_size
+            log_agent_action("Agent B", f"✅ Template file exists: src/lib/randomuser.js ({file_size} bytes)")
+        else:
+            log_agent_action("Agent B", f"❌❌❌ CRITICAL: Template file src/lib/randomuser.js does NOT exist in template!")
+            # List what's actually in the template
+            template_src = template_path / "src"
+            if template_src.exists():
+                log_agent_action("Agent B", f"📋 Template src directory exists")
+                template_lib = template_path / "src" / "lib"
+                if template_lib.exists():
+                    lib_files = list(template_lib.iterdir())
+                    log_agent_action("Agent B", f"📋 Files in template src/lib: {[f.name for f in lib_files]}")
+                else:
+                    log_agent_action("Agent B", f"❌ Template src/lib directory does NOT exist!")
+            else:
+                log_agent_action("Agent B", f"❌ Template src directory does NOT exist!")
+            raise FileNotFoundError(f"Template file src/lib/randomuser.js does not exist in template {template_id}")
+
         # Copy template
         if project_path.exists():
             shutil.rmtree(project_path)
-        shutil.copytree(template_path, project_path)
+        
+        log_agent_action("Agent B", f"📋 Copying template from {template_path} to {project_path}")
+        try:
+            shutil.copytree(template_path, project_path, dirs_exist_ok=False)
+            log_agent_action("Agent B", f"✅ Template copied successfully")
+        except Exception as e:
+            log_agent_action("Agent B", f"❌ Error copying template: {e}")
+            import traceback
+            log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
+            raise
 
         # Verify critical files were copied - with detailed logging
         critical_files = [
             "package.json",
             "pages/index.js",
             "src/lib/randomuser.js",
-            "next.config.js",  # Required for Next.js to resolve modules correctly
+            "next.config.js",
         ]
         missing_files = []
         for file_rel in critical_files:
@@ -147,6 +177,30 @@ class MVPGenerator:
                 missing_files.append(file_rel)
                 log_agent_action("Agent B", f"❌ MISSING: {file_rel} not found after copy!")
         
+        # If randomuser.js is missing, try to copy it explicitly
+        if "src/lib/randomuser.js" in missing_files:
+            log_agent_action("Agent B", f"🔧 Attempting to manually copy src/lib/randomuser.js")
+            try:
+                # Ensure destination directory exists
+                dest_lib_dir = project_path / "src" / "lib"
+                dest_lib_dir.mkdir(parents=True, exist_ok=True)
+                log_agent_action("Agent B", f"✅ Created directory: {dest_lib_dir}")
+                
+                # Copy the file explicitly
+                dest_file = dest_lib_dir / "randomuser.js"
+                shutil.copy2(template_randomuser, dest_file)
+                
+                if dest_file.exists():
+                    file_size = dest_file.stat().st_size
+                    log_agent_action("Agent B", f"✅✅✅ MANUALLY COPIED: src/lib/randomuser.js ({file_size} bytes)")
+                    missing_files.remove("src/lib/randomuser.js")
+                else:
+                    log_agent_action("Agent B", f"❌ Failed to manually copy src/lib/randomuser.js")
+            except Exception as e:
+                log_agent_action("Agent B", f"❌ Error manually copying src/lib/randomuser.js: {e}")
+                import traceback
+                log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
+        
         if missing_files:
             # List all files in src/lib directory for debugging
             lib_dir = project_path / "src" / "lib"
@@ -155,6 +209,12 @@ class MVPGenerator:
                 log_agent_action("Agent B", f"📋 Files in src/lib: {[f.name for f in lib_files]}")
             else:
                 log_agent_action("Agent B", f"❌ src/lib directory does not exist!")
+            
+            # List all files in project for debugging
+            all_files = list(project_path.rglob('*'))
+            file_count = len([f for f in all_files if f.is_file()])
+            log_agent_action("Agent B", f"📋 Total files in project: {file_count}")
+            
             raise FileNotFoundError(f"Critical files missing after copy: {', '.join(missing_files)}")
         else:
             log_agent_action("Agent B", f"✅ All critical files copied successfully")
