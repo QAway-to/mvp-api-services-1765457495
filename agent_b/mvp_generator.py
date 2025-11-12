@@ -77,7 +77,7 @@ class MVPGenerator:
             await self._create_project_from_template(template_id, project_name, project_description)
 
             # 4. Push to GitHub
-            github_url = await self._push_to_github(project_name, repo_name)
+            github_url = await self._push_to_github(project_name, repo_name, template_id)
 
             # 5. Trigger Vercel deployment
             deploy_url = await self._deploy_to_vercel(project_name, repo_name, github_url, template_id)
@@ -299,7 +299,7 @@ class MVPGenerator:
 
         log_agent_action("Agent B", "✅ Project customization completed")
 
-    async def _push_to_github(self, project_name: str, repo_name: str) -> str:
+    async def _push_to_github(self, project_name: str, repo_name: str, template_id: str) -> str:
         """Push project to GitHub (supports reusable or per-project repositories)"""
         if not Config.GITHUB_USER or not Config.GITHUB_TOKEN:
             raise RuntimeError("GitHub credentials are not configured")
@@ -309,7 +309,7 @@ class MVPGenerator:
         if not project_path.exists():
             raise FileNotFoundError(f"Generated project folder not found: {project_path}")
 
-        await asyncio.to_thread(self._sync_repository, repo_name, project_path, project_name)
+        await asyncio.to_thread(self._sync_repository, repo_name, project_path, project_name, template_id)
 
         github_url = f"https://github.com/{Config.GITHUB_USER}/{repo_name}"
         return github_url
@@ -328,7 +328,7 @@ class MVPGenerator:
         deploy_url = await asyncio.to_thread(self._create_vercel_deployment, project_name, repo_name)
         return deploy_url
 
-    def _sync_repository(self, repo_name: str, project_path: Path, project_name: str) -> None:
+    def _sync_repository(self, repo_name: str, project_path: Path, project_name: str, template_id: str) -> None:
         """Synchronize generated project with GitHub repository."""
         headers = {
             "Authorization": f"Bearer {Config.GITHUB_TOKEN}",
@@ -343,10 +343,6 @@ class MVPGenerator:
             self._clear_repository(repo_name, headers, branch)
 
         log_agent_action("Agent B", f"📤 Uploading {project_path} to {repo_name}")
-        # Determine template_id from project_path
-        template_id = None
-        if "mini-etl-pipeline" in project_name:
-            template_id = "mini-etl-pipeline"
         self._upload_directory(repo_name, project_path, headers, branch, project_name, template_id)
         # Ensure GitHub returns latest commits/contents before Vercel deploy
         self._wait_for_repo_ready(repo_name, headers, branch)
@@ -434,8 +430,13 @@ class MVPGenerator:
                 
                 all_files.append((file_path, relative_path))
                 
-                # Track critical files (spacex.js for mini-etl-pipeline, randomuser.js for others)
+                # Track critical files for logging
                 if 'spacex.js' in relative_path or 'randomuser.js' in relative_path:
+                    critical_files_to_upload.append(relative_path)
+                    file_size = file_path.stat().st_size
+                    log_agent_action("Agent B", f"🎯 CRITICAL FILE FOUND: {relative_path} ({file_size} bytes) - will upload")
+                elif relative_path == "next.config.js":
+                    # Also track next.config.js as critical for templates that have it
                     critical_files_to_upload.append(relative_path)
                     file_size = file_path.stat().st_size
                     log_agent_action("Agent B", f"🎯 CRITICAL FILE FOUND: {relative_path} ({file_size} bytes) - will upload")
@@ -530,12 +531,15 @@ class MVPGenerator:
         time.sleep(2)
         
         # Verify critical files were uploaded to GitHub with retries (template-specific)
+        # Only verify files that actually exist in the project
         critical_files_to_verify = ["pages/index.js", "package.json"]
         if template_id == "mini-etl-pipeline":
             critical_files_to_verify.extend(["src/lib/spacex.js", "next.config.js"])
         else:
-            # For other templates, check for next.config.js if it exists
-            critical_files_to_verify.append("next.config.js")
+            # For other templates, only check next.config.js if it exists in the project
+            # Check if next.config.js was actually uploaded by verifying it exists in project_path
+            if (project_path / "next.config.js").exists():
+                critical_files_to_verify.append("next.config.js")
         
         critical_uploaded = []
         for file_rel in critical_files_to_verify:
