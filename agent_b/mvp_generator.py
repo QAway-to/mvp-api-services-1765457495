@@ -130,7 +130,7 @@ class MVPGenerator:
             shutil.rmtree(project_path)
         shutil.copytree(template_path, project_path)
 
-        # Verify critical files were copied
+        # Verify critical files were copied - with detailed logging
         critical_files = [
             "package.json",
             "pages/index.js",
@@ -140,16 +140,36 @@ class MVPGenerator:
         missing_files = []
         for file_rel in critical_files:
             file_path = project_path / file_rel
-            if not file_path.exists():
+            if file_path.exists():
+                file_size = file_path.stat().st_size
+                log_agent_action("Agent B", f"✅ Verified copy: {file_rel} exists ({file_size} bytes)")
+            else:
                 missing_files.append(file_rel)
+                log_agent_action("Agent B", f"❌ MISSING: {file_rel} not found after copy!")
         
         if missing_files:
-            log_agent_action("Agent B", f"⚠️ Warning: Missing files after copy: {', '.join(missing_files)}")
+            # List all files in src/lib directory for debugging
+            lib_dir = project_path / "src" / "lib"
+            if lib_dir.exists():
+                lib_files = list(lib_dir.iterdir())
+                log_agent_action("Agent B", f"📋 Files in src/lib: {[f.name for f in lib_files]}")
+            else:
+                log_agent_action("Agent B", f"❌ src/lib directory does not exist!")
+            raise FileNotFoundError(f"Critical files missing after copy: {', '.join(missing_files)}")
         else:
             log_agent_action("Agent B", f"✅ All critical files copied successfully")
 
         # Customize project
         await self._customize_project(project_path, project_name, description)
+
+        # Verify critical files still exist after customization
+        randomuser_file = project_path / "src" / "lib" / "randomuser.js"
+        if randomuser_file.exists():
+            file_size = randomuser_file.stat().st_size
+            log_agent_action("Agent B", f"✅ Verified: randomuser.js still exists after customization ({file_size} bytes)")
+        else:
+            log_agent_action("Agent B", f"❌❌❌ CRITICAL: randomuser.js was deleted during customization!")
+            raise FileNotFoundError("randomuser.js was deleted during customization")
 
         log_agent_action("Agent B", f"✅ Project created at: {project_path}")
 
@@ -302,7 +322,10 @@ class MVPGenerator:
         uploaded_count = 0
         skipped_count = 0
         error_count = 0
+        critical_files_to_upload = []
         
+        # First pass: collect all files and identify critical ones
+        all_files = []
         for file_path in project_path.rglob('*'):
             if file_path.is_dir():
                 continue
@@ -313,67 +336,146 @@ class MVPGenerator:
                 continue
 
             if file_path.is_file():
-                try:
-                    relative_path = file_path.relative_to(project_path).as_posix()
-                    
-                    # Skip binary files that might cause issues
-                    if file_path.suffix in {'.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot'}:
-                        skipped_count += 1
-                        continue
-                    
-                    url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{relative_path}"
+                relative_path = file_path.relative_to(project_path).as_posix()
+                
+                # Skip binary files
+                if file_path.suffix in {'.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot'}:
+                    skipped_count += 1
+                    continue
+                
+                all_files.append((file_path, relative_path))
+                
+                # Track critical files
+                if 'randomuser.js' in relative_path:
+                    critical_files_to_upload.append(relative_path)
+                    file_size = file_path.stat().st_size
+                    log_agent_action("Agent B", f"🎯 CRITICAL FILE FOUND: {relative_path} ({file_size} bytes) - will upload")
+        
+        log_agent_action("Agent B", f"📋 Total files to upload: {len(all_files)} (including {len(critical_files_to_upload)} critical)")
+        
+        # Upload all files
+        for file_path, relative_path in all_files:
+            try:
+                url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{relative_path}"
 
-                    existing = requests.get(url, headers=headers, params={"ref": branch}, timeout=Config.REQUEST_TIMEOUT)
-                    sha = existing.json().get("sha") if existing.status_code == 200 else None
-
-                    # Read file content
+                # Check if file exists in GitHub
+                existing = requests.get(url, headers=headers, params={"ref": branch}, timeout=Config.REQUEST_TIMEOUT)
+                sha = None
+                if existing.status_code == 200:
                     try:
-                        content_bytes = file_path.read_bytes()
-                    except Exception as e:
-                        log_agent_action("Agent B", f"⚠️ Failed to read {relative_path}: {e}")
-                        error_count += 1
-                        continue
-                    
-                    encoded = base64.b64encode(content_bytes).decode()
+                        sha = existing.json().get("sha")
+                    except:
+                        pass
 
-                    data = {
-                        "message": f"Update MVP files from {project_name}",
-                        "content": encoded,
-                        "branch": branch,
-                    }
-                    if sha:
-                        data["sha"] = sha
-
-                    put_resp = requests.put(url, headers=headers, json=data, timeout=Config.REQUEST_TIMEOUT)
-                    if put_resp.status_code >= 400:
-                        self._raise_for_status_verbose(put_resp, f"Upload {relative_path}")
-                    else:
-                        uploaded_count += 1
-                        # Log critical files explicitly
-                        if 'randomuser.js' in relative_path or 'package.json' in relative_path or 'index.js' in relative_path:
-                            log_agent_action("Agent B", f"✅ Uploaded critical file: {relative_path}")
-                        if uploaded_count % 10 == 0:
-                            log_agent_action("Agent B", f"📤 Uploaded {uploaded_count} files...")
+                # Read file content
+                try:
+                    content_bytes = file_path.read_bytes()
+                    if 'randomuser.js' in relative_path:
+                        log_agent_action("Agent B", f"📖 Reading {relative_path}: {len(content_bytes)} bytes")
                 except Exception as e:
-                    log_agent_action("Agent B", f"❌ Error uploading {relative_path}: {e}")
+                    log_agent_action("Agent B", f"⚠️ Failed to read {relative_path}: {e}")
                     error_count += 1
                     continue
+                
+                # Encode to base64
+                try:
+                    encoded = base64.b64encode(content_bytes).decode('utf-8')
+                    if 'randomuser.js' in relative_path:
+                        log_agent_action("Agent B", f"🔐 Encoded {relative_path}: {len(encoded)} chars")
+                except Exception as e:
+                    log_agent_action("Agent B", f"⚠️ Failed to encode {relative_path}: {e}")
+                    error_count += 1
+                    continue
+
+                # Prepare upload data
+                data = {
+                    "message": f"Update MVP files from {project_name}",
+                    "content": encoded,
+                    "branch": branch,
+                }
+                if sha:
+                    data["sha"] = sha
+
+                # Upload file
+                put_resp = requests.put(url, headers=headers, json=data, timeout=Config.REQUEST_TIMEOUT)
+                
+                if put_resp.status_code >= 400:
+                    if 'randomuser.js' in relative_path:
+                        log_agent_action("Agent B", f"❌ FAILED to upload {relative_path}: {put_resp.status_code}")
+                        try:
+                            error_detail = put_resp.json()
+                            log_agent_action("Agent B", f"❌ Error detail: {error_detail}")
+                        except:
+                            log_agent_action("Agent B", f"❌ Error text: {put_resp.text[:500]}")
+                    self._raise_for_status_verbose(put_resp, f"Upload {relative_path}")
+                else:
+                    uploaded_count += 1
+                    if 'randomuser.js' in relative_path:
+                        log_agent_action("Agent B", f"✅✅✅ SUCCESS: Uploaded {relative_path} to GitHub (status: {put_resp.status_code})")
+                        # Verify immediately
+                        verify_resp = requests.get(url, headers=headers, params={"ref": branch}, timeout=Config.REQUEST_TIMEOUT)
+                        if verify_resp.status_code == 200:
+                            log_agent_action("Agent B", f"✅✅✅ VERIFIED: {relative_path} exists in GitHub after upload")
+                        else:
+                            log_agent_action("Agent B", f"⚠️⚠️⚠️ WARNING: {relative_path} NOT verified after upload (status: {verify_resp.status_code})")
+                    elif 'package.json' in relative_path or 'index.js' in relative_path or 'next.config.js' in relative_path:
+                        log_agent_action("Agent B", f"✅ Uploaded critical file: {relative_path}")
+                    
+                    if uploaded_count % 10 == 0:
+                        log_agent_action("Agent B", f"📤 Uploaded {uploaded_count} files...")
+                        
+            except Exception as e:
+                if 'randomuser.js' in relative_path:
+                    log_agent_action("Agent B", f"❌❌❌ EXCEPTION uploading {relative_path}: {e}")
+                    import traceback
+                    log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
+                else:
+                    log_agent_action("Agent B", f"❌ Error uploading {relative_path}: {e}")
+                error_count += 1
+                continue
         
         log_agent_action("Agent B", f"✅ Upload complete: {uploaded_count} files uploaded, {skipped_count} skipped, {error_count} errors")
         
-        # Verify critical files were uploaded to GitHub
+        # Wait a moment for GitHub to process
+        import time
+        time.sleep(2)
+        
+        # Verify critical files were uploaded to GitHub with retries
         critical_uploaded = []
         for file_rel in ["src/lib/randomuser.js", "pages/index.js", "package.json", "next.config.js"]:
             check_url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{file_rel}"
-            check_resp = requests.get(check_url, headers=headers, params={"ref": branch}, timeout=Config.REQUEST_TIMEOUT)
-            if check_resp.status_code == 200:
-                critical_uploaded.append(file_rel)
-                log_agent_action("Agent B", f"✅ Verified {file_rel} exists in GitHub")
-            else:
-                log_agent_action("Agent B", f"⚠️ WARNING: {file_rel} NOT found in GitHub (status: {check_resp.status_code})")
+            
+            # Retry up to 3 times
+            found = False
+            for attempt in range(3):
+                check_resp = requests.get(check_url, headers=headers, params={"ref": branch}, timeout=Config.REQUEST_TIMEOUT)
+                if check_resp.status_code == 200:
+                    found = True
+                    critical_uploaded.append(file_rel)
+                    try:
+                        file_info = check_resp.json()
+                        file_size = file_info.get("size", 0)
+                        log_agent_action("Agent B", f"✅✅✅ VERIFIED {file_rel} exists in GitHub (size: {file_size} bytes, attempt {attempt+1})")
+                    except:
+                        log_agent_action("Agent B", f"✅✅✅ VERIFIED {file_rel} exists in GitHub (attempt {attempt+1})")
+                    break
+                else:
+                    if attempt < 2:
+                        time.sleep(1)
+                    else:
+                        log_agent_action("Agent B", f"❌❌❌ FAILED to verify {file_rel} in GitHub (status: {check_resp.status_code} after 3 attempts)")
+                        try:
+                            error_detail = check_resp.json()
+                            log_agent_action("Agent B", f"❌ Error detail: {error_detail}")
+                        except:
+                            log_agent_action("Agent B", f"❌ Error text: {check_resp.text[:200]}")
         
         if len(critical_uploaded) < 4:
-            log_agent_action("Agent B", f"⚠️ Only {len(critical_uploaded)}/4 critical files verified in GitHub repository")
+            error_msg = f"Critical files missing in GitHub repository. Only {len(critical_uploaded)}/4 files found: {critical_uploaded}"
+            log_agent_action("Agent B", f"❌❌❌ {error_msg}")
+            raise RuntimeError(error_msg)
+        else:
+            log_agent_action("Agent B", f"✅✅✅ All {len(critical_uploaded)}/4 critical files verified in GitHub repository")
 
     def _list_contents(self, repo_name: str, headers: Dict[str, str], branch: str, path: str = "") -> Optional[List[Dict[str, Any]]]:
         url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{path}"
