@@ -23,6 +23,9 @@ wheels/
 *.egg-info/
 *.egg
 
+# Don't ignore lib/ in MVP templates (they contain required source files)
+!agent_b/mvp_templates/**/lib/
+
 # Node.js
 node_modules/
 npm-debug.log*
