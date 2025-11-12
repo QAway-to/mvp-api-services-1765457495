@@ -28,11 +28,18 @@ export default function MiniETL({
   fetchedAt: initialFetchedAt
 }) {
   const steps = useMemo(() => etlFallback.pipeline, []);
-  const [users, setUsers] = useState(initialUsers);
-  const [metrics, setMetrics] = useState(initialMetrics);
-  const [sourceUrl, setSourceUrl] = useState(initialSource);
-  const [fallbackUsed, setFallbackUsed] = useState(initialFallback);
-  const [fetchedAt, setFetchedAt] = useState(initialFetchedAt);
+  const [users, setUsers] = useState(Array.isArray(initialUsers) ? initialUsers : []);
+  const [metrics, setMetrics] = useState(initialMetrics || {
+    rows_in: 0,
+    rows_out: 0,
+    dedup_removed: 0,
+    countries: 0,
+    duration_sec: 0,
+    lastUser: 'N/A'
+  });
+  const [sourceUrl, setSourceUrl] = useState(initialSource || '');
+  const [fallbackUsed, setFallbackUsed] = useState(initialFallback || false);
+  const [fetchedAt, setFetchedAt] = useState(initialFetchedAt || new Date().toISOString());
   const [stepStatuses, setStepStatuses] = useState(() => steps.map(() => 'pending'));
   const [logLines, setLogLines] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -260,18 +267,48 @@ export default function MiniETL({
 }
 
 export async function getServerSideProps() {
-  const meta = await loadUsers(true);
-  const metrics = meta.users.length ? buildMetrics(meta.users) : etlFallback.metrics;
-
-  return {
-    props: {
-      initialMetrics: metrics,
-      initialUsers: meta.users,
-      sourceUrl: meta.sourceUrl,
-      fallbackUsed: meta.fallbackUsed,
-      fetchedAt: meta.fetchedAt
+  try {
+    const meta = await loadUsers(true);
+    const users = Array.isArray(meta.users) ? meta.users : [];
+    const metrics = users.length ? buildMetrics(users) : {
+      ...etlFallback.metrics,
+      countries: typeof etlFallback.metrics.countries === 'number' ? etlFallback.metrics.countries : 0,
+      lastUser: etlFallback.metrics.lastUser || 'N/A'
+    };
+    
+    // Убедиться, что countries - это число
+    if (typeof metrics.countries !== 'number') {
+      metrics.countries = 0;
     }
-  };
+
+    return {
+      props: {
+        initialMetrics: metrics,
+        initialUsers: users,
+        sourceUrl: meta.sourceUrl || '',
+        fallbackUsed: meta.fallbackUsed || false,
+        fetchedAt: meta.fetchedAt || new Date().toISOString()
+      }
+    };
+  } catch (error) {
+    console.error('[MiniETL] getServerSideProps error:', error);
+    return {
+      props: {
+        initialMetrics: {
+          rows_in: 0,
+          rows_out: 0,
+          dedup_removed: 0,
+          countries: 0,
+          duration_sec: 0,
+          lastUser: 'N/A'
+        },
+        initialUsers: [],
+        sourceUrl: '',
+        fallbackUsed: true,
+        fetchedAt: new Date().toISOString()
+      }
+    };
+  }
 }
 
 function Metric({ label, value }) {

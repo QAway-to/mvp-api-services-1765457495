@@ -131,13 +131,16 @@ class MVPGenerator:
             raise FileNotFoundError(f"Template {template_id} not found")
 
         # Check template structure (file may not exist, we'll generate it if needed)
-        template_randomuser = template_path / "src" / "lib" / "randomuser.js"
-        if template_randomuser.exists():
-            file_size = template_randomuser.stat().st_size
-            log_agent_action("Agent B", f"✅ Template file exists: src/lib/randomuser.js ({file_size} bytes)")
-        else:
-            log_agent_action("Agent B", f"⚠️ Template file src/lib/randomuser.js does NOT exist in template")
-            log_agent_action("Agent B", f"🤖 Will generate it via AI agents if needed after template copy")
+        # Only check randomuser.js for mini-etl-pipeline template
+        template_randomuser = None
+        if template_id == "mini-etl-pipeline":
+            template_randomuser = template_path / "src" / "lib" / "randomuser.js"
+            if template_randomuser.exists():
+                file_size = template_randomuser.stat().st_size
+                log_agent_action("Agent B", f"✅ Template file exists: src/lib/randomuser.js ({file_size} bytes)")
+            else:
+                log_agent_action("Agent B", f"⚠️ Template file src/lib/randomuser.js does NOT exist in template")
+                log_agent_action("Agent B", f"🤖 Will generate it via AI agents if needed after template copy")
 
         # Copy template
         if project_path.exists():
@@ -154,12 +157,20 @@ class MVPGenerator:
             raise
 
         # Verify critical files were copied - with detailed logging
+        # Critical files depend on template structure
         critical_files = [
             "package.json",
             "pages/index.js",
-            "src/lib/randomuser.js",
-            "next.config.js",
         ]
+        
+        # Add template-specific critical files
+        if template_id == "mini-etl-pipeline":
+            critical_files.append("src/lib/randomuser.js")
+            critical_files.append("next.config.js")
+        elif template_id in ["email-campaign-manager", "brand-mention-monitor", "data-formatter", "price-stock-parser"]:
+            # These templates may have next.config.js but it's not critical
+            pass
+        
         missing_files = []
         for file_rel in critical_files:
             file_path = project_path / file_rel
@@ -194,7 +205,7 @@ class MVPGenerator:
                     log_agent_action("Agent B", f"❌ Failed to generate src/lib/randomuser.js via AI agents")
         
         # If randomuser.js is still missing, try to copy from template if it exists
-        if "src/lib/randomuser.js" in missing_files and template_randomuser.exists():
+        if "src/lib/randomuser.js" in missing_files and template_id == "mini-etl-pipeline" and template_randomuser and template_randomuser.exists():
             log_agent_action("Agent B", f"🔧 Attempting to manually copy src/lib/randomuser.js from template")
             try:
                 # Ensure destination directory exists
@@ -238,14 +249,15 @@ class MVPGenerator:
         # Customize project
         await self._customize_project(project_path, project_name, description)
 
-        # Verify critical files still exist after customization
-        randomuser_file = project_path / "src" / "lib" / "randomuser.js"
-        if randomuser_file.exists():
-            file_size = randomuser_file.stat().st_size
-            log_agent_action("Agent B", f"✅ Verified: randomuser.js still exists after customization ({file_size} bytes)")
-        else:
-            log_agent_action("Agent B", f"❌❌❌ CRITICAL: randomuser.js was deleted during customization!")
-            raise FileNotFoundError("randomuser.js was deleted during customization")
+        # Verify critical files still exist after customization (template-specific)
+        if template_id == "mini-etl-pipeline":
+            randomuser_file = project_path / "src" / "lib" / "randomuser.js"
+            if randomuser_file.exists():
+                file_size = randomuser_file.stat().st_size
+                log_agent_action("Agent B", f"✅ Verified: randomuser.js still exists after customization ({file_size} bytes)")
+            else:
+                log_agent_action("Agent B", f"❌❌❌ CRITICAL: randomuser.js was deleted during customization!")
+                raise FileNotFoundError("randomuser.js was deleted during customization")
 
         log_agent_action("Agent B", f"✅ Project created at: {project_path}")
 
@@ -678,8 +690,13 @@ Generate the fixed code (ONLY code, no markdown):
         time.sleep(2)
         
         # Verify critical files were uploaded to GitHub with retries
+        # Critical files depend on template
+        critical_files_to_verify = ["pages/index.js", "package.json"]
+        if template_id == "mini-etl-pipeline":
+            critical_files_to_verify.extend(["src/lib/randomuser.js", "next.config.js"])
+        
         critical_uploaded = []
-        for file_rel in ["src/lib/randomuser.js", "pages/index.js", "package.json", "next.config.js"]:
+        for file_rel in critical_files_to_verify:
             check_url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{file_rel}"
             
             # Retry up to 3 times
