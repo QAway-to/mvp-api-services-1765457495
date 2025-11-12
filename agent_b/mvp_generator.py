@@ -448,11 +448,6 @@ class MVPGenerator:
                     critical_files_to_upload.append(relative_path)
                     file_size = file_path.stat().st_size
                     log_agent_action("Agent B", f"🎯 CRITICAL FILE FOUND: {relative_path} ({file_size} bytes) - will upload")
-                elif relative_path == "next.config.js":
-                    # Also track next.config.js as critical for templates that have it
-                    critical_files_to_upload.append(relative_path)
-                    file_size = file_path.stat().st_size
-                    log_agent_action("Agent B", f"🎯 CRITICAL FILE FOUND: {relative_path} ({file_size} bytes) - will upload")
         
         log_agent_action("Agent B", f"📋 Total files to upload: {len(all_files)} (including {len(critical_files_to_upload)} critical)")
         
