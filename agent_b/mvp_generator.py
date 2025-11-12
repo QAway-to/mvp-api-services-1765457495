@@ -13,17 +13,12 @@ from typing import Dict, Any, Optional, List, Tuple
 import requests
 from requests import Response, exceptions as req_exc
 import asyncio
-import google.generativeai as genai
 
 from template_selector import AITemplateSelector
 from config import Config
-from reviewer_agent import review_project_structure
 
 # Import shared logger
 from shared_logger import logger, log_agent_action
-
-# Configure Gemini
-genai.configure(api_key=Config.GEMINI_API_KEY)
 
 class MVPGenerator:
     """Generates MVP applications from templates"""
@@ -82,7 +77,7 @@ class MVPGenerator:
             await self._create_project_from_template(template_id, project_name, project_description)
 
             # 4. Push to GitHub
-            github_url = await self._push_to_github(project_name, repo_name, template_id)
+            github_url = await self._push_to_github(project_name, repo_name)
 
             # 5. Trigger Vercel deployment
             deploy_url = await self._deploy_to_vercel(project_name, repo_name, github_url, template_id)
@@ -130,17 +125,39 @@ class MVPGenerator:
         if not template_path.exists():
             raise FileNotFoundError(f"Template {template_id} not found")
 
-        # Check template structure (file may not exist, we'll generate it if needed)
-        # Only check randomuser.js for mini-etl-pipeline template
-        template_randomuser = None
+        # Verify template files exist BEFORE copying (template-specific)
+        template_lib_file = None
         if template_id == "mini-etl-pipeline":
-            template_randomuser = template_path / "src" / "lib" / "randomuser.js"
-            if template_randomuser.exists():
-                file_size = template_randomuser.stat().st_size
-                log_agent_action("Agent B", f"✅ Template file exists: src/lib/randomuser.js ({file_size} bytes)")
+            template_lib_file = template_path / "src" / "lib" / "spacex.js"
+            lib_file_name = "spacex.js"
+        else:
+            # For other templates, check if they have lib files
+            template_lib = template_path / "src" / "lib"
+            if template_lib.exists():
+                lib_files = list(template_lib.glob("*.js"))
+                if lib_files:
+                    template_lib_file = lib_files[0]
+                    lib_file_name = template_lib_file.name
+        
+        if template_lib_file and template_lib_file.exists():
+            file_size = template_lib_file.stat().st_size
+            log_agent_action("Agent B", f"✅ Template file exists: src/lib/{lib_file_name} ({file_size} bytes)")
+        elif template_lib_file:
+            log_agent_action("Agent B", f"⚠️ Template file src/lib/{lib_file_name} does NOT exist in template")
+            # List what's actually in the template
+            template_src = template_path / "src"
+            if template_src.exists():
+                log_agent_action("Agent B", f"📋 Template src directory exists")
+                template_lib = template_path / "src" / "lib"
+                if template_lib.exists():
+                    lib_files = list(template_lib.iterdir())
+                    log_agent_action("Agent B", f"📋 Files in template src/lib: {[f.name for f in lib_files]}")
+                else:
+                    log_agent_action("Agent B", f"❌ Template src/lib directory does NOT exist!")
             else:
-                log_agent_action("Agent B", f"⚠️ Template file src/lib/randomuser.js does NOT exist in template")
-                log_agent_action("Agent B", f"🤖 Will generate it via AI agents if needed after template copy")
+                log_agent_action("Agent B", f"❌ Template src directory does NOT exist!")
+            if template_id == "mini-etl-pipeline":
+                raise FileNotFoundError(f"Template file src/lib/spacex.js does not exist in template {template_id}")
 
         # Copy template
         if project_path.exists():
@@ -156,8 +173,7 @@ class MVPGenerator:
             log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
             raise
 
-        # Verify critical files were copied - with detailed logging
-        # Critical files depend on template structure
+        # Verify critical files were copied - with detailed logging (template-specific)
         critical_files = [
             "package.json",
             "pages/index.js",
@@ -165,12 +181,11 @@ class MVPGenerator:
         
         # Add template-specific critical files
         if template_id == "mini-etl-pipeline":
-            critical_files.append("src/lib/randomuser.js")
-            critical_files.append("next.config.js")
+            critical_files.extend(["src/lib/spacex.js", "next.config.js"])
         elif template_id in ["email-campaign-manager", "brand-mention-monitor", "data-formatter", "price-stock-parser"]:
             # These templates may have next.config.js but it's not critical
-            pass
-        
+            if (project_path / "next.config.js").exists():
+                critical_files.append("next.config.js")
         missing_files = []
         for file_rel in critical_files:
             file_path = project_path / file_rel
@@ -181,32 +196,15 @@ class MVPGenerator:
                 missing_files.append(file_rel)
                 log_agent_action("Agent B", f"❌ MISSING: {file_rel} not found after copy!")
         
-        # Review project structure using Reviewer agent
-        structure_review = review_project_structure(template_id, project_path, critical_files)
+        # If lib file is missing, try to copy it explicitly (template-specific)
+        lib_file_to_copy = None
+        if template_id == "mini-etl-pipeline" and "src/lib/spacex.js" in missing_files:
+            lib_file_to_copy = "spacex.js"
+        elif "src/lib/randomuser.js" in missing_files:
+            lib_file_to_copy = "randomuser.js"
         
-        if structure_review["status"] == "reject":
-            missing_from_review = structure_review.get("missing_files", [])
-            log_agent_action("Agent B", f"🔍 Project structure review: {structure_review['comments']}")
-            
-            # Generate missing critical files via AI agents
-            if "src/lib/randomuser.js" in missing_from_review and template_id == "mini-etl-pipeline":
-                log_agent_action("Agent B", f"🤖 Generating src/lib/randomuser.js via AI agents...")
-                dest_file = project_path / "src" / "lib" / "randomuser.js"
-                success = await self._generate_critical_file_via_agents(
-                    dest_file, 
-                    "javascript", 
-                    template_id, 
-                    description
-                )
-                if success and dest_file.exists():
-                    missing_files = [f for f in missing_files if f != "src/lib/randomuser.js"]
-                    log_agent_action("Agent B", f"✅✅✅ Successfully generated src/lib/randomuser.js via AI agents")
-                else:
-                    log_agent_action("Agent B", f"❌ Failed to generate src/lib/randomuser.js via AI agents")
-        
-        # If randomuser.js is still missing, try to copy from template if it exists
-        if "src/lib/randomuser.js" in missing_files and template_id == "mini-etl-pipeline" and template_randomuser and template_randomuser.exists():
-            log_agent_action("Agent B", f"🔧 Attempting to manually copy src/lib/randomuser.js from template")
+        if lib_file_to_copy and template_lib_file and template_lib_file.exists():
+            log_agent_action("Agent B", f"🔧 Attempting to manually copy src/lib/{lib_file_to_copy}")
             try:
                 # Ensure destination directory exists
                 dest_lib_dir = project_path / "src" / "lib"
@@ -214,17 +212,17 @@ class MVPGenerator:
                 log_agent_action("Agent B", f"✅ Created directory: {dest_lib_dir}")
                 
                 # Copy the file explicitly
-                dest_file = dest_lib_dir / "randomuser.js"
-                shutil.copy2(template_randomuser, dest_file)
+                dest_file = dest_lib_dir / lib_file_to_copy
+                shutil.copy2(template_lib_file, dest_file)
                 
                 if dest_file.exists():
                     file_size = dest_file.stat().st_size
-                    log_agent_action("Agent B", f"✅✅✅ MANUALLY COPIED: src/lib/randomuser.js ({file_size} bytes)")
-                    missing_files.remove("src/lib/randomuser.js")
+                    log_agent_action("Agent B", f"✅✅✅ MANUALLY COPIED: src/lib/{lib_file_to_copy} ({file_size} bytes)")
+                    missing_files.remove(f"src/lib/{lib_file_to_copy}")
                 else:
-                    log_agent_action("Agent B", f"❌ Failed to manually copy src/lib/randomuser.js")
+                    log_agent_action("Agent B", f"❌ Failed to manually copy src/lib/{lib_file_to_copy}")
             except Exception as e:
-                log_agent_action("Agent B", f"❌ Error manually copying src/lib/randomuser.js: {e}")
+                log_agent_action("Agent B", f"❌ Error manually copying src/lib/{lib_file_to_copy}: {e}")
                 import traceback
                 log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
         
@@ -251,176 +249,15 @@ class MVPGenerator:
 
         # Verify critical files still exist after customization (template-specific)
         if template_id == "mini-etl-pipeline":
-            randomuser_file = project_path / "src" / "lib" / "randomuser.js"
-            if randomuser_file.exists():
-                file_size = randomuser_file.stat().st_size
-                log_agent_action("Agent B", f"✅ Verified: randomuser.js still exists after customization ({file_size} bytes)")
+            spacex_file = project_path / "src" / "lib" / "spacex.js"
+            if spacex_file.exists():
+                file_size = spacex_file.stat().st_size
+                log_agent_action("Agent B", f"✅ Verified: spacex.js still exists after customization ({file_size} bytes)")
             else:
-                log_agent_action("Agent B", f"❌❌❌ CRITICAL: randomuser.js was deleted during customization!")
-                raise FileNotFoundError("randomuser.js was deleted during customization")
+                log_agent_action("Agent B", f"❌❌❌ CRITICAL: spacex.js was deleted during customization!")
+                raise FileNotFoundError("spacex.js was deleted during customization")
 
         log_agent_action("Agent B", f"✅ Project created at: {project_path}")
-
-    async def _generate_critical_file_via_agents(
-        self, 
-        file_path: Path, 
-        file_type: str, 
-        template_id: str, 
-        project_description: str
-    ) -> bool:
-        """Generate critical file using Architect-Coder-Reviewer architecture"""
-        try:
-            log_agent_action("Agent B", f"🤖 Generating critical file via AI agents: {file_path.name}")
-            
-            # Define file specifications based on template and file type
-            if template_id == "mini-etl-pipeline" and file_path.name == "randomuser.js":
-                file_spec = {
-                    "path": str(file_path.relative_to(file_path.parent.parent.parent)),
-                    "purpose": "Random User API data loader for ETL pipeline",
-                    "requirements": """
-                    - Export async function loadUsers(withMeta = false) that fetches from RANDOMUSER_API_URL env var
-                    - Export function buildMetrics(users) that calculates ETL metrics
-                    - Export function fallbackUsers() that returns 50 mock user objects
-                    - Use fetch API for HTTP requests
-                    - Handle errors gracefully with fallback data
-                    - Return data structure: {users, fallbackUsed, sourceUrl, fetchedAt} when withMeta=true
-                    - User object structure: {id: {value}, name: {first, last}, email, phone, location: {country, city}, registered: {date}, picture: {thumbnail}}
-                    - Environment variable: process.env.RANDOMUSER_API_URL (default: 'https://randomuser.me/api/?results=500')
-                    """
-                }
-            else:
-                log_agent_action("Agent B", f"⚠️ Unknown critical file type: {file_path.name}")
-                return False
-            
-            # Generate code using Gemini (Coder)
-            coder = genai.GenerativeModel(Config.GEMINI_MODEL)
-            
-            prompt = f"""
-You are a senior JavaScript developer. Generate a complete, production-ready JavaScript/ES6 module.
-
-File: {file_spec['path']}
-Purpose: {file_spec['purpose']}
-Project Context: {project_description[:500]}
-
-Requirements:
-{file_spec['requirements']}
-
-Additional requirements:
-- Use ES6 module syntax (export async function, export function)
-- Use async/await for asynchronous operations
-- Include proper error handling with try/catch
-- Provide fallback data if API fails
-- Code should be clean, readable, and well-structured
-- No comments or explanations, only code
-- Output ONLY valid JavaScript code (no markdown, no code blocks)
-
-Generate the complete code for this file:
-"""
-            
-            log_agent_action("Agent B", f"🔧 Generating code for {file_path.name}...")
-            response = coder.generate_content(prompt)
-            
-            if not response or not response.text:
-                log_agent_action("Agent B", f"❌ Empty response from AI for {file_path.name}")
-                return False
-            
-            # Clean response (remove markdown code blocks if present)
-            code = response.text.strip()
-            if code.startswith("```"):
-                # Remove markdown code blocks
-                lines = code.split('\n')
-                if lines[0].startswith("```"):
-                    lines = lines[1:]
-                if lines[-1].strip() == "```":
-                    lines = lines[:-1]
-                code = '\n'.join(lines)
-            
-            # Review the generated code (Reviewer)
-            log_agent_action("Agent B", f"🔍 Reviewing generated code for {file_path.name}...")
-            reviewer = genai.GenerativeModel(Config.GEMINI_MODEL)
-            
-            review_prompt = f"""
-You are a strict code reviewer. Review this JavaScript code for the file {file_spec['path']}.
-
-Requirements to check:
-1. Code must export the required functions: loadUsers, buildMetrics, fallbackUsers
-2. Code must handle errors gracefully
-3. Code must use environment variables correctly
-4. Code must return correct data structures
-5. Code must be valid JavaScript/ES6 syntax
-6. Code must not have syntax errors
-7. Code must handle edge cases (empty arrays, null values, etc.)
-
-Respond ONLY with valid JSON:
-{{
-  "status": "approve",
-  "comments": []
-}}
-
-or
-
-{{
-  "status": "reject",
-  "comments": ["issue1", "issue2"]
-}}
-
-Code to review:
-{code}
-"""
-            
-            review_response = reviewer.generate_content(review_prompt)
-            if review_response and review_response.text:
-                try:
-                    review_result = json.loads(review_response.text.strip())
-                    if review_result.get("status") != "approve":
-                        log_agent_action("Agent B", f"⚠️ Code rejected: {review_result.get('comments', [])}")
-                        # Try to fix based on feedback
-                        if review_result.get("comments"):
-                            feedback_text = "\n".join(review_result["comments"])
-                            fix_prompt = f"""
-The previous code was rejected. Fix the following issues:
-
-{feedback_text}
-
-Original code:
-{code}
-
-Generate the fixed code (ONLY code, no markdown):
-"""
-                            fix_response = coder.generate_content(fix_prompt)
-                            if fix_response and fix_response.text:
-                                code = fix_response.text.strip()
-                                if code.startswith("```"):
-                                    lines = code.split('\n')
-                                    if lines[0].startswith("```"):
-                                        lines = lines[1:]
-                                    if lines[-1].strip() == "```":
-                                        lines = lines[:-1]
-                                    code = '\n'.join(lines)
-                                log_agent_action("Agent B", f"✅ Code fixed based on reviewer feedback")
-                except Exception as e:
-                    log_agent_action("Agent B", f"⚠️ Could not parse review result: {e}")
-            
-            # Ensure directory exists
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Write the file
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(code)
-            
-            if file_path.exists():
-                file_size = file_path.stat().st_size
-                log_agent_action("Agent B", f"✅✅✅ Generated {file_path.name} via AI agents ({file_size} bytes)")
-                return True
-            else:
-                log_agent_action("Agent B", f"❌ Failed to create {file_path.name}")
-                return False
-                
-        except Exception as e:
-            log_agent_action("Agent B", f"❌ Error generating {file_path.name} via agents: {e}")
-            import traceback
-            log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
-            return False
 
     async def _customize_project(self, project_path: Path, project_name: str, description: str):
         """Customize project files with project-specific data"""
@@ -464,7 +301,7 @@ Generate the fixed code (ONLY code, no markdown):
 
         log_agent_action("Agent B", "✅ Project customization completed")
 
-    async def _push_to_github(self, project_name: str, repo_name: str, template_id: str) -> str:
+    async def _push_to_github(self, project_name: str, repo_name: str) -> str:
         """Push project to GitHub (supports reusable or per-project repositories)"""
         if not Config.GITHUB_USER or not Config.GITHUB_TOKEN:
             raise RuntimeError("GitHub credentials are not configured")
@@ -474,7 +311,7 @@ Generate the fixed code (ONLY code, no markdown):
         if not project_path.exists():
             raise FileNotFoundError(f"Generated project folder not found: {project_path}")
 
-        await asyncio.to_thread(self._sync_repository, repo_name, project_path, project_name, template_id)
+        await asyncio.to_thread(self._sync_repository, repo_name, project_path, project_name)
 
         github_url = f"https://github.com/{Config.GITHUB_USER}/{repo_name}"
         return github_url
@@ -493,7 +330,7 @@ Generate the fixed code (ONLY code, no markdown):
         deploy_url = await asyncio.to_thread(self._create_vercel_deployment, project_name, repo_name)
         return deploy_url
 
-    def _sync_repository(self, repo_name: str, project_path: Path, project_name: str, template_id: str) -> None:
+    def _sync_repository(self, repo_name: str, project_path: Path, project_name: str) -> None:
         """Synchronize generated project with GitHub repository."""
         headers = {
             "Authorization": f"Bearer {Config.GITHUB_TOKEN}",
@@ -508,6 +345,10 @@ Generate the fixed code (ONLY code, no markdown):
             self._clear_repository(repo_name, headers, branch)
 
         log_agent_action("Agent B", f"📤 Uploading {project_path} to {repo_name}")
+        # Determine template_id from project_path
+        template_id = None
+        if "mini-etl-pipeline" in project_name:
+            template_id = "mini-etl-pipeline"
         self._upload_directory(repo_name, project_path, headers, branch, project_name, template_id)
         # Ensure GitHub returns latest commits/contents before Vercel deploy
         self._wait_for_repo_ready(repo_name, headers, branch)
@@ -567,7 +408,7 @@ Generate the fixed code (ONLY code, no markdown):
         headers: Dict[str, str],
         branch: str,
         project_name: str,
-        template_id: str,
+        template_id: str = None,
     ) -> None:
         uploaded_count = 0
         skipped_count = 0
@@ -595,8 +436,8 @@ Generate the fixed code (ONLY code, no markdown):
                 
                 all_files.append((file_path, relative_path))
                 
-                # Track critical files
-                if 'randomuser.js' in relative_path:
+                # Track critical files (spacex.js for mini-etl-pipeline, randomuser.js for others)
+                if 'spacex.js' in relative_path or 'randomuser.js' in relative_path:
                     critical_files_to_upload.append(relative_path)
                     file_size = file_path.stat().st_size
                     log_agent_action("Agent B", f"🎯 CRITICAL FILE FOUND: {relative_path} ({file_size} bytes) - will upload")
@@ -620,7 +461,7 @@ Generate the fixed code (ONLY code, no markdown):
                 # Read file content
                 try:
                     content_bytes = file_path.read_bytes()
-                    if 'randomuser.js' in relative_path:
+                    if 'spacex.js' in relative_path or 'randomuser.js' in relative_path:
                         log_agent_action("Agent B", f"📖 Reading {relative_path}: {len(content_bytes)} bytes")
                 except Exception as e:
                     log_agent_action("Agent B", f"⚠️ Failed to read {relative_path}: {e}")
@@ -630,7 +471,7 @@ Generate the fixed code (ONLY code, no markdown):
                 # Encode to base64
                 try:
                     encoded = base64.b64encode(content_bytes).decode('utf-8')
-                    if 'randomuser.js' in relative_path:
+                    if 'spacex.js' in relative_path or 'randomuser.js' in relative_path:
                         log_agent_action("Agent B", f"🔐 Encoded {relative_path}: {len(encoded)} chars")
                 except Exception as e:
                     log_agent_action("Agent B", f"⚠️ Failed to encode {relative_path}: {e}")
@@ -650,7 +491,7 @@ Generate the fixed code (ONLY code, no markdown):
                 put_resp = requests.put(url, headers=headers, json=data, timeout=Config.REQUEST_TIMEOUT)
                 
                 if put_resp.status_code >= 400:
-                    if 'randomuser.js' in relative_path:
+                    if 'spacex.js' in relative_path or 'randomuser.js' in relative_path:
                         log_agent_action("Agent B", f"❌ FAILED to upload {relative_path}: {put_resp.status_code}")
                         try:
                             error_detail = put_resp.json()
@@ -660,7 +501,7 @@ Generate the fixed code (ONLY code, no markdown):
                     self._raise_for_status_verbose(put_resp, f"Upload {relative_path}")
                 else:
                     uploaded_count += 1
-                    if 'randomuser.js' in relative_path:
+                    if 'spacex.js' in relative_path or 'randomuser.js' in relative_path:
                         log_agent_action("Agent B", f"✅✅✅ SUCCESS: Uploaded {relative_path} to GitHub (status: {put_resp.status_code})")
                         # Verify immediately
                         verify_resp = requests.get(url, headers=headers, params={"ref": branch}, timeout=Config.REQUEST_TIMEOUT)
@@ -675,7 +516,7 @@ Generate the fixed code (ONLY code, no markdown):
                         log_agent_action("Agent B", f"📤 Uploaded {uploaded_count} files...")
                         
             except Exception as e:
-                if 'randomuser.js' in relative_path:
+                if 'spacex.js' in relative_path or 'randomuser.js' in relative_path:
                     log_agent_action("Agent B", f"❌❌❌ EXCEPTION uploading {relative_path}: {e}")
                     import traceback
                     log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
@@ -690,11 +531,13 @@ Generate the fixed code (ONLY code, no markdown):
         import time
         time.sleep(2)
         
-        # Verify critical files were uploaded to GitHub with retries
-        # Critical files depend on template
+        # Verify critical files were uploaded to GitHub with retries (template-specific)
         critical_files_to_verify = ["pages/index.js", "package.json"]
         if template_id == "mini-etl-pipeline":
-            critical_files_to_verify.extend(["src/lib/randomuser.js", "next.config.js"])
+            critical_files_to_verify.extend(["src/lib/spacex.js", "next.config.js"])
+        else:
+            # For other templates, check for next.config.js if it exists
+            critical_files_to_verify.append("next.config.js")
         
         critical_uploaded = []
         for file_rel in critical_files_to_verify:
@@ -725,12 +568,13 @@ Generate the fixed code (ONLY code, no markdown):
                         except:
                             log_agent_action("Agent B", f"❌ Error text: {check_resp.text[:200]}")
         
-        if len(critical_uploaded) < 4:
-            error_msg = f"Critical files missing in GitHub repository. Only {len(critical_uploaded)}/4 files found: {critical_uploaded}"
+        expected_count = len(critical_files_to_verify)
+        if len(critical_uploaded) < expected_count:
+            error_msg = f"Critical files missing in GitHub repository. Only {len(critical_uploaded)}/{expected_count} files found: {critical_uploaded}"
             log_agent_action("Agent B", f"❌❌❌ {error_msg}")
             raise RuntimeError(error_msg)
         else:
-            log_agent_action("Agent B", f"✅✅✅ All {len(critical_uploaded)}/4 critical files verified in GitHub repository")
+            log_agent_action("Agent B", f"✅✅✅ All {len(critical_uploaded)}/{expected_count} critical files verified in GitHub repository")
 
     def _list_contents(self, repo_name: str, headers: Dict[str, str], branch: str, path: str = "") -> Optional[List[Dict[str, Any]]]:
         url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{path}"
@@ -875,14 +719,14 @@ Generate the fixed code (ONLY code, no markdown):
             log_agent_action("Agent B", f"⚠️ Unable to determine Vercel project id for {project_name}, skipping env configuration")
             return
 
-        randomuser_url = Config.RANDOMUSER_API_URL
-        if not randomuser_url:
-            log_agent_action("Agent B", "ℹ️ RANDOMUSER_API_URL not set in environment; skipping Vercel env injection")
-            return
+        spacex_url = os.getenv("SPACEX_API_URL", "https://api.spacexdata.com/v5/launches")
+        if not spacex_url:
+            log_agent_action("Agent B", "ℹ️ SPACEX_API_URL not set in environment; using default")
+            spacex_url = "https://api.spacexdata.com/v5/launches"
 
         try:
-            self._set_vercel_env_var(project_id, "RANDOMUSER_API_URL", randomuser_url)
-            log_agent_action("Agent B", f"🔐 Vercel env configured for {project_name} (RANDOMUSER_API_URL)")
+            self._set_vercel_env_var(project_id, "SPACEX_API_URL", spacex_url)
+            log_agent_action("Agent B", f"🔐 Vercel env configured for {project_name} (SPACEX_API_URL)")
         except Exception as error:
             log_agent_action("Agent B", f"❌ Failed to configure Vercel env vars: {error}")
 
