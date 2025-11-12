@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
+from pathlib import Path
 
 import google.generativeai as genai
 from config import Config
@@ -188,3 +189,72 @@ def validate_review_result(result: Dict[str, Any]) -> bool:
         return False
 
     return True
+
+
+def review_project_structure(
+    template_id: str, 
+    project_path: Path, 
+    critical_files: List[str]
+) -> Dict[str, Any]:
+    """Review project structure and verify critical files exist"""
+    try:
+        logger.info(f"🔍 Reviewing project structure for template: {template_id}")
+        
+        missing_files = []
+        existing_files = []
+        
+        for file_rel in critical_files:
+            file_path = project_path / file_rel
+            if file_path.exists():
+                file_size = file_path.stat().st_size
+                existing_files.append({"path": file_rel, "size": file_size})
+            else:
+                missing_files.append(file_rel)
+        
+        if missing_files:
+            return {
+                "status": "reject",
+                "comments": [f"Missing critical files: {', '.join(missing_files)}"],
+                "missing_files": missing_files,
+                "existing_files": existing_files
+            }
+        
+        # Additional checks for specific templates
+        if template_id == "mini-etl-pipeline":
+            # Check if randomuser.js has required exports
+            randomuser_file = project_path / "src" / "lib" / "randomuser.js"
+            if randomuser_file.exists():
+                try:
+                    content = randomuser_file.read_text(encoding='utf-8')
+                    required_exports = ["loadUsers", "buildMetrics", "fallbackUsers"]
+                    missing_exports = []
+                    for export in required_exports:
+                        # Check if export exists in content
+                        if f"export" in content and export in content:
+                            # Verify it's actually exported (not just mentioned in comments)
+                            if f"export" in content and (f"export function {export}" in content or f"export async function {export}" in content):
+                                continue
+                        missing_exports.append(export)
+                    
+                    if missing_exports:
+                        return {
+                            "status": "reject",
+                            "comments": [f"randomuser.js missing required exports: {', '.join(missing_exports)}"],
+                            "missing_exports": missing_exports,
+                            "existing_files": existing_files
+                        }
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not read randomuser.js for export check: {e}")
+        
+        return {
+            "status": "approve",
+            "comments": [],
+            "existing_files": existing_files
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error reviewing project structure: {e}")
+        return {
+            "status": "reject",
+            "comments": [f"Error reviewing project structure: {str(e)}"]
+        }

@@ -13,12 +13,17 @@ from typing import Dict, Any, Optional, List, Tuple
 import requests
 from requests import Response, exceptions as req_exc
 import asyncio
+import google.generativeai as genai
 
 from template_selector import AITemplateSelector
 from config import Config
+from reviewer_agent import review_project_structure
 
 # Import shared logger
 from shared_logger import logger, log_agent_action
+
+# Configure Gemini
+genai.configure(api_key=Config.GEMINI_API_KEY)
 
 class MVPGenerator:
     """Generates MVP applications from templates"""
@@ -125,26 +130,14 @@ class MVPGenerator:
         if not template_path.exists():
             raise FileNotFoundError(f"Template {template_id} not found")
 
-        # Verify template files exist BEFORE copying
+        # Check template structure (file may not exist, we'll generate it if needed)
         template_randomuser = template_path / "src" / "lib" / "randomuser.js"
         if template_randomuser.exists():
             file_size = template_randomuser.stat().st_size
             log_agent_action("Agent B", f"✅ Template file exists: src/lib/randomuser.js ({file_size} bytes)")
         else:
-            log_agent_action("Agent B", f"❌❌❌ CRITICAL: Template file src/lib/randomuser.js does NOT exist in template!")
-            # List what's actually in the template
-            template_src = template_path / "src"
-            if template_src.exists():
-                log_agent_action("Agent B", f"📋 Template src directory exists")
-                template_lib = template_path / "src" / "lib"
-                if template_lib.exists():
-                    lib_files = list(template_lib.iterdir())
-                    log_agent_action("Agent B", f"📋 Files in template src/lib: {[f.name for f in lib_files]}")
-                else:
-                    log_agent_action("Agent B", f"❌ Template src/lib directory does NOT exist!")
-            else:
-                log_agent_action("Agent B", f"❌ Template src directory does NOT exist!")
-            raise FileNotFoundError(f"Template file src/lib/randomuser.js does not exist in template {template_id}")
+            log_agent_action("Agent B", f"⚠️ Template file src/lib/randomuser.js does NOT exist in template")
+            log_agent_action("Agent B", f"🤖 Will generate it via AI agents if needed after template copy")
 
         # Copy template
         if project_path.exists():
@@ -177,9 +170,32 @@ class MVPGenerator:
                 missing_files.append(file_rel)
                 log_agent_action("Agent B", f"❌ MISSING: {file_rel} not found after copy!")
         
-        # If randomuser.js is missing, try to copy it explicitly
-        if "src/lib/randomuser.js" in missing_files:
-            log_agent_action("Agent B", f"🔧 Attempting to manually copy src/lib/randomuser.js")
+        # Review project structure using Reviewer agent
+        structure_review = review_project_structure(template_id, project_path, critical_files)
+        
+        if structure_review["status"] == "reject":
+            missing_from_review = structure_review.get("missing_files", [])
+            log_agent_action("Agent B", f"🔍 Project structure review: {structure_review['comments']}")
+            
+            # Generate missing critical files via AI agents
+            if "src/lib/randomuser.js" in missing_from_review and template_id == "mini-etl-pipeline":
+                log_agent_action("Agent B", f"🤖 Generating src/lib/randomuser.js via AI agents...")
+                dest_file = project_path / "src" / "lib" / "randomuser.js"
+                success = await self._generate_critical_file_via_agents(
+                    dest_file, 
+                    "javascript", 
+                    template_id, 
+                    description
+                )
+                if success and dest_file.exists():
+                    missing_files = [f for f in missing_files if f != "src/lib/randomuser.js"]
+                    log_agent_action("Agent B", f"✅✅✅ Successfully generated src/lib/randomuser.js via AI agents")
+                else:
+                    log_agent_action("Agent B", f"❌ Failed to generate src/lib/randomuser.js via AI agents")
+        
+        # If randomuser.js is still missing, try to copy from template if it exists
+        if "src/lib/randomuser.js" in missing_files and template_randomuser.exists():
+            log_agent_action("Agent B", f"🔧 Attempting to manually copy src/lib/randomuser.js from template")
             try:
                 # Ensure destination directory exists
                 dest_lib_dir = project_path / "src" / "lib"
@@ -232,6 +248,167 @@ class MVPGenerator:
             raise FileNotFoundError("randomuser.js was deleted during customization")
 
         log_agent_action("Agent B", f"✅ Project created at: {project_path}")
+
+    async def _generate_critical_file_via_agents(
+        self, 
+        file_path: Path, 
+        file_type: str, 
+        template_id: str, 
+        project_description: str
+    ) -> bool:
+        """Generate critical file using Architect-Coder-Reviewer architecture"""
+        try:
+            log_agent_action("Agent B", f"🤖 Generating critical file via AI agents: {file_path.name}")
+            
+            # Define file specifications based on template and file type
+            if template_id == "mini-etl-pipeline" and file_path.name == "randomuser.js":
+                file_spec = {
+                    "path": str(file_path.relative_to(file_path.parent.parent.parent)),
+                    "purpose": "Random User API data loader for ETL pipeline",
+                    "requirements": """
+                    - Export async function loadUsers(withMeta = false) that fetches from RANDOMUSER_API_URL env var
+                    - Export function buildMetrics(users) that calculates ETL metrics
+                    - Export function fallbackUsers() that returns 50 mock user objects
+                    - Use fetch API for HTTP requests
+                    - Handle errors gracefully with fallback data
+                    - Return data structure: {users, fallbackUsed, sourceUrl, fetchedAt} when withMeta=true
+                    - User object structure: {id: {value}, name: {first, last}, email, phone, location: {country, city}, registered: {date}, picture: {thumbnail}}
+                    - Environment variable: process.env.RANDOMUSER_API_URL (default: 'https://randomuser.me/api/?results=500')
+                    """
+                }
+            else:
+                log_agent_action("Agent B", f"⚠️ Unknown critical file type: {file_path.name}")
+                return False
+            
+            # Generate code using Gemini (Coder)
+            coder = genai.GenerativeModel(Config.GEMINI_MODEL)
+            
+            prompt = f"""
+You are a senior JavaScript developer. Generate a complete, production-ready JavaScript/ES6 module.
+
+File: {file_spec['path']}
+Purpose: {file_spec['purpose']}
+Project Context: {project_description[:500]}
+
+Requirements:
+{file_spec['requirements']}
+
+Additional requirements:
+- Use ES6 module syntax (export async function, export function)
+- Use async/await for asynchronous operations
+- Include proper error handling with try/catch
+- Provide fallback data if API fails
+- Code should be clean, readable, and well-structured
+- No comments or explanations, only code
+- Output ONLY valid JavaScript code (no markdown, no code blocks)
+
+Generate the complete code for this file:
+"""
+            
+            log_agent_action("Agent B", f"🔧 Generating code for {file_path.name}...")
+            response = coder.generate_content(prompt)
+            
+            if not response or not response.text:
+                log_agent_action("Agent B", f"❌ Empty response from AI for {file_path.name}")
+                return False
+            
+            # Clean response (remove markdown code blocks if present)
+            code = response.text.strip()
+            if code.startswith("```"):
+                # Remove markdown code blocks
+                lines = code.split('\n')
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                code = '\n'.join(lines)
+            
+            # Review the generated code (Reviewer)
+            log_agent_action("Agent B", f"🔍 Reviewing generated code for {file_path.name}...")
+            reviewer = genai.GenerativeModel(Config.GEMINI_MODEL)
+            
+            review_prompt = f"""
+You are a strict code reviewer. Review this JavaScript code for the file {file_spec['path']}.
+
+Requirements to check:
+1. Code must export the required functions: loadUsers, buildMetrics, fallbackUsers
+2. Code must handle errors gracefully
+3. Code must use environment variables correctly
+4. Code must return correct data structures
+5. Code must be valid JavaScript/ES6 syntax
+6. Code must not have syntax errors
+7. Code must handle edge cases (empty arrays, null values, etc.)
+
+Respond ONLY with valid JSON:
+{{
+  "status": "approve",
+  "comments": []
+}}
+
+or
+
+{{
+  "status": "reject",
+  "comments": ["issue1", "issue2"]
+}}
+
+Code to review:
+{code}
+"""
+            
+            review_response = reviewer.generate_content(review_prompt)
+            if review_response and review_response.text:
+                try:
+                    review_result = json.loads(review_response.text.strip())
+                    if review_result.get("status") != "approve":
+                        log_agent_action("Agent B", f"⚠️ Code rejected: {review_result.get('comments', [])}")
+                        # Try to fix based on feedback
+                        if review_result.get("comments"):
+                            feedback_text = "\n".join(review_result["comments"])
+                            fix_prompt = f"""
+The previous code was rejected. Fix the following issues:
+
+{feedback_text}
+
+Original code:
+{code}
+
+Generate the fixed code (ONLY code, no markdown):
+"""
+                            fix_response = coder.generate_content(fix_prompt)
+                            if fix_response and fix_response.text:
+                                code = fix_response.text.strip()
+                                if code.startswith("```"):
+                                    lines = code.split('\n')
+                                    if lines[0].startswith("```"):
+                                        lines = lines[1:]
+                                    if lines[-1].strip() == "```":
+                                        lines = lines[:-1]
+                                    code = '\n'.join(lines)
+                                log_agent_action("Agent B", f"✅ Code fixed based on reviewer feedback")
+                except Exception as e:
+                    log_agent_action("Agent B", f"⚠️ Could not parse review result: {e}")
+            
+            # Ensure directory exists
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Write the file
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(code)
+            
+            if file_path.exists():
+                file_size = file_path.stat().st_size
+                log_agent_action("Agent B", f"✅✅✅ Generated {file_path.name} via AI agents ({file_size} bytes)")
+                return True
+            else:
+                log_agent_action("Agent B", f"❌ Failed to create {file_path.name}")
+                return False
+                
+        except Exception as e:
+            log_agent_action("Agent B", f"❌ Error generating {file_path.name} via agents: {e}")
+            import traceback
+            log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
+            return False
 
     async def _customize_project(self, project_path: Path, project_name: str, description: str):
         """Customize project files with project-specific data"""
