@@ -200,8 +200,6 @@ class MVPGenerator:
         lib_file_to_copy = None
         if template_id == "mini-etl-pipeline" and "src/lib/spacex.js" in missing_files:
             lib_file_to_copy = "spacex.js"
-        elif "src/lib/randomuser.js" in missing_files:
-            lib_file_to_copy = "randomuser.js"
         
         if lib_file_to_copy and template_lib_file and template_lib_file.exists():
             log_agent_action("Agent B", f"🔧 Attempting to manually copy src/lib/{lib_file_to_copy}")
