@@ -187,10 +187,13 @@ class MVPGenerator:
         # Add template-specific critical files
         if template_id == "mini-etl-pipeline":
             critical_files.extend(["src/lib/spacex.js", "next.config.js"])
-        elif template_id in ["email-campaign-manager", "brand-mention-monitor", "data-formatter", "price-stock-parser"]:
+        elif template_id in ["email-campaign-manager", "brand-mention-monitor", "data-formatter", "price-stock-parser", "news-parser"]:
             # These templates may have next.config.js but it's not critical
             if (project_path / "next.config.js").exists():
                 critical_files.append("next.config.js")
+            # vercel.json is critical for Vercel deployment
+            if (project_path / "vercel.json").exists():
+                critical_files.append("vercel.json")
         missing_files = []
         for file_rel in critical_files:
             file_path = project_path / file_rel
@@ -545,6 +548,9 @@ class MVPGenerator:
             # Check if next.config.js was actually uploaded by verifying it exists in project_path
             if (project_path / "next.config.js").exists():
                 critical_files_to_verify.append("next.config.js")
+            # vercel.json is critical for Vercel deployment
+            if (project_path / "vercel.json").exists():
+                critical_files_to_verify.append("vercel.json")
         
         critical_uploaded = []
         for file_rel in critical_files_to_verify:
