@@ -127,6 +127,7 @@ class MVPGenerator:
 
         # Verify template files exist BEFORE copying (template-specific)
         template_lib_file = None
+        lib_file_name = None
         if template_id == "mini-etl-pipeline":
             template_lib_file = template_path / "src" / "lib" / "spacex.js"
             lib_file_name = "spacex.js"
@@ -142,9 +143,10 @@ class MVPGenerator:
         if template_lib_file and template_lib_file.exists():
             file_size = template_lib_file.stat().st_size
             log_agent_action("Agent B", f"✅ Template file exists: src/lib/{lib_file_name} ({file_size} bytes)")
-        elif template_lib_file:
-            log_agent_action("Agent B", f"⚠️ Template file src/lib/{lib_file_name} does NOT exist in template")
-            # List what's actually in the template
+        elif template_id == "mini-etl-pipeline":
+            # For mini-etl-pipeline, spacex.js is required
+            log_agent_action("Agent B", f"❌❌❌ CRITICAL: Template file src/lib/spacex.js does NOT exist in template!")
+            # List what's actually in the template for debugging
             template_src = template_path / "src"
             if template_src.exists():
                 log_agent_action("Agent B", f"📋 Template src directory exists")
@@ -156,8 +158,11 @@ class MVPGenerator:
                     log_agent_action("Agent B", f"❌ Template src/lib directory does NOT exist!")
             else:
                 log_agent_action("Agent B", f"❌ Template src directory does NOT exist!")
-            if template_id == "mini-etl-pipeline":
-                raise FileNotFoundError(f"Template file src/lib/spacex.js does not exist in template {template_id}")
+            # List all files in template for debugging
+            all_template_files = list(template_path.rglob('*'))
+            template_file_count = len([f for f in all_template_files if f.is_file()])
+            log_agent_action("Agent B", f"📋 Total files in template: {template_file_count}")
+            raise FileNotFoundError(f"Template file src/lib/spacex.js does not exist in template {template_id}. This file is required for mini-etl-pipeline.")
 
         # Copy template
         if project_path.exists():
