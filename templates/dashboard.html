@@ -3,135 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Freelance Agents MVP</title>
+    <title>AI Multi-Agent MVP System</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="container">
-        <!-- Компактный заголовок -->
-        <header class="compact-header">
-            <h1>🤖 AI Multi-Agent MVP System</h1>
-            <div class="header-controls">
-                <span id="mode-badge" class="badge">{{ mode }}</span>
-                <span id="agent-a-status" class="status-badge status-a">Ожидание</span>
-                <span id="agent-b-status" class="status-badge status-b">Готов</span>
-            </div>
-        </header>
-
-        <!-- Основная область: два окна агентов -->
-        <div class="main-grid">
-            <!-- АГЕНТ А (Слева) -->
-            <div class="agent-window agent-a-window">
-                <div class="window-header">
-                    <h2>🔍 Агент А: Поиск проектов</h2>
-                </div>
-                <div class="window-content">
-                    <!-- Управление -->
-                    <div class="controls-compact">
-                        <button id="start-btn" class="btn btn-primary btn-small">▶️ Continuous</button>
-                        <button id="run-session-btn" class="btn btn-success btn-small">🚀 Сессия</button>
-                        <button id="stop-btn" class="btn btn-danger btn-small" disabled>⏹️ Стоп</button>
-                        <span class="search-info-small">Ключ: <strong>{{ keyword }}</strong></span>
-                    </div>
-
-                    <!-- Статистика -->
-                    <div class="stats-compact">
-                        <div class="stat-item">
-                            <span class="stat-label">Найдено:</span>
-                            <span id="projects-count" class="stat-value-small">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Подходящих:</span>
-                            <span id="suitable-count" class="stat-value-small">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Проверка:</span>
-                            <span id="last-check" class="stat-value-small">-</span>
-                        </div>
-                    </div>
-
-                    <!-- Сессия -->
-                    <div class="session-info-compact" id="session-info" style="display: none;">
-                        <span>⏱️ <span id="session-time">0s</span> | <span id="session-step">-</span></span>
-                    </div>
-
-                    <!-- Результаты Агента А -->
-                    <div class="results-container">
-                        <div class="results-header">
-                            <h3>📊 Результаты</h3>
-                            <button id="clear-logs-a" class="btn btn-secondary btn-tiny">🗑️</button>
-                        </div>
-                        <div id="logs-container-a" class="results-logs">
-                            <div id="logs-a" class="logs"></div>
-                        </div>
-                    </div>
-                </div>
+        <!-- Agent A Block -->
+        <div class="agent-card agent-a-card">
+            <h2 class="card-title">Agent A — Search Projects</h2>
+            
+            <div class="form-group">
+                <label for="search-keywords" class="form-label">Keywords</label>
+                <input type="text" id="search-keywords" class="form-input" value="{{ keyword }}" placeholder="Enter search keywords">
             </div>
 
-            <!-- АГЕНТ Б (Справа) -->
-            <div class="agent-window agent-b-window">
-                <div class="window-header">
-                    <h2>🚀 Агент Б: Генерация MVP</h2>
-                </div>
-                <div class="window-content">
-                    <!-- Генерация MVP -->
-                    <div class="mvp-controls-compact">
-                        <div class="mvp-input-row">
-                            <label for="mvp-template">Шаблон:</label>
-                            <select id="mvp-template" class="select-compact">
-                                <option value="">-- Выберите --</option>
-                                <option value="telegram-shop-bot">🤖 Telegram Shop Bot</option>
-                                <option value="news-parser">📰 News Parser</option>
-                                <option value="analytics-dashboard">📊 Analytics Dashboard</option>
-                                <option value="email-campaign-manager">📬 Email Campaign Manager</option>
-                                <option value="brand-mention-monitor">📰 Brand Mention Monitor</option>
-                                <option value="data-formatter">🧹 Data Formatter</option>
-                                <option value="mini-etl-pipeline">🔄 Mini ETL Pipeline</option>
-                                <option value="price-stock-parser">💰 Price & Stock Parser</option>
-                            </select>
-                        </div>
-                        <div class="mvp-input-row">
-                            <label for="project-description">Описание:</label>
-                            <textarea id="project-description" class="textarea-compact" rows="2" placeholder="Опишите проект..."></textarea>
-                        </div>
-                        <div class="mvp-build-type-compact">
-                            <label class="build-option-small">
-                                <input type="radio" name="build-type" value="mock" checked>
-                                <span>🎭 Мок</span>
-                            </label>
-                            <label class="build-option-small">
-                                <input type="radio" name="build-type" value="full">
-                                <span>🚀 Полный</span>
-                            </label>
-                        </div>
-                        <div class="mvp-buttons-compact">
-                            <button id="generate-mvp-btn" class="btn btn-mvp btn-small">🎯 Сгенерировать</button>
-                            <div id="mvp-status" class="mvp-status-compact">Выберите шаблон</div>
-                        </div>
-                    </div>
+            <div class="form-group">
+                <button id="start-btn" class="btn btn-primary">Start Search</button>
+                <button id="run-session-btn" class="btn btn-secondary">Single Session</button>
+                <button id="stop-btn" class="btn btn-secondary" disabled>Stop</button>
+            </div>
 
-                    <!-- Результаты Агента Б -->
-                    <div class="results-container">
-                        <div class="results-header">
-                            <h3>📊 Результаты</h3>
-                            <button id="clear-logs-b" class="btn btn-secondary btn-tiny">🗑️</button>
-                        </div>
-                        <div id="logs-container-b" class="results-logs">
-                            <div id="logs-b" class="logs"></div>
-                        </div>
-                    </div>
+            <div class="status-line">
+                <span class="status-label">Status:</span>
+                <span id="agent-a-status" class="status-value">Waiting</span>
+                <span class="status-separator">|</span>
+                <span class="status-label">Found:</span>
+                <span id="projects-count" class="status-value">0</span>
+                <span class="status-separator">|</span>
+                <span class="status-label">Checking:</span>
+                <span id="last-check" class="status-value">-</span>
+            </div>
+
+            <div class="results-section">
+                <div class="results-header">
+                    <h3 class="results-title">Results</h3>
+                    <button id="clear-logs-a" class="btn-clear">Clear</button>
+                </div>
+                <div id="logs-container-a" class="results-output">
+                    <div id="logs-a" class="logs-content"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Общие логи (по центру внизу) -->
-        <div class="common-logs">
-            <div class="common-logs-header">
-                <h3>📝 Общие логи</h3>
-                <button id="clear-logs-common" class="btn btn-secondary btn-tiny">🗑️</button>
+        <!-- Agent B Block -->
+        <div class="agent-card agent-b-card">
+            <h2 class="card-title">Agent B — Generate MVP</h2>
+            
+            <div class="form-group">
+                <label for="mvp-template" class="form-label">Template</label>
+                <select id="mvp-template" class="form-select">
+                    <option value="">Select template</option>
+                    <option value="telegram-shop-bot">Telegram Shop Bot</option>
+                    <option value="news-parser">News Parser</option>
+                    <option value="analytics-dashboard">Analytics Dashboard</option>
+                    <option value="email-campaign-manager">Email Campaign Manager</option>
+                    <option value="brand-mention-monitor">Brand Mention Monitor</option>
+                    <option value="data-formatter">Data Formatter</option>
+                    <option value="mini-etl-pipeline">Mini ETL Pipeline</option>
+                    <option value="price-stock-parser">Price & Stock Parser</option>
+                </select>
             </div>
-            <div id="logs-container-common" class="common-logs-container">
-                <div id="logs-common" class="logs"></div>
+
+            <div class="form-group">
+                <label for="project-description" class="form-label">Project Description</label>
+                <textarea id="project-description" class="form-textarea" rows="4" placeholder="Enter project description"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Build Type</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="build-type" value="mock" checked>
+                        <span>Mock</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="build-type" value="full">
+                        <span>Full</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <button id="generate-mvp-btn" class="btn btn-primary">Generate MVP</button>
+                <span id="mvp-status" class="status-text">Select template</span>
+            </div>
+
+            <div class="results-section">
+                <div class="results-header">
+                    <h3 class="results-title">Output</h3>
+                    <button id="clear-logs-b" class="btn-clear">Clear</button>
+                </div>
+                <div id="logs-container-b" class="results-output">
+                    <div id="logs-b" class="logs-content"></div>
+                </div>
             </div>
         </div>
     </div>

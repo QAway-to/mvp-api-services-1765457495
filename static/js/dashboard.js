@@ -1,4 +1,4 @@
-// Compact Dashboard JavaScript
+// Tableau-style Dashboard JavaScript
 class Dashboard {
     constructor() {
         this.eventSource = null;
@@ -6,23 +6,16 @@ class Dashboard {
         // Agent A elements
         this.logsContainerA = document.getElementById('logs-a');
         this.logsContainerB = document.getElementById('logs-b');
-        this.logsContainerCommon = document.getElementById('logs-common');
         this.agentAStatus = document.getElementById('agent-a-status');
-        this.agentBStatus = document.getElementById('agent-b-status');
         this.projectsCount = document.getElementById('projects-count');
-        this.suitableCount = document.getElementById('suitable-count');
         this.lastCheck = document.getElementById('last-check');
         this.startBtn = document.getElementById('start-btn');
         this.runSessionBtn = document.getElementById('run-session-btn');
         this.stopBtn = document.getElementById('stop-btn');
         this.clearLogsBtnA = document.getElementById('clear-logs-a');
         this.clearLogsBtnB = document.getElementById('clear-logs-b');
-        this.clearLogsBtnCommon = document.getElementById('clear-logs-common');
-        this.sessionInfo = document.getElementById('session-info');
-        this.sessionTime = document.getElementById('session-time');
-        this.sessionStep = document.getElementById('session-step');
 
-        // Agent B (MVP) elements
+        // Agent B elements
         this.mvpTemplate = document.getElementById('mvp-template');
         this.projectDescription = document.getElementById('project-description');
         this.generateMvpBtn = document.getElementById('generate-mvp-btn');
@@ -32,13 +25,10 @@ class Dashboard {
         // Log queues
         this.logQueueA = [];
         this.logQueueB = [];
-        this.logQueueCommon = [];
         this.isProcessingLogsA = false;
         this.isProcessingLogsB = false;
-        this.isProcessingLogsCommon = false;
         this.logProcessTimerA = null;
         this.logProcessTimerB = null;
-        this.logProcessTimerCommon = null;
         this.maxLogEntries = 500;
 
         this.init();
@@ -54,7 +44,6 @@ class Dashboard {
     }
 
     bindEvents() {
-        // Agent A events
         if (this.startBtn) {
             this.startBtn.addEventListener('click', () => this.startAgent());
         }
@@ -70,11 +59,6 @@ class Dashboard {
         if (this.clearLogsBtnB) {
             this.clearLogsBtnB.addEventListener('click', () => this.clearLogs('b'));
         }
-        if (this.clearLogsBtnCommon) {
-            this.clearLogsBtnCommon.addEventListener('click', () => this.clearLogs('common'));
-        }
-
-        // Agent B (MVP) events
         if (this.generateMvpBtn) {
             this.generateMvpBtn.addEventListener('click', () => this.generateMVP());
         }
@@ -84,7 +68,6 @@ class Dashboard {
         if (this.projectDescription) {
             this.projectDescription.addEventListener('input', () => this.updateMVPStatus());
         }
-
         if (this.buildTypeInputs && this.buildTypeInputs.length) {
             this.buildTypeInputs.forEach(input => {
                 input.addEventListener('change', () => this.updateMVPButtonText());
@@ -106,26 +89,12 @@ class Dashboard {
 
         this.eventSource.onerror = (error) => {
             console.error('EventSource error:', error);
-            this.addLogEntry({
-                timestamp: new Date().toISOString(),
-                level: 'ERROR',
-                message: 'Connection to log stream lost. Retrying...',
-                module: 'dashboard'
-            }, { immediate: true, target: 'common' });
-
             setTimeout(() => {
                 if (this.eventSource && this.eventSource.readyState === EventSource.CLOSED) {
                     this.startLogStream();
                 }
             }, 5000);
         };
-
-        this.addLogEntry({
-            timestamp: new Date().toISOString(),
-            level: 'INFO',
-            message: 'Dashboard connected to log stream',
-            module: 'dashboard'
-        }, { immediate: true, target: 'common' });
     }
 
     addLogEntry(logData, options = {}) {
@@ -135,35 +104,22 @@ class Dashboard {
         const message = logData.message || '';
         const module = logData.module || '';
 
-        // Determine target
         let logTarget = target;
         if (!logTarget) {
-            if (message.includes('Agent B') || message.includes('MVP') || module === 'MVP' || message.includes('🎯') || message.includes('🚀 MVP')) {
+            if (message.includes('Agent B') || message.includes('MVP') || module === 'MVP') {
                 logTarget = 'b';
-            } else if (message.includes('Agent A') || message.includes('[SELENIUM]') || message.includes('[SESSION]') || message.includes('[EVALUATION]')) {
-                logTarget = 'a';
             } else {
-                logTarget = 'common';
+                logTarget = 'a';
             }
         }
 
-        // Always add to common logs too
-        if (logTarget !== 'common') {
-            this.addToQueue(logData, 'common', immediate);
-        }
-
-        // Add to specific target
-        this.addToQueue(logData, logTarget, immediate);
-    }
-
-    addToQueue(logData, target, immediate) {
         if (immediate) {
-            this.renderLogEntry(logData, target);
+            this.renderLogEntry(logData, logTarget);
             return;
         }
 
-        const queue = target === 'a' ? this.logQueueA : (target === 'b' ? this.logQueueB : this.logQueueCommon);
-        const isProcessing = target === 'a' ? 'isProcessingLogsA' : (target === 'b' ? 'isProcessingLogsB' : 'isProcessingLogsCommon');
+        const queue = logTarget === 'a' ? this.logQueueA : this.logQueueB;
+        const isProcessing = logTarget === 'a' ? 'isProcessingLogsA' : 'isProcessingLogsB';
 
         queue.push(logData);
         if (queue.length > this.maxLogEntries) {
@@ -172,14 +128,14 @@ class Dashboard {
 
         if (!this[isProcessing]) {
             this[isProcessing] = true;
-            this.processLogQueue(target);
+            this.processLogQueue(logTarget);
         }
     }
 
     processLogQueue(target) {
-        const queue = target === 'a' ? this.logQueueA : (target === 'b' ? this.logQueueB : this.logQueueCommon);
-        const timer = target === 'a' ? 'logProcessTimerA' : (target === 'b' ? 'logProcessTimerB' : 'logProcessTimerCommon');
-        const isProcessing = target === 'a' ? 'isProcessingLogsA' : (target === 'b' ? 'isProcessingLogsB' : 'isProcessingLogsCommon');
+        const queue = target === 'a' ? this.logQueueA : this.logQueueB;
+        const timer = target === 'a' ? 'logProcessTimerA' : 'logProcessTimerB';
+        const isProcessing = target === 'a' ? 'isProcessingLogsA' : 'isProcessingLogsB';
 
         if (queue.length === 0) {
             this[isProcessing] = false;
@@ -202,7 +158,7 @@ class Dashboard {
     }
 
     renderLogEntry(logData, target) {
-        const container = target === 'a' ? this.logsContainerA : (target === 'b' ? this.logsContainerB : this.logsContainerCommon);
+        const container = target === 'a' ? this.logsContainerA : this.logsContainerB;
         if (!container) return;
 
         const entry = document.createElement('div');
@@ -213,19 +169,11 @@ class Dashboard {
         const module = logData.module ? `[${logData.module}]` : '';
         let message = logData.message;
 
-        // Color coding
-        if (message.includes('[SELENIUM]')) {
-            entry.style.color = '#4fc3f7';
-            entry.style.borderLeftColor = '#4fc3f7';
-        } else if (message.includes('[SESSION]')) {
-            entry.style.color = '#ba68c8';
-            entry.style.borderLeftColor = '#ba68c8';
-        } else if (message.includes('Agent B') || message.includes('MVP') || message.includes('🎯')) {
-            entry.style.color = '#9b59b6';
-            entry.style.borderLeftColor = '#9b59b6';
-        }
+        // Remove emojis from messages
+        message = message.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
+        message = message.replace(/[🔧✅⚠️❌🌐👁️⏱️💰📄🔍🚀🎯📊📝📦🧹🔄📰📬🤖]/g, '').trim();
 
-        entry.textContent = `${timestamp} │ ${level} │ ${module} ${message}`;
+        entry.textContent = `${timestamp} | ${level} | ${module} ${message}`;
         container.appendChild(entry);
 
         container.scrollTo({
@@ -235,28 +183,6 @@ class Dashboard {
 
         while (container.children.length > this.maxLogEntries) {
             container.removeChild(container.firstChild);
-        }
-        
-        if (target === 'a') {
-            this.extractSessionStep(message);
-        }
-    }
-    
-    extractSessionStep(message) {
-        if (!this.sessionStep) return;
-        
-        if (message.includes('Step 1/3')) {
-            this.sessionStep.textContent = 'Step 1/3: Searching...';
-        } else if (message.includes('Step 2/3')) {
-            this.sessionStep.textContent = 'Step 2/3: Evaluating...';
-        } else if (message.includes('Step 3/3')) {
-            this.sessionStep.textContent = 'Step 3/3: Notifying...';
-        } else if (message.includes('[SELENIUM]')) {
-            const match = message.match(/\[SELENIUM\]\s+(.+?)(?:\s+|$)/);
-            if (match) {
-                const action = match[1].replace(/[🔧✅⚠️❌🌐👁️⏱️💰📄🔍]/g, '').trim();
-                this.sessionStep.textContent = `Selenium: ${action.substring(0, 30)}...`;
-            }
         }
     }
 
@@ -268,14 +194,10 @@ class Dashboard {
             if (this.agentAStatus) {
                 const statusText = this.formatStatus(data.agent_a_status);
                 this.agentAStatus.textContent = statusText;
-                this.agentAStatus.className = `status-badge status-a status-${data.agent_a_status}`;
             }
 
             if (this.projectsCount) {
                 this.projectsCount.textContent = data.projects_found || 0;
-            }
-            if (this.suitableCount) {
-                this.suitableCount.textContent = data.suitable_projects || 0;
             }
             if (this.lastCheck) {
                 this.lastCheck.textContent = data.last_check ? 
@@ -294,13 +216,6 @@ class Dashboard {
                 }
             }
 
-            if (data.current_session && this.sessionInfo) {
-                this.sessionInfo.style.display = 'block';
-                this.updateSessionInfo();
-            } else if (this.sessionInfo) {
-                this.sessionInfo.style.display = 'none';
-            }
-
         } catch (error) {
             console.error('Error updating status:', error);
         }
@@ -309,30 +224,15 @@ class Dashboard {
     }
     
     async updateSessionInfo() {
-        try {
-            const response = await fetch('/status');
-            const data = await response.json();
-
-            if (data.current_session && this.sessionTime) {
-                const elapsed = data.current_session.elapsed_seconds;
-                const minutes = Math.floor(elapsed / 60);
-                const seconds = Math.floor(elapsed % 60);
-                this.sessionTime.textContent = `${minutes}m ${seconds}s`;
-                if (this.sessionStep) {
-                    this.sessionStep.textContent = `Step ${data.current_session.steps || 0}`;
-                }
-            }
-        } catch (error) {
-            // Silently fail
-        }
+        // Session info removed from compact UI
     }
 
     formatStatus(status) {
         const statusMap = {
-            'running': '🔄 Работает',
-            'stopped': '⏹️ Остановлен',
-            'waiting': '⏳ Ожидает',
-            'error': '❌ Ошибка'
+            'running': 'Running',
+            'stopped': 'Stopped',
+            'waiting': 'Waiting',
+            'error': 'Error'
         };
         return statusMap[status] || status;
     }
@@ -341,7 +241,7 @@ class Dashboard {
         try {
             if (this.startBtn) {
                 this.startBtn.disabled = true;
-                this.startBtn.textContent = '⏳...';
+                this.startBtn.textContent = 'Starting...';
             }
 
             const response = await fetch('/agent/start', { method: 'POST' });
@@ -352,14 +252,14 @@ class Dashboard {
             } else if (data.status === 'already_running') {
                 if (this.startBtn) {
                     this.startBtn.disabled = false;
-                    this.startBtn.textContent = '▶️ Continuous';
+                    this.startBtn.textContent = 'Start Search';
                 }
             }
 
         } catch (error) {
             if (this.startBtn) {
                 this.startBtn.disabled = false;
-                this.startBtn.textContent = '▶️ Continuous';
+                this.startBtn.textContent = 'Start Search';
             }
         }
     }
@@ -368,7 +268,7 @@ class Dashboard {
         try {
             if (this.runSessionBtn) {
                 this.runSessionBtn.disabled = true;
-                this.runSessionBtn.textContent = '⏳...';
+                this.runSessionBtn.textContent = 'Running...';
             }
 
             const response = await fetch('/agent/run-session', { method: 'POST' });
@@ -379,14 +279,14 @@ class Dashboard {
             } else if (data.status === 'busy') {
                 if (this.runSessionBtn) {
                     this.runSessionBtn.disabled = false;
-                    this.runSessionBtn.textContent = '🚀 Сессия';
+                    this.runSessionBtn.textContent = 'Single Session';
                 }
             }
 
         } catch (error) {
             if (this.runSessionBtn) {
                 this.runSessionBtn.disabled = false;
-                this.runSessionBtn.textContent = '🚀 Сессия';
+                this.runSessionBtn.textContent = 'Single Session';
             }
         }
     }
@@ -395,7 +295,7 @@ class Dashboard {
         try {
             if (this.stopBtn) {
                 this.stopBtn.disabled = true;
-                this.stopBtn.textContent = '⏳...';
+                this.stopBtn.textContent = 'Stopping...';
             }
 
             const response = await fetch('/agent/stop', { method: 'POST' });
@@ -408,16 +308,16 @@ class Dashboard {
         } catch (error) {
             if (this.stopBtn) {
                 this.stopBtn.disabled = false;
-                this.stopBtn.textContent = '⏹️ Стоп';
+                this.stopBtn.textContent = 'Stop';
             }
         }
     }
 
     clearLogs(target) {
-        const queue = target === 'a' ? this.logQueueA : (target === 'b' ? this.logQueueB : this.logQueueCommon);
-        const timer = target === 'a' ? 'logProcessTimerA' : (target === 'b' ? 'logProcessTimerB' : 'logProcessTimerCommon');
-        const isProcessing = target === 'a' ? 'isProcessingLogsA' : (target === 'b' ? 'isProcessingLogsB' : 'isProcessingLogsCommon');
-        const container = target === 'a' ? this.logsContainerA : (target === 'b' ? this.logsContainerB : this.logsContainerCommon);
+        const queue = target === 'a' ? this.logQueueA : this.logQueueB;
+        const timer = target === 'a' ? 'logProcessTimerA' : 'logProcessTimerB';
+        const isProcessing = target === 'a' ? 'isProcessingLogsA' : 'isProcessingLogsB';
+        const container = target === 'a' ? this.logsContainerA : this.logsContainerB;
 
         if (this[timer]) {
             clearTimeout(this[timer]);
@@ -437,16 +337,13 @@ class Dashboard {
         const description = this.projectDescription ? this.projectDescription.value.trim() : '';
 
         if (!template) {
-            this.mvpStatus.textContent = 'Выберите шаблон';
-            this.mvpStatus.className = 'mvp-status-compact';
+            this.mvpStatus.textContent = 'Select template';
             this.generateMvpBtn.disabled = true;
         } else if (description && description.length < 10) {
-            this.mvpStatus.textContent = 'Описание слишком короткое';
-            this.mvpStatus.className = 'mvp-status-compact error';
+            this.mvpStatus.textContent = 'Description too short';
             this.generateMvpBtn.disabled = true;
         } else {
-            this.mvpStatus.textContent = 'Готово к генерации';
-            this.mvpStatus.className = 'mvp-status-compact success';
+            this.mvpStatus.textContent = 'Ready to generate';
             this.generateMvpBtn.disabled = false;
         }
         this.updateMVPButtonText();
@@ -455,9 +352,8 @@ class Dashboard {
     updateMVPButtonText() {
         if (!this.generateMvpBtn) return;
         const buildType = this.getSelectedBuildType();
-        const buildTypeText = buildType === 'mock' ? 'Мок' : 'Полный';
-        const emoji = buildType === 'mock' ? '🎭' : '🚀';
-        this.generateMvpBtn.innerHTML = `${emoji} ${buildTypeText}`;
+        const buildTypeText = buildType === 'mock' ? 'Mock' : 'Full';
+        this.generateMvpBtn.textContent = `Generate MVP (${buildTypeText})`;
     }
 
     getSelectedBuildType() {
@@ -471,25 +367,18 @@ class Dashboard {
         const buildType = this.getSelectedBuildType();
 
         if (!template) {
-            this.showMVPError('Выберите шаблон MVP');
+            this.showMVPError('Select template');
             return;
         }
 
         if (description && description.length < 10) {
-            this.showMVPError('Описание слишком короткое');
+            this.showMVPError('Description too short');
             return;
         }
 
         try {
             this.generateMvpBtn.disabled = true;
-            const buildTypeText = buildType === 'mock' ? 'мокового' : 'полного';
-            this.mvpStatus.textContent = `Генерация ${buildTypeText}...`;
-            this.mvpStatus.className = 'mvp-status-compact loading';
-
-            if (this.agentBStatus) {
-                this.agentBStatus.textContent = '🔄 Генерирует';
-                this.agentBStatus.className = 'status-badge status-b status-running';
-            }
+            this.mvpStatus.textContent = 'Generating...';
 
             const response = await fetch('/api/generate-mvp', {
                 method: 'POST',
@@ -507,23 +396,18 @@ class Dashboard {
             if (response.ok) {
                 this.showMVPSuccess(result);
             } else {
-                throw new Error(result.error || 'Неизвестная ошибка');
+                throw new Error(result.error || 'Unknown error');
             }
 
         } catch (error) {
             console.error('MVP generation error:', error);
             this.showMVPError(error.message);
-        } finally {
-            if (this.agentBStatus) {
-                this.agentBStatus.textContent = 'Готов';
-                this.agentBStatus.className = 'status-badge status-b status-stopped';
-            }
         }
     }
 
     showMVPSuccess(result) {
-        this.mvpStatus.textContent = `✅ ${result.deployUrl}`;
-        this.mvpStatus.className = 'mvp-status-compact success';
+        this.mvpStatus.textContent = `Success: ${result.deployUrl}`;
+        this.generateMvpBtn.disabled = false;
 
         setTimeout(() => {
             if (this.projectDescription) {
@@ -531,13 +415,10 @@ class Dashboard {
                 this.updateMVPStatus();
             }
         }, 3000);
-
-        this.generateMvpBtn.disabled = false;
     }
 
     showMVPError(message) {
-        this.mvpStatus.textContent = `❌ ${message}`;
-        this.mvpStatus.className = 'mvp-status-compact error';
+        this.mvpStatus.textContent = `Error: ${message}`;
         this.generateMvpBtn.disabled = false;
     }
 
@@ -548,13 +429,10 @@ class Dashboard {
         }
         if (this.logProcessTimerA) clearTimeout(this.logProcessTimerA);
         if (this.logProcessTimerB) clearTimeout(this.logProcessTimerB);
-        if (this.logProcessTimerCommon) clearTimeout(this.logProcessTimerCommon);
         this.logQueueA = [];
         this.logQueueB = [];
-        this.logQueueCommon = [];
         this.isProcessingLogsA = false;
         this.isProcessingLogsB = false;
-        this.isProcessingLogsCommon = false;
     }
 }
 
