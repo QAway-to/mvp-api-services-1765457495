@@ -1,4 +1,4 @@
-// Tableau-style Dashboard JavaScript
+// Tableau-inspired minimalistic dashboard
 class Dashboard {
     constructor() {
         this.eventSource = null;
@@ -14,6 +14,7 @@ class Dashboard {
         this.stopBtn = document.getElementById('stop-btn');
         this.clearLogsBtnA = document.getElementById('clear-logs-a');
         this.clearLogsBtnB = document.getElementById('clear-logs-b');
+        this.searchKeywords = document.getElementById('search-keywords');
 
         // Agent B elements
         this.mvpTemplate = document.getElementById('mvp-template');
@@ -36,14 +37,15 @@ class Dashboard {
 
     init() {
         this.bindEvents();
-        this.updateMVPButtonText();
+        this.updateMVPStatus();
         this.updateStatus().then(() => {
             this.startLogStream();
-            setInterval(() => this.updateSessionInfo(), 1000);
+            setInterval(() => this.updateStatus(), 2000);
         });
     }
 
     bindEvents() {
+        // Agent A events
         if (this.startBtn) {
             this.startBtn.addEventListener('click', () => this.startAgent());
         }
@@ -59,6 +61,8 @@ class Dashboard {
         if (this.clearLogsBtnB) {
             this.clearLogsBtnB.addEventListener('click', () => this.clearLogs('b'));
         }
+
+        // Agent B events
         if (this.generateMvpBtn) {
             this.generateMvpBtn.addEventListener('click', () => this.generateMVP());
         }
@@ -70,7 +74,7 @@ class Dashboard {
         }
         if (this.buildTypeInputs && this.buildTypeInputs.length) {
             this.buildTypeInputs.forEach(input => {
-                input.addEventListener('change', () => this.updateMVPButtonText());
+                input.addEventListener('change', () => this.updateMVPStatus());
             });
         }
     }
@@ -167,13 +171,9 @@ class Dashboard {
         const timestamp = new Date(logData.timestamp).toLocaleTimeString();
         const level = logData.level.padEnd(6);
         const module = logData.module ? `[${logData.module}]` : '';
-        let message = logData.message;
+        const message = logData.message || '';
 
-        // Remove emojis from messages
-        message = message.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
-        message = message.replace(/[🔧✅⚠️❌🌐👁️⏱️💰📄🔍🚀🎯📊📝📦🧹🔄📰📬🤖]/g, '').trim();
-
-        entry.textContent = `${timestamp} | ${level} | ${module} ${message}`;
+        entry.textContent = `${timestamp} ${level} ${module} ${message}`;
         container.appendChild(entry);
 
         container.scrollTo({
@@ -219,12 +219,6 @@ class Dashboard {
         } catch (error) {
             console.error('Error updating status:', error);
         }
-
-        setTimeout(() => this.updateStatus(), 2000);
-    }
-    
-    async updateSessionInfo() {
-        // Session info removed from compact UI
     }
 
     formatStatus(status) {
@@ -346,14 +340,6 @@ class Dashboard {
             this.mvpStatus.textContent = 'Ready to generate';
             this.generateMvpBtn.disabled = false;
         }
-        this.updateMVPButtonText();
-    }
-
-    updateMVPButtonText() {
-        if (!this.generateMvpBtn) return;
-        const buildType = this.getSelectedBuildType();
-        const buildTypeText = buildType === 'mock' ? 'Mock' : 'Full';
-        this.generateMvpBtn.textContent = `Generate MVP (${buildTypeText})`;
     }
 
     getSelectedBuildType() {
@@ -367,12 +353,12 @@ class Dashboard {
         const buildType = this.getSelectedBuildType();
 
         if (!template) {
-            this.showMVPError('Select template');
+            this.mvpStatus.textContent = 'Select template';
             return;
         }
 
         if (description && description.length < 10) {
-            this.showMVPError('Description too short');
+            this.mvpStatus.textContent = 'Description too short';
             return;
         }
 
@@ -394,32 +380,23 @@ class Dashboard {
             const result = await response.json();
 
             if (response.ok) {
-                this.showMVPSuccess(result);
+                this.mvpStatus.textContent = `Success: ${result.deployUrl}`;
+                setTimeout(() => {
+                    if (this.projectDescription) {
+                        this.projectDescription.value = '';
+                        this.updateMVPStatus();
+                    }
+                }, 3000);
             } else {
                 throw new Error(result.error || 'Unknown error');
             }
 
         } catch (error) {
             console.error('MVP generation error:', error);
-            this.showMVPError(error.message);
+            this.mvpStatus.textContent = `Error: ${error.message}`;
+        } finally {
+            this.generateMvpBtn.disabled = false;
         }
-    }
-
-    showMVPSuccess(result) {
-        this.mvpStatus.textContent = `Success: ${result.deployUrl}`;
-        this.generateMvpBtn.disabled = false;
-
-        setTimeout(() => {
-            if (this.projectDescription) {
-                this.projectDescription.value = '';
-                this.updateMVPStatus();
-            }
-        }, 3000);
-    }
-
-    showMVPError(message) {
-        this.mvpStatus.textContent = `Error: ${message}`;
-        this.generateMvpBtn.disabled = false;
     }
 
     destroy() {

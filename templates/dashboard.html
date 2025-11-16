@@ -8,13 +8,13 @@
 </head>
 <body>
     <div class="container">
-        <!-- Agent A Block -->
-        <div class="agent-card agent-a-card">
-            <h2 class="card-title">Agent A — Search Projects</h2>
+        <!-- Block 1: Agent A - Search Projects -->
+        <div class="card agent-a-card">
+            <div class="card-title">Agent A — Search Projects</div>
             
             <div class="form-group">
-                <label for="search-keywords" class="form-label">Keywords</label>
-                <input type="text" id="search-keywords" class="form-input" value="{{ keyword }}" placeholder="Enter search keywords">
+                <label for="search-keywords">Keywords</label>
+                <input type="text" id="search-keywords" class="input-field" value="{{ keyword }}" placeholder="Enter search keywords">
             </div>
 
             <div class="form-group">
@@ -36,7 +36,7 @@
 
             <div class="results-section">
                 <div class="results-header">
-                    <h3 class="results-title">Results</h3>
+                    <span class="results-title">Results</span>
                     <button id="clear-logs-a" class="btn-clear">Clear</button>
                 </div>
                 <div id="logs-container-a" class="results-output">
@@ -45,13 +45,13 @@
             </div>
         </div>
 
-        <!-- Agent B Block -->
-        <div class="agent-card agent-b-card">
-            <h2 class="card-title">Agent B — Generate MVP</h2>
-            
+        <!-- Block 2: Agent B - Generate MVP -->
+        <div class="card agent-b-card">
+            <div class="card-title">Agent B — Generate MVP</div>
+
             <div class="form-group">
-                <label for="mvp-template" class="form-label">Template</label>
-                <select id="mvp-template" class="form-select">
+                <label for="mvp-template">Template</label>
+                <select id="mvp-template" class="select-field">
                     <option value="">Select template</option>
                     <option value="telegram-shop-bot">Telegram Shop Bot</option>
                     <option value="news-parser">News Parser</option>
@@ -65,18 +65,18 @@
             </div>
 
             <div class="form-group">
-                <label for="project-description" class="form-label">Project Description</label>
-                <textarea id="project-description" class="form-textarea" rows="4" placeholder="Enter project description"></textarea>
+                <label for="project-description">Project Description</label>
+                <textarea id="project-description" class="textarea-field" rows="4" placeholder="Enter project description"></textarea>
             </div>
 
             <div class="form-group">
-                <label class="form-label">Build Type</label>
+                <label class="radio-group-label">Build Type</label>
                 <div class="radio-group">
-                    <label class="radio-label">
+                    <label class="radio-option">
                         <input type="radio" name="build-type" value="mock" checked>
                         <span>Mock</span>
                     </label>
-                    <label class="radio-label">
+                    <label class="radio-option">
                         <input type="radio" name="build-type" value="full">
                         <span>Full</span>
                     </label>
@@ -90,7 +90,7 @@
 
             <div class="results-section">
                 <div class="results-header">
-                    <h3 class="results-title">Output</h3>
+                    <span class="results-title">Output</span>
                     <button id="clear-logs-b" class="btn-clear">Clear</button>
                 </div>
                 <div id="logs-container-b" class="results-output">

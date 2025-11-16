@@ -11,89 +11,94 @@ body {
     background: #F7F7F7;
     color: #222;
     line-height: 1.5;
-    min-height: 100vh;
-    padding: 24px;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .container {
-    max-width: 1200px;
-    margin: 0 auto;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    align-items: start;
+    gap: 12px;
+    padding: 12px;
+    height: 100vh;
+    max-width: 1600px;
+    margin: 0 auto;
 }
 
-/* Agent Cards */
-.agent-card {
+/* Card styling */
+.card {
     background: white;
     border: 1px solid #E2E2E2;
-    padding: 24px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    overflow: hidden;
 }
 
 .card-title {
-    font-size: 18px;
+    font-size: 14px;
     font-weight: 500;
     color: #222;
-    margin: 0;
-    padding-bottom: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
     border-bottom: 1px solid #E2E2E2;
 }
 
-/* Form Elements */
+/* Form elements */
 .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    margin-bottom: 12px;
 }
 
-.form-label {
-    font-size: 13px;
+.form-group label {
+    display: block;
+    font-size: 12px;
     font-weight: 500;
     color: #222;
+    margin-bottom: 4px;
 }
 
-.form-input,
-.form-select,
-.form-textarea {
+.input-field,
+.select-field,
+.textarea-field {
     width: 100%;
-    padding: 8px 12px;
+    padding: 6px 8px;
     border: 1px solid #E2E2E2;
     background: white;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 13px;
     color: #222;
     border-radius: 0;
 }
 
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
+.input-field:focus,
+.select-field:focus,
+.textarea-field:focus {
     outline: none;
     border-color: #4C78A8;
 }
 
-.form-textarea {
+.textarea-field {
     resize: vertical;
     min-height: 80px;
 }
 
 /* Buttons */
 .btn {
-    padding: 8px 16px;
+    padding: 6px 12px;
     border: 1px solid #E2E2E2;
     background: white;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: #222;
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s;
     border-radius: 0;
-    display: inline-block;
+    transition: background-color 0.15s ease;
+    margin-right: 8px;
+}
+
+.btn:hover {
+    background: #F7F7F7;
 }
 
 .btn-primary {
@@ -103,8 +108,8 @@ body {
 }
 
 .btn-primary:hover {
-    background: #3d5f85;
-    border-color: #3d5f85;
+    background: #3d6a94;
+    border-color: #3d6a94;
 }
 
 .btn-secondary {
@@ -121,108 +126,119 @@ body {
     cursor: not-allowed;
 }
 
-/* Radio Buttons */
-.radio-group {
-    display: flex;
-    gap: 24px;
+.btn:disabled:hover {
+    background: white;
 }
 
-.radio-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    color: #222;
-    cursor: pointer;
-}
-
-.radio-label input[type="radio"] {
-    margin: 0;
-    width: 16px;
-    height: 16px;
-    accent-color: #4C78A8;
-}
-
-/* Status Line */
+/* Status line */
 .status-line {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px;
-    background: #F7F7F7;
-    border: 1px solid #E2E2E2;
-    font-size: 13px;
+    font-size: 12px;
+    color: #222;
+    padding: 8px 0;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #E2E2E2;
 }
 
 .status-label {
     color: #666;
-    font-weight: 500;
+    margin-right: 4px;
 }
 
 .status-value {
     color: #222;
     font-weight: 500;
+    margin-right: 12px;
 }
 
 .status-separator {
     color: #E2E2E2;
+    margin: 0 8px;
 }
 
 .status-text {
-    font-size: 13px;
+    font-size: 12px;
     color: #666;
-    font-style: italic;
+    margin-left: 8px;
 }
 
-/* Results Section */
+/* Radio buttons */
+.radio-group-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: #222;
+    margin-bottom: 4px;
+}
+
+.radio-group {
+    display: flex;
+    gap: 16px;
+}
+
+.radio-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #222;
+    cursor: pointer;
+}
+
+.radio-option input[type="radio"] {
+    margin: 0;
+    width: 14px;
+    height: 14px;
+    accent-color: #4C78A8;
+    cursor: pointer;
+}
+
+/* Results section */
 .results-section {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    flex: 1;
-    min-height: 200px;
+    min-height: 0;
+    margin-top: 8px;
 }
 
 .results-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
     border-bottom: 1px solid #E2E2E2;
 }
 
 .results-title {
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 500;
     color: #222;
-    margin: 0;
 }
 
 .btn-clear {
     background: none;
     border: none;
-    color: #4C78A8;
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 11px;
+    color: #666;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 2px 4px;
     text-decoration: underline;
 }
 
 .btn-clear:hover {
-    color: #3d5f85;
+    color: #222;
 }
 
 .results-output {
     flex: 1;
     background: #F7F7F7;
     border: 1px solid #E2E2E2;
-    padding: 12px;
     overflow-y: auto;
-    min-height: 200px;
-    max-height: 400px;
+    padding: 8px;
+    min-height: 0;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1.6;
     color: #222;
 }
@@ -232,56 +248,37 @@ body {
     word-wrap: break-word;
 }
 
-/* Log Entry Styling */
+/* Log entry styling */
 .log-entry {
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     padding: 2px 0;
-    border-left: 2px solid transparent;
-    padding-left: 8px;
-}
-
-.log-entry:hover {
-    background: rgba(0, 0, 0, 0.02);
 }
 
 .log-info {
     color: #4C78A8;
-    border-left-color: #4C78A8;
 }
 
 .log-warning {
     color: #F58518;
-    border-left-color: #F58518;
 }
 
 .log-error {
     color: #E74C3C;
-    border-left-color: #E74C3C;
     font-weight: 500;
 }
 
 .log-debug {
-    color: #666;
-    border-left-color: #666;
+    color: #999;
 }
 
 /* Responsive */
-@media (max-width: 968px) {
+@media (max-width: 1200px) {
     .container {
         grid-template-columns: 1fr;
+        overflow-y: auto;
     }
-}
-
-@media (max-width: 640px) {
+    
     body {
-        padding: 12px;
-    }
-
-    .agent-card {
-        padding: 16px;
-    }
-
-    .container {
-        gap: 16px;
+        overflow: auto;
     }
 }
