@@ -5,123 +5,104 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Multi-Agent MVP System</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <!-- Agent A Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">Agent A — Search Projects</h2>
+        <!-- Block 1: Agent A - Search Projects -->
+        <div class="card agent-a-card">
+            <div class="card-title">Agent A — Search Projects</div>
+            
+            <div class="form-group">
+                <label for="search-keywords">Keywords</label>
+                <input type="text" id="search-keywords" class="input-field" value="{{ keyword }}" placeholder="Enter search keywords">
             </div>
 
-            <div class="card-body">
-                <!-- Controls Section -->
-                <div class="section">
-                    <div class="section-title">Search Configuration</div>
-                    <div class="form-row">
-                        <label for="search-keywords">Keywords</label>
-                        <input type="text" id="search-keywords" class="input-field" value="{{ keyword }}" placeholder="Enter search keywords">
-                    </div>
-                    <div class="button-group">
-                        <button id="start-btn" class="btn btn-primary">Start Search</button>
-                        <button id="run-session-btn" class="btn btn-secondary">Single Session</button>
-                        <button id="stop-btn" class="btn btn-secondary" disabled>Stop</button>
-                    </div>
-                </div>
+            <div class="form-group">
+                <button id="start-btn" class="btn btn-primary">Start Search</button>
+                <button id="run-session-btn" class="btn btn-secondary">Single Session</button>
+                <button id="stop-btn" class="btn btn-secondary" disabled>Stop</button>
+            </div>
 
-                <!-- Status Section -->
-                <div class="section">
-                    <div class="section-title">Status</div>
-                    <div class="status-grid">
-                        <div class="status-item">
-                            <span class="status-label">Status</span>
-                            <span id="agent-a-status" class="status-value">Waiting</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="status-label">Found</span>
-                            <span id="projects-count" class="status-value">0</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="status-label">Last Check</span>
-                            <span id="last-check" class="status-value">-</span>
-                        </div>
-                    </div>
-                </div>
+            <div class="status-line">
+                <span class="status-label">Status:</span>
+                <span id="agent-a-status" class="status-value">Waiting</span>
+                <span class="status-separator">|</span>
+                <span class="status-label">Found:</span>
+                <span id="projects-count" class="status-value">0</span>
+                <span class="status-separator">|</span>
+                <span class="status-label">Suitable:</span>
+                <span id="suitable-count" class="status-value">0</span>
+            </div>
 
-                <!-- Results Section -->
-                <div class="section section-results">
-                    <div class="section-header">
-                        <div class="section-title">Results</div>
-                        <button id="clear-logs-a" class="btn-clear">Clear</button>
-                    </div>
-                    <div id="logs-container-a" class="results-output">
-                        <div id="logs-a" class="logs-content"></div>
-                    </div>
+            <div class="results-section">
+                <div class="results-header">
+                    <span class="results-title">Results</span>
+                    <button id="clear-logs-a" class="btn-clear">Clear</button>
+                </div>
+                <div id="logs-container-a" class="results-output">
+                    <div id="logs-a" class="logs"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Agent B Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">Agent B — Generate MVP</h2>
+        <!-- Block 2: Agent B - Generate MVP -->
+        <div class="card agent-b-card">
+            <div class="card-title">Agent B — Generate MVP</div>
+
+            <div class="form-group">
+                <label for="mvp-template">Template</label>
+                <select id="mvp-template" class="select-field">
+                    <option value="">Select template</option>
+                    <option value="telegram-shop-bot">Telegram Shop Bot</option>
+                    <option value="news-parser">News Parser</option>
+                    <option value="analytics-dashboard">Analytics Dashboard</option>
+                    <option value="email-campaign-manager">Email Campaign Manager</option>
+                    <option value="brand-mention-monitor">Brand Mention Monitor</option>
+                    <option value="data-formatter">Data Formatter</option>
+                    <option value="mini-etl-pipeline">Mini ETL Pipeline</option>
+                    <option value="price-stock-parser">Price & Stock Parser</option>
+                </select>
             </div>
 
-            <div class="card-body">
-                <!-- Configuration Section -->
-                <div class="section">
-                    <div class="section-title">Configuration</div>
-                    <div class="form-row">
-                        <label for="mvp-template">Template</label>
-                        <select id="mvp-template" class="select-field">
-                            <option value="">Select template</option>
-                            <option value="telegram-shop-bot">Telegram Shop Bot</option>
-                            <option value="news-parser">News Parser</option>
-                            <option value="analytics-dashboard">Analytics Dashboard</option>
-                            <option value="email-campaign-manager">Email Campaign Manager</option>
-                            <option value="brand-mention-monitor">Brand Mention Monitor</option>
-                            <option value="data-formatter">Data Formatter</option>
-                            <option value="mini-etl-pipeline">Mini ETL Pipeline</option>
-                            <option value="price-stock-parser">Price & Stock Parser</option>
-                        </select>
-                    </div>
-                    <div class="form-row">
-                        <label for="project-description">Project Description</label>
-                        <textarea id="project-description" class="textarea-field" rows="4" placeholder="Enter project description"></textarea>
-                    </div>
-                    <div class="form-row">
-                        <label class="form-label">Build Type</label>
-                        <div class="radio-group">
-                            <label class="radio-option">
-                                <input type="radio" name="build-type" value="mock" checked>
-                                <span>Mock</span>
-                            </label>
-                            <label class="radio-option">
-                                <input type="radio" name="build-type" value="full">
-                                <span>Full</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
+            <div class="form-group">
+                <label for="project-description">Project Description</label>
+                <textarea id="project-description" class="textarea-field" rows="4" placeholder="Describe the project requirements..."></textarea>
+            </div>
 
-                <!-- Action Section -->
-                <div class="section">
-                    <div class="section-title">Actions</div>
-                    <div class="action-row">
-                        <button id="generate-mvp-btn" class="btn btn-primary">Generate MVP</button>
-                        <span id="mvp-status" class="status-text">Select template</span>
-                    </div>
+            <div class="form-group">
+                <label class="radio-group-label">Build Type</label>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="build-type" value="mock" checked>
+                        <span>Mock</span>
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="build-type" value="full">
+                        <span>Full</span>
+                    </label>
                 </div>
+            </div>
 
-                <!-- Output Section -->
-                <div class="section section-results">
-                    <div class="section-header">
-                        <div class="section-title">Output</div>
-                        <button id="clear-logs-b" class="btn-clear">Clear</button>
-                    </div>
-                    <div id="logs-container-b" class="results-output">
-                        <div id="logs-b" class="logs-content"></div>
-                    </div>
+            <div class="form-group">
+                <button id="generate-mvp-btn" class="btn btn-primary">Generate MVP</button>
+            </div>
+
+            <div class="status-line">
+                <span class="status-label">Status:</span>
+                <span id="agent-b-status" class="status-value">Ready</span>
+                <span id="mvp-status" class="status-message"></span>
+            </div>
+
+            <div class="results-section">
+                <div class="results-header">
+                    <span class="results-title">Output</span>
+                    <button id="clear-logs-b" class="btn-clear">Clear</button>
+                </div>
+                <div id="logs-container-b" class="results-output">
+                    <div id="logs-b" class="logs"></div>
                 </div>
             </div>
         </div>

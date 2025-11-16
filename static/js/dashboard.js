@@ -1,4 +1,4 @@
-// Tableau-inspired minimalistic dashboard
+// Tableau-style Dashboard JavaScript
 class Dashboard {
     constructor() {
         this.eventSource = null;
@@ -7,8 +7,9 @@ class Dashboard {
         this.logsContainerA = document.getElementById('logs-a');
         this.logsContainerB = document.getElementById('logs-b');
         this.agentAStatus = document.getElementById('agent-a-status');
+        this.agentBStatus = document.getElementById('agent-b-status');
         this.projectsCount = document.getElementById('projects-count');
-        this.lastCheck = document.getElementById('last-check');
+        this.suitableCount = document.getElementById('suitable-count');
         this.startBtn = document.getElementById('start-btn');
         this.runSessionBtn = document.getElementById('run-session-btn');
         this.stopBtn = document.getElementById('stop-btn');
@@ -16,7 +17,7 @@ class Dashboard {
         this.clearLogsBtnB = document.getElementById('clear-logs-b');
         this.searchKeywords = document.getElementById('search-keywords');
 
-        // Agent B elements
+        // Agent B (MVP) elements
         this.mvpTemplate = document.getElementById('mvp-template');
         this.projectDescription = document.getElementById('project-description');
         this.generateMvpBtn = document.getElementById('generate-mvp-btn');
@@ -37,7 +38,6 @@ class Dashboard {
 
     init() {
         this.bindEvents();
-        this.updateMVPStatus();
         this.updateStatus().then(() => {
             this.startLogStream();
             setInterval(() => this.updateStatus(), 2000);
@@ -62,7 +62,7 @@ class Dashboard {
             this.clearLogsBtnB.addEventListener('click', () => this.clearLogs('b'));
         }
 
-        // Agent B events
+        // Agent B (MVP) events
         if (this.generateMvpBtn) {
             this.generateMvpBtn.addEventListener('click', () => this.generateMVP());
         }
@@ -72,6 +72,7 @@ class Dashboard {
         if (this.projectDescription) {
             this.projectDescription.addEventListener('input', () => this.updateMVPStatus());
         }
+
         if (this.buildTypeInputs && this.buildTypeInputs.length) {
             this.buildTypeInputs.forEach(input => {
                 input.addEventListener('change', () => this.updateMVPStatus());
@@ -93,6 +94,13 @@ class Dashboard {
 
         this.eventSource.onerror = (error) => {
             console.error('EventSource error:', error);
+            this.addLogEntry({
+                timestamp: new Date().toISOString(),
+                level: 'ERROR',
+                message: 'Connection to log stream lost. Retrying...',
+                module: 'dashboard'
+            }, { immediate: true, target: 'a' });
+
             setTimeout(() => {
                 if (this.eventSource && this.eventSource.readyState === EventSource.CLOSED) {
                     this.startLogStream();
@@ -108,6 +116,7 @@ class Dashboard {
         const message = logData.message || '';
         const module = logData.module || '';
 
+        // Determine target
         let logTarget = target;
         if (!logTarget) {
             if (message.includes('Agent B') || message.includes('MVP') || module === 'MVP') {
@@ -117,13 +126,17 @@ class Dashboard {
             }
         }
 
+        this.addToQueue(logData, logTarget, immediate);
+    }
+
+    addToQueue(logData, target, immediate) {
         if (immediate) {
-            this.renderLogEntry(logData, logTarget);
+            this.renderLogEntry(logData, target);
             return;
         }
 
-        const queue = logTarget === 'a' ? this.logQueueA : this.logQueueB;
-        const isProcessing = logTarget === 'a' ? 'isProcessingLogsA' : 'isProcessingLogsB';
+        const queue = target === 'a' ? this.logQueueA : this.logQueueB;
+        const isProcessing = target === 'a' ? 'isProcessingLogsA' : 'isProcessingLogsB';
 
         queue.push(logData);
         if (queue.length > this.maxLogEntries) {
@@ -132,7 +145,7 @@ class Dashboard {
 
         if (!this[isProcessing]) {
             this[isProcessing] = true;
-            this.processLogQueue(logTarget);
+            this.processLogQueue(target);
         }
     }
 
@@ -171,9 +184,12 @@ class Dashboard {
         const timestamp = new Date(logData.timestamp).toLocaleTimeString();
         const level = logData.level.padEnd(6);
         const module = logData.module ? `[${logData.module}]` : '';
-        const message = logData.message || '';
+        let message = logData.message;
 
-        entry.textContent = `${timestamp} ${level} ${module} ${message}`;
+        // Remove emojis from messages for clean Tableau style
+        message = message.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
+
+        entry.textContent = `${timestamp} | ${level} | ${module} ${message}`;
         container.appendChild(entry);
 
         container.scrollTo({
@@ -192,16 +208,14 @@ class Dashboard {
             const data = await response.json();
 
             if (this.agentAStatus) {
-                const statusText = this.formatStatus(data.agent_a_status);
-                this.agentAStatus.textContent = statusText;
+                this.agentAStatus.textContent = this.formatStatus(data.agent_a_status);
             }
 
             if (this.projectsCount) {
                 this.projectsCount.textContent = data.projects_found || 0;
             }
-            if (this.lastCheck) {
-                this.lastCheck.textContent = data.last_check ? 
-                    new Date(data.last_check).toLocaleTimeString() : '-';
+            if (this.suitableCount) {
+                this.suitableCount.textContent = data.suitable_projects || 0;
             }
 
             if (this.startBtn && this.runSessionBtn && this.stopBtn) {
@@ -331,13 +345,16 @@ class Dashboard {
         const description = this.projectDescription ? this.projectDescription.value.trim() : '';
 
         if (!template) {
-            this.mvpStatus.textContent = 'Select template';
-            this.generateMvpBtn.disabled = true;
+            this.mvpStatus.textContent = '';
+            this.mvpStatus.className = 'status-message';
+            this.generateMvpBtn.disabled = false;
         } else if (description && description.length < 10) {
-            this.mvpStatus.textContent = 'Description too short';
+            this.mvpStatus.textContent = 'Description too short (min 10 chars)';
+            this.mvpStatus.className = 'status-message error';
             this.generateMvpBtn.disabled = true;
         } else {
             this.mvpStatus.textContent = 'Ready to generate';
+            this.mvpStatus.className = 'status-message success';
             this.generateMvpBtn.disabled = false;
         }
     }
@@ -353,18 +370,23 @@ class Dashboard {
         const buildType = this.getSelectedBuildType();
 
         if (!template) {
-            this.mvpStatus.textContent = 'Select template';
+            this.showMVPError('Select a template');
             return;
         }
 
         if (description && description.length < 10) {
-            this.mvpStatus.textContent = 'Description too short';
+            this.showMVPError('Description too short');
             return;
         }
 
         try {
             this.generateMvpBtn.disabled = true;
             this.mvpStatus.textContent = 'Generating...';
+            this.mvpStatus.className = 'status-message loading';
+
+            if (this.agentBStatus) {
+                this.agentBStatus.textContent = 'Generating';
+            }
 
             const response = await fetch('/api/generate-mvp', {
                 method: 'POST',
@@ -380,23 +402,39 @@ class Dashboard {
             const result = await response.json();
 
             if (response.ok) {
-                this.mvpStatus.textContent = `Success: ${result.deployUrl}`;
-                setTimeout(() => {
-                    if (this.projectDescription) {
-                        this.projectDescription.value = '';
-                        this.updateMVPStatus();
-                    }
-                }, 3000);
+                this.showMVPSuccess(result);
             } else {
                 throw new Error(result.error || 'Unknown error');
             }
 
         } catch (error) {
             console.error('MVP generation error:', error);
-            this.mvpStatus.textContent = `Error: ${error.message}`;
+            this.showMVPError(error.message);
         } finally {
-            this.generateMvpBtn.disabled = false;
+            if (this.agentBStatus) {
+                this.agentBStatus.textContent = 'Ready';
+            }
         }
+    }
+
+    showMVPSuccess(result) {
+        this.mvpStatus.textContent = `Success: ${result.deployUrl}`;
+        this.mvpStatus.className = 'status-message success';
+
+        setTimeout(() => {
+            if (this.projectDescription) {
+                this.projectDescription.value = '';
+                this.updateMVPStatus();
+            }
+        }, 3000);
+
+        this.generateMvpBtn.disabled = false;
+    }
+
+    showMVPError(message) {
+        this.mvpStatus.textContent = `Error: ${message}`;
+        this.mvpStatus.className = 'status-message error';
+        this.generateMvpBtn.disabled = false;
     }
 
     destroy() {
