@@ -299,8 +299,13 @@ class MVPGenerator:
                 with open(mock_file, 'r', encoding='utf-8') as f:
                     content = f.read()
 
-                # Add project description as comment
-                content = f"// Project: {description[:200]}...\n{content}"
+                # Add project description as comment (properly escaped)
+                # Escape newlines and ensure it's a valid JavaScript comment
+                description_comment = description[:200].replace('\n', ' ').replace('\r', ' ')
+                # Remove any characters that could break JavaScript
+                description_comment = ''.join(c for c in description_comment if c.isprintable() or c in ' \t')
+                # Wrap in comment
+                content = f"// Project: {description_comment}\n{content}"
 
                 with open(mock_file, 'w', encoding='utf-8') as f:
                     f.write(content)
