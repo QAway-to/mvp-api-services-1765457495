@@ -143,30 +143,18 @@ class MVPGenerator:
                     template_lib_file = lib_files[0]
                     lib_file_name = template_lib_file.name
         
-        if template_lib_file and template_lib_file.exists():
+        # Only check for mini-etl-pipeline (required), web-scraper will be handled during copy
+        if template_id == "mini-etl-pipeline":
+            if template_lib_file and template_lib_file.exists():
+                file_size = template_lib_file.stat().st_size
+                log_agent_action("Agent B", f"✅ Template file exists: src/lib/{lib_file_name} ({file_size} bytes)")
+            else:
+                log_agent_action("Agent B", f"❌❌❌ CRITICAL: Template file src/lib/spacex.js does NOT exist in template!")
+                raise FileNotFoundError(f"Template file src/lib/spacex.js does not exist in template {template_id}. This file is required for mini-etl-pipeline.")
+        elif template_id == "web-scraper" and template_lib_file and template_lib_file.exists():
+            # Just log that file exists, don't fail if it doesn't - will be handled during copy
             file_size = template_lib_file.stat().st_size
             log_agent_action("Agent B", f"✅ Template file exists: src/lib/{lib_file_name} ({file_size} bytes)")
-        elif template_id in ["mini-etl-pipeline", "web-scraper"]:
-            # For mini-etl-pipeline and web-scraper, lib files are required
-            required_file = "spacex.js" if template_id == "mini-etl-pipeline" else "scraper_core.js"
-            log_agent_action("Agent B", f"❌❌❌ CRITICAL: Template file src/lib/{required_file} does NOT exist in template!")
-            # List what's actually in the template for debugging
-            template_src = template_path / "src"
-            if template_src.exists():
-                log_agent_action("Agent B", f"📋 Template src directory exists")
-                template_lib = template_path / "src" / "lib"
-                if template_lib.exists():
-                    lib_files = list(template_lib.iterdir())
-                    log_agent_action("Agent B", f"📋 Files in template src/lib: {[f.name for f in lib_files]}")
-                else:
-                    log_agent_action("Agent B", f"❌ Template src/lib directory does NOT exist!")
-            else:
-                log_agent_action("Agent B", f"❌ Template src directory does NOT exist!")
-            # List all files in template for debugging
-            all_template_files = list(template_path.rglob('*'))
-            template_file_count = len([f for f in all_template_files if f.is_file()])
-            log_agent_action("Agent B", f"📋 Total files in template: {template_file_count}")
-            raise FileNotFoundError(f"Template file src/lib/{required_file} does not exist in template {template_id}. This file is required for {template_id}.")
 
         # Copy template
         if project_path.exists():
@@ -244,20 +232,36 @@ class MVPGenerator:
                 log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
         
         if missing_files:
-            # List all files in src/lib directory for debugging
-            lib_dir = project_path / "src" / "lib"
-            if lib_dir.exists():
-                lib_files = list(lib_dir.iterdir())
-                log_agent_action("Agent B", f"📋 Files in src/lib: {[f.name for f in lib_files]}")
-            else:
-                log_agent_action("Agent B", f"❌ src/lib directory does not exist!")
+            # For web-scraper, if scraper_core.js is missing, try one more time to copy it
+            if template_id == "web-scraper" and "src/lib/scraper_core.js" in missing_files:
+                template_lib_file = template_path / "src" / "lib" / "scraper_core.js"
+                if template_lib_file.exists():
+                    try:
+                        dest_lib_dir = project_path / "src" / "lib"
+                        dest_lib_dir.mkdir(parents=True, exist_ok=True)
+                        dest_file = dest_lib_dir / "scraper_core.js"
+                        shutil.copy2(template_lib_file, dest_file)
+                        if dest_file.exists():
+                            log_agent_action("Agent B", f"✅✅✅ FINAL ATTEMPT SUCCESS: scraper_core.js copied")
+                            missing_files.remove("src/lib/scraper_core.js")
+                    except Exception as e:
+                        log_agent_action("Agent B", f"❌ Final copy attempt failed: {e}")
             
-            # List all files in project for debugging
-            all_files = list(project_path.rglob('*'))
-            file_count = len([f for f in all_files if f.is_file()])
-            log_agent_action("Agent B", f"📋 Total files in project: {file_count}")
-            
-            raise FileNotFoundError(f"Critical files missing after copy: {', '.join(missing_files)}")
+            if missing_files:
+                # List all files in src/lib directory for debugging
+                lib_dir = project_path / "src" / "lib"
+                if lib_dir.exists():
+                    lib_files = list(lib_dir.iterdir())
+                    log_agent_action("Agent B", f"📋 Files in src/lib: {[f.name for f in lib_files]}")
+                else:
+                    log_agent_action("Agent B", f"❌ src/lib directory does not exist!")
+                
+                # List all files in project for debugging
+                all_files = list(project_path.rglob('*'))
+                file_count = len([f for f in all_files if f.is_file()])
+                log_agent_action("Agent B", f"📋 Total files in project: {file_count}")
+                
+                raise FileNotFoundError(f"Critical files missing after copy: {', '.join(missing_files)}")
         else:
             log_agent_action("Agent B", f"✅ All critical files copied successfully")
 
