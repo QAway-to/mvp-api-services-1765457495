@@ -74,6 +74,7 @@
                             <option value="data-formatter">Data Formatter</option>
                             <option value="mini-etl-pipeline">Mini ETL Pipeline</option>
                             <option value="price-stock-parser">Price & Stock Parser</option>
+                            <option value="web-scraper">Universal Web Scraper</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -94,7 +95,6 @@
             </div>
                     <div class="form-group">
                         <button id="agent-b-button" class="btn btn-secondary">Generate</button>
-                        <button id="agent-b-improve-button" class="btn btn-secondary" style="margin-left: 10px; display: none;">Доработать MVP</button>
                     </div>
                     <div class="form-group">
                         <div class="logs-label">Output Logs</div>
@@ -105,29 +105,6 @@
         </div>
     </div>
 
-    <!-- Dialog for MVP improvement commands -->
-    <div id="improve-mvp-dialog" class="dialog-overlay" style="display: none;">
-        <div class="dialog-content">
-            <div class="dialog-header">
-                <h3>Доработка MVP</h3>
-                <button class="dialog-close" id="dialog-close-btn">&times;</button>
-            </div>
-            <div class="dialog-body">
-                <div class="form-group">
-                    <label class="form-label" for="improve-command-input">Команда для архитектора:</label>
-                    <textarea id="improve-command-input" class="form-textarea" placeholder="Опишите, что нужно доработать в MVP (например: 'Добавить авторизацию пользователей', 'Изменить цветовую схему на темную', 'Добавить экспорт данных в Excel')" rows="5"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="improve-project-name">Название проекта (из последнего MVP):</label>
-                    <input type="text" id="improve-project-name" class="form-input" placeholder="Название проекта для доработки" readonly>
-                </div>
-            </div>
-            <div class="dialog-footer">
-                <button id="improve-cancel-btn" class="btn btn-secondary">Отмена</button>
-                <button id="improve-submit-btn" class="btn btn-primary">Применить доработку</button>
-            </div>
-        </div>
-    </div>
                 </div>
             </div>
         </div>

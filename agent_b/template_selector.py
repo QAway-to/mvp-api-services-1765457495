@@ -134,6 +134,17 @@ class AITemplateSelector:
                 complexity="low",
                 estimated_completion="80%"
             ),
+
+            # Web Scraper (Universal)
+            "web-scraper": TemplateInfo(
+                id="web-scraper",
+                name="Universal Web Scraper",
+                category="parsers",
+                description="Универсальный веб-скрапер для парсинга любых сайтов с поддержкой сезонов и отдельных страниц",
+                features=["scraping", "season support", "data export", "table view"],
+                complexity="low",
+                estimated_completion="75%"
+            ),
         }
 
     async def select_template(self, project_description: str) -> TemplateMatch:
