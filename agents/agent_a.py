@@ -454,15 +454,15 @@ class AgentA:
                             # First, try to find the exact text pattern in visible elements
                             try:
                                 # Look for elements containing "Предложений:" followed by a number
-                                proposals_xpath = [
+                            proposals_xpath = [
                                     "//*[contains(text(), 'Предложений:')]",
                                     "//*[contains(text(), 'предложений:')]",
                                     "//*[contains(., 'Предложений:')]",
                                     "//*[contains(., 'предложений:')]"
-                                ]
+                            ]
                                 
                                 for xpath in proposals_xpath:
-                                    try:
+                                try:
                                         elements = self.driver.find_elements(By.XPATH, xpath)
                                         for elem in elements:
                                             elem_text = elem.text.strip()
@@ -482,7 +482,7 @@ class AgentA:
                                                 parent_text = parent.text.strip()
                                                 if parent_text:
                                                     match = re.search(r'Предложений[:\s]+(\d{1,3})', parent_text, re.IGNORECASE)
-                                                    if match:
+                                        if match:
                                                         proposals_candidate = int(match.group(1))
                                                         if 0 <= proposals_candidate <= 200:
                                                             proposals = proposals_candidate
@@ -508,8 +508,8 @@ class AgentA:
                                                 break
                                         if proposals > 0:
                                             break
-                                    except Exception:
-                                        continue
+                                except Exception:
+                                    continue
                             except Exception:
                                 pass
                             
@@ -568,7 +568,7 @@ class AgentA:
                                                     proposals = proposals_candidate
                                                     break
                                         if proposals > 0:
-                                            break
+                                        break
                             
                             # Hired percentage - look for "нанято X%" or "X% нанято"
                             if page_text:
@@ -588,12 +588,14 @@ class AgentA:
                                             break
                             
                             # Time left parsing - look for "осталось X часов/дней" or similar
+                            # Extract only hours, ignore minutes (e.g., "1 ч. 55 мин." -> 1 hour)
                             if page_text:
                                 time_patterns = [
-                                    r'осталось[:\s]+(\d{1,2})\s*(?:час|ч\.|ч)',  # "осталось 48 часов" or "осталось 48 ч."
+                                    r'осталось[:\s]+(\d{1,2})\s*(?:час|ч\.|ч)(?:\s*\d+.*мин)?',  # "осталось 1 ч. 55 мин." -> 1
                                     r'осталось[:\s]+(\d{1,2})\s*дн',  # "осталось 2 дня" (convert to hours)
-                                    r'(\d{1,2})\s*(?:час|ч\.|ч)\s*осталось',  # "48 часов осталось"
-                                    r'(\d{1,2})\s*дн[.\s]*осталось'  # "2 дн. осталось"
+                                    r'(\d{1,2})\s*(?:час|ч\.|ч)(?:\s*\d+.*мин)?\s*осталось',  # "1 ч. 55 мин. осталось" -> 1
+                                    r'(\d{1,2})\s*дн[.\s]*осталось',  # "2 дн. осталось"
+                                    r'Осталось[:\s]+(\d{1,2})\s*(?:ч\.|ч|час)',  # "Осталось: 11 ч. 13 мин." -> 11
                                 ]
                                 for pattern in time_patterns:
                                     match = re.search(pattern, page_text, re.IGNORECASE)
@@ -627,9 +629,10 @@ class AgentA:
                         # Apply filters if specified
                         should_add = True
                         
-                        # Filter by time left (minimum hours)
+                        # Filter by time left (maximum hours - "не более чем")
+                        # Projects with time_left <= search_time_left will pass
                         if self.search_time_left is not None and time_left_hours is not None:
-                            if time_left_hours < self.search_time_left:
+                            if time_left_hours > self.search_time_left:
                                 should_add = False
                         
                         # Filter by hired percentage (minimum percentage)
@@ -643,13 +646,13 @@ class AgentA:
                                 should_add = False
                         
                         if should_add:
-                            all_projects.append(project_data)
-                            # Push to live queue for immediate evaluation/notification (from Selenium thread)
-                            try:
-                                if self.live_queue is not None and self._loop is not None:
-                                    asyncio.run_coroutine_threadsafe(self.live_queue.put(project_data), self._loop)
-                            except Exception:
-                                pass
+                        all_projects.append(project_data)
+                        # Push to live queue for immediate evaluation/notification (from Selenium thread)
+                        try:
+                            if self.live_queue is not None and self._loop is not None:
+                                asyncio.run_coroutine_threadsafe(self.live_queue.put(project_data), self._loop)
+                        except Exception:
+                            pass
 
                         # Human delay between projects
                         self.human_delay(1, 3)
@@ -765,7 +768,7 @@ class AgentA:
         if keywords:
             log_msg += f" with keywords: {keywords}"
         if timeLeft is not None:
-            log_msg += f", time left >= {timeLeft}h"
+            log_msg += f", time left <= {timeLeft}h"
         if hiredMin is not None:
             log_msg += f", hired >= {hiredMin}%"
         if proposalsMax is not None:

@@ -16,13 +16,13 @@
             <div class="agent-card">
                 <div class="card-title">Agent A</div>
                 <div class="card-content">
-                    <div class="form-group">
+            <div class="form-group">
                         <input type="text" id="agent-a-input" class="form-input" placeholder="Ключевые слова (только кириллица, запятые, пробелы)" pattern="[а-яА-ЯёЁ\s,.-]*" title="Разрешены только русские буквы, пробелы, запятые и дефисы">
                     </div>
                     <div class="form-group form-group-row">
                         <div class="form-field-inline">
-                            <label class="form-label-inline" for="agent-a-time-left">Осталось</label>
-                            <input type="number" id="agent-a-time-left" class="form-input-inline" placeholder="ч" min="0" step="1">
+                            <label class="form-label-inline" for="agent-a-time-left">Осталось ≤</label>
+                            <input type="number" id="agent-a-time-left" class="form-input-inline" placeholder="ч макс" min="0" step="1" title="Максимальное оставшееся время (часы)">
                         </div>
                         <div class="form-field-inline">
                             <label class="form-label-inline" for="agent-a-hired-min">Нанято</label>
@@ -32,20 +32,20 @@
                             <label class="form-label-inline" for="agent-a-proposals-max">Предложений</label>
                             <input type="number" id="agent-a-proposals-max" class="form-input-inline" placeholder="макс" min="0" step="1">
                         </div>
-                    </div>
-                    <div class="form-group">
+            </div>
+            <div class="form-group">
                         <button id="agent-a-button" class="btn btn-primary">Execute</button>
-                    </div>
+            </div>
                     <div class="form-group">
                         <div class="status-label">Status</div>
                         <div id="agent-a-status" class="status-value">Waiting</div>
-                    </div>
+            </div>
                     <div class="form-group">
                         <div class="results-label">Results</div>
                         <div id="agent-a-results" class="results-list"></div>
-                    </div>
                 </div>
             </div>
+        </div>
 
             <!-- Agent B Card -->
             <div class="agent-card">
