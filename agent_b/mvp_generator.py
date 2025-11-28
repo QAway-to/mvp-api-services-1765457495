@@ -401,8 +401,18 @@ class MVPGenerator:
                 with open(mock_file, 'r', encoding='utf-8') as f:
                     content = f.read()
 
-                # Add project description as comment
-                content = f"// Project: {description[:200]}...\n{content}"
+                # Add project description as comment - sanitize to prevent JS syntax errors
+                import re
+                # Replace newlines and carriage returns with spaces
+                cleaned_description = description.replace('\n', ' ').replace('\r', ' ')
+                # Remove or replace characters that could break JS comments
+                cleaned_description = re.sub(r'[*/\\]', '', cleaned_description)  # Remove */ and \
+                # Limit length and ensure it's a single line
+                cleaned_description = cleaned_description[:200].strip()
+                if len(cleaned_description) > 200:
+                    cleaned_description = cleaned_description[:197] + "..."
+                
+                content = f"// Project: {cleaned_description}\n{content}"
 
                 with open(mock_file, 'w', encoding='utf-8') as f:
                     f.write(content)
