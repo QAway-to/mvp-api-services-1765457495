@@ -237,6 +237,22 @@ class MVPGenerator:
                 missing_files.append(file_rel)
                 log_agent_action("Agent B", f"❌ MISSING: {file_rel} not found after copy!")
         
+        # Filter missing_files immediately to only include files required for this template
+        # This prevents false errors for files that aren't needed for this specific template
+        template_critical_files_map = {
+            "mini-etl-pipeline": ["package.json", "pages/index.js", "src/lib/spacex.js", "next.config.js"],
+            "web-scraper": ["package.json", "pages/index.js", "src/lib/scraper_core.js", "next.config.js", "vercel.json"],
+            "brand-mention-monitor": ["package.json", "pages/index.js", "src/lib/news.js", "vercel.json"],
+            "data-formatter": ["package.json", "pages/index.js", "src/lib/quotes.js", "vercel.json"],
+            "email-campaign-manager": ["package.json", "pages/index.js", "vercel.json"],
+            "price-stock-parser": ["package.json", "pages/index.js", "vercel.json"],
+            "news-parser": ["package.json", "pages/index.js", "vercel.json"],
+            "analytics-dashboard": ["package.json", "pages/index.js", "vercel.json"],
+            "telegram-shop-bot": ["package.json", "pages/index.js", "vercel.json"],
+        }
+        required_files_for_template = template_critical_files_map.get(template_id, ["package.json", "pages/index.js"])
+        missing_files = [f for f in missing_files if f in required_files_for_template]
+        
         # If lib file is missing, try to copy it explicitly (template-specific)
         lib_file_to_copy = None
         template_lib_file = None
@@ -309,24 +325,6 @@ class MVPGenerator:
                                 missing_files.remove(missing_file_path)
                         except Exception as e:
                             log_agent_action("Agent B", f"❌ Final copy attempt failed for {lib_file_name}: {e}")
-            
-            # Filter out files that are not critical for this template
-            # Only keep files that are actually required for this specific template
-            template_critical_files = {
-                "mini-etl-pipeline": ["package.json", "pages/index.js", "src/lib/spacex.js", "next.config.js"],
-                "web-scraper": ["package.json", "pages/index.js", "src/lib/scraper_core.js", "next.config.js", "vercel.json"],
-                "brand-mention-monitor": ["package.json", "pages/index.js", "src/lib/news.js", "vercel.json"],
-                "data-formatter": ["package.json", "pages/index.js", "src/lib/quotes.js", "vercel.json"],
-                "email-campaign-manager": ["package.json", "pages/index.js"],
-                "price-stock-parser": ["package.json", "pages/index.js"],
-                "news-parser": ["package.json", "pages/index.js"],
-            }
-            
-            # Get critical files for this template
-            required_files = template_critical_files.get(template_id, ["package.json", "pages/index.js"])
-            
-            # Filter missing_files to only include files that are actually required for this template
-            missing_files = [f for f in missing_files if f in required_files]
             
             if missing_files:
                 # List all files in src/lib directory for debugging
