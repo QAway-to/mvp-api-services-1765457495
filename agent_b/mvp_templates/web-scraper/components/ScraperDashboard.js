@@ -49,17 +49,42 @@ export default function ScraperDashboard() {
       return;
     }
 
-    // Convert to CSV
-    const headers = Object.keys(scrapedData[0]);
-    const csvRows = [
-      headers.join(','),
-      ...scrapedData.map(row =>
-        headers.map(header => {
-          const value = row[header];
-          return typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value;
-        }).join(',')
-      ),
-    ];
+    // Convert to CSV - handle both cell-based and object-based data
+    let csvRows = [];
+    
+    if (scrapedData[0].cells) {
+      // Cell-based format
+      const maxCells = Math.max(...scrapedData.map(row => row.cells ? row.cells.length : 0));
+      const headers = Array.from({ length: maxCells }, (_, i) => `Column ${i + 1}`);
+      csvRows = [
+        [...headers, 'Source URL', 'Timestamp'].join(','),
+        ...scrapedData.map(row => {
+          const cells = row.cells || [];
+          const paddedCells = [...cells, ...Array(maxCells - cells.length).fill('')];
+          return [
+            ...paddedCells.map(cell => {
+              const value = String(cell || '');
+              return `"${value.replace(/"/g, '""')}"`;
+            }),
+            `"${row.sourceUrl || ''}"`,
+            `"${row.timestamp || ''}"`
+          ].join(',');
+        }),
+      ];
+    } else {
+      // Object-based format
+      const headers = Object.keys(scrapedData[0]);
+      csvRows = [
+        headers.join(','),
+        ...scrapedData.map(row =>
+          headers.map(header => {
+            const value = row[header];
+            const strValue = value === null || value === undefined ? '' : String(value);
+            return `"${strValue.replace(/"/g, '""')}"`;
+          }).join(',')
+        ),
+      ];
+    }
 
     const csvContent = csvRows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

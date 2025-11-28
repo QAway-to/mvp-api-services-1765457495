@@ -1,5 +1,5 @@
 // API endpoint for web scraping
-import { scrapeMatch, scrapeSeason } from '../../../src/lib/scraper_core';
+import { scrapeMatch, scrapeSeason, Fetcher } from '../../src/lib/scraper_core';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -17,7 +17,6 @@ export default async function handler(req, res) {
 
     if (type === 'match') {
       // Scrape single match
-      const { Fetcher } = await import('../../../src/lib/scraper_core');
       const fetcher = new Fetcher();
       data = await scrapeMatch(url, fetcher);
     } else if (type === 'season') {
