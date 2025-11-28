@@ -131,6 +131,9 @@ class MVPGenerator:
         if template_id == "mini-etl-pipeline":
             template_lib_file = template_path / "src" / "lib" / "spacex.js"
             lib_file_name = "spacex.js"
+        elif template_id == "web-scraper":
+            template_lib_file = template_path / "src" / "lib" / "scraper_core.js"
+            lib_file_name = "scraper_core.js"
         else:
             # For other templates, check if they have lib files
             template_lib = template_path / "src" / "lib"
@@ -143,9 +146,10 @@ class MVPGenerator:
         if template_lib_file and template_lib_file.exists():
             file_size = template_lib_file.stat().st_size
             log_agent_action("Agent B", f"✅ Template file exists: src/lib/{lib_file_name} ({file_size} bytes)")
-        elif template_id == "mini-etl-pipeline":
-            # For mini-etl-pipeline, spacex.js is required
-            log_agent_action("Agent B", f"❌❌❌ CRITICAL: Template file src/lib/spacex.js does NOT exist in template!")
+        elif template_id in ["mini-etl-pipeline", "web-scraper"]:
+            # For mini-etl-pipeline and web-scraper, lib files are required
+            required_file = "spacex.js" if template_id == "mini-etl-pipeline" else "scraper_core.js"
+            log_agent_action("Agent B", f"❌❌❌ CRITICAL: Template file src/lib/{required_file} does NOT exist in template!")
             # List what's actually in the template for debugging
             template_src = template_path / "src"
             if template_src.exists():
@@ -162,7 +166,7 @@ class MVPGenerator:
             all_template_files = list(template_path.rglob('*'))
             template_file_count = len([f for f in all_template_files if f.is_file()])
             log_agent_action("Agent B", f"📋 Total files in template: {template_file_count}")
-            raise FileNotFoundError(f"Template file src/lib/spacex.js does not exist in template {template_id}. This file is required for mini-etl-pipeline.")
+            raise FileNotFoundError(f"Template file src/lib/{required_file} does not exist in template {template_id}. This file is required for {template_id}.")
 
         # Copy template
         if project_path.exists():
