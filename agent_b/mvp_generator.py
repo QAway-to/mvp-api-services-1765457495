@@ -170,6 +170,37 @@ class MVPGenerator:
             log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
             raise
 
+        # Immediately after copy, ensure src/lib files are copied for templates that need them
+        # This is a proactive approach - copy before verification
+        if template_id in ["web-scraper", "brand-mention-monitor", "data-formatter"]:
+            lib_files_map = {
+                "web-scraper": "scraper_core.js",
+                "brand-mention-monitor": "news.js",
+                "data-formatter": "quotes.js",
+            }
+            lib_file_name = lib_files_map.get(template_id)
+            if lib_file_name:
+                template_lib_file = template_path / "src" / "lib" / lib_file_name
+                dest_lib_dir = project_path / "src" / "lib"
+                dest_file = dest_lib_dir / lib_file_name
+                
+                if template_lib_file.exists():
+                    if not dest_file.exists():
+                        log_agent_action("Agent B", f"🔧 Proactively copying {lib_file_name} (not found after copytree)")
+                        try:
+                            dest_lib_dir.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(template_lib_file, dest_file)
+                            if dest_file.exists():
+                                log_agent_action("Agent B", f"✅✅✅ Proactively copied: {lib_file_name}")
+                            else:
+                                log_agent_action("Agent B", f"❌ Failed to proactively copy {lib_file_name}")
+                        except Exception as e:
+                            log_agent_action("Agent B", f"❌ Error proactively copying {lib_file_name}: {e}")
+                    else:
+                        log_agent_action("Agent B", f"✅ {lib_file_name} already exists after copytree")
+                else:
+                    log_agent_action("Agent B", f"❌ Template file {template_lib_file} does not exist!")
+
         # Verify critical files were copied - with detailed logging (template-specific)
         critical_files = [
             "package.json",
@@ -215,6 +246,10 @@ class MVPGenerator:
         elif template_id == "web-scraper" and "src/lib/scraper_core.js" in missing_files:
             lib_file_to_copy = "scraper_core.js"
             template_lib_file = template_path / "src" / "lib" / "scraper_core.js"
+            log_agent_action("Agent B", f"🔍 DEBUG: web-scraper missing scraper_core.js")
+            log_agent_action("Agent B", f"🔍 DEBUG: template_path = {template_path}")
+            log_agent_action("Agent B", f"🔍 DEBUG: template_lib_file = {template_lib_file}")
+            log_agent_action("Agent B", f"🔍 DEBUG: template_lib_file.exists() = {template_lib_file.exists()}")
         elif template_id == "brand-mention-monitor" and "src/lib/news.js" in missing_files:
             lib_file_to_copy = "news.js"
             template_lib_file = template_path / "src" / "lib" / "news.js"
@@ -222,28 +257,34 @@ class MVPGenerator:
             lib_file_to_copy = "quotes.js"
             template_lib_file = template_path / "src" / "lib" / "quotes.js"
         
-        if lib_file_to_copy and template_lib_file and template_lib_file.exists():
-            log_agent_action("Agent B", f"🔧 Attempting to manually copy src/lib/{lib_file_to_copy}")
-            try:
-                # Ensure destination directory exists
-                dest_lib_dir = project_path / "src" / "lib"
-                dest_lib_dir.mkdir(parents=True, exist_ok=True)
-                log_agent_action("Agent B", f"✅ Created directory: {dest_lib_dir}")
-                
-                # Copy the file explicitly
-                dest_file = dest_lib_dir / lib_file_to_copy
-                shutil.copy2(template_lib_file, dest_file)
-                
-                if dest_file.exists():
-                    file_size = dest_file.stat().st_size
-                    log_agent_action("Agent B", f"✅✅✅ MANUALLY COPIED: src/lib/{lib_file_to_copy} ({file_size} bytes)")
-                    missing_files.remove(f"src/lib/{lib_file_to_copy}")
-                else:
-                    log_agent_action("Agent B", f"❌ Failed to manually copy src/lib/{lib_file_to_copy}")
-            except Exception as e:
-                log_agent_action("Agent B", f"❌ Error manually copying src/lib/{lib_file_to_copy}: {e}")
-                import traceback
-                log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
+        if lib_file_to_copy and template_lib_file:
+            log_agent_action("Agent B", f"🔧 Checking template file for manual copy: {template_lib_file}")
+            log_agent_action("Agent B", f"🔧 Template file exists: {template_lib_file.exists()}")
+            if template_lib_file.exists():
+                log_agent_action("Agent B", f"🔧 Attempting to manually copy src/lib/{lib_file_to_copy}")
+                try:
+                    # Ensure destination directory exists
+                    dest_lib_dir = project_path / "src" / "lib"
+                    dest_lib_dir.mkdir(parents=True, exist_ok=True)
+                    log_agent_action("Agent B", f"✅ Created directory: {dest_lib_dir}")
+                    
+                    # Copy the file explicitly
+                    dest_file = dest_lib_dir / lib_file_to_copy
+                    log_agent_action("Agent B", f"🔧 Copying from {template_lib_file} to {dest_file}")
+                    shutil.copy2(template_lib_file, dest_file)
+                    
+                    if dest_file.exists():
+                        file_size = dest_file.stat().st_size
+                        log_agent_action("Agent B", f"✅✅✅ MANUALLY COPIED: src/lib/{lib_file_to_copy} ({file_size} bytes)")
+                        missing_files.remove(f"src/lib/{lib_file_to_copy}")
+                    else:
+                        log_agent_action("Agent B", f"❌ Failed to manually copy src/lib/{lib_file_to_copy} - file doesn't exist after copy")
+                except Exception as e:
+                    log_agent_action("Agent B", f"❌ Error manually copying src/lib/{lib_file_to_copy}: {e}")
+                    import traceback
+                    log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
+            else:
+                log_agent_action("Agent B", f"❌ Template file {template_lib_file} does NOT exist - cannot copy!")
         
         if missing_files:
             # Final fallback copy attempts for lib files
