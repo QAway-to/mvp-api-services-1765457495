@@ -251,7 +251,10 @@ class MVPGenerator:
             "telegram-shop-bot": ["package.json", "pages/index.js", "vercel.json"],
         }
         required_files_for_template = template_critical_files_map.get(template_id, ["package.json", "pages/index.js"])
+        log_agent_action("Agent B", f"🔍 DEBUG: template_id={template_id}, required_files={required_files_for_template}")
+        log_agent_action("Agent B", f"🔍 DEBUG: missing_files before filter={missing_files}")
         missing_files = [f for f in missing_files if f in required_files_for_template]
+        log_agent_action("Agent B", f"🔍 DEBUG: missing_files after filter={missing_files}")
         
         # If lib file is missing, try to copy it explicitly (template-specific)
         lib_file_to_copy = None
