@@ -35,6 +35,10 @@ class AgentA:
         self.session_steps: List[Dict[str, Any]] = []
         # Live streaming of projects during Selenium run
         self.live_queue = None  # type: ignore
+        # Search parameters for current session
+        self.search_keywords = None  # Override keywords if provided
+        self.search_time_left = None  # Filter by minimum time left (hours)
+        self.search_hired_min = None  # Filter by minimum hired percentage
         self._loop = None  # event loop captured per session for thread-safe puts
 
     def setup_driver(self):
@@ -229,7 +233,13 @@ class AgentA:
         """Real search on Kwork with pagination, proposal button check, and semantic ranking"""
         log_agent_action("Agent A", "🔍 Searching projects...")
 
-        keywords_str = ','.join(config.SEARCH_KEYWORDS_LIST)
+        # Use custom keywords if provided, otherwise use config
+        if self.search_keywords:
+            keywords_list = [kw.strip() for kw in self.search_keywords.split(',') if kw.strip()]
+        else:
+            keywords_list = config.SEARCH_KEYWORDS_LIST
+        
+        keywords_str = ','.join(keywords_list)
         keywords_encoded = quote_plus(keywords_str)
 
         # Search parameters
@@ -426,9 +436,10 @@ class AgentA:
                         except Exception:
                             pass
 
-                        # Get proposals and hired counts
+                        # Get proposals, hired counts, and time left
                         proposals = 0
                         hired = 0
+                        time_left_hours = None
                         try:
                             page_text = ""
                             try:
@@ -436,53 +447,91 @@ class AgentA:
                             except Exception:
                                 page_text = ""
 
-                            # Proposals (first try DOM elements, then fallback to raw HTML)
-                            proposals_xpath = [
-                                "//*[contains(translate(., 'ОТКЛИКИПРЕДЛОЖЕНИЙ', 'откликипредложений'), 'отклик')]",
-                                "//*[contains(translate(., 'ОТКЛИКИПРЕДЛОЖЕНИЙ', 'откликипредложений'), 'предлож')]",
-                                "//*[contains(@class,'responses') or contains(@class,'proposals')]"
+                            # Improved Proposals parsing - look for specific patterns near proposal-related text
+                            # Try DOM elements first
+                            proposals_selectors = [
+                                "[class*='responses']",
+                                "[class*='proposals']",
+                                "[class*='отклик']",
+                                "[class*='предложен']",
+                                "[data-test-id*='response']"
                             ]
-                            for xp in proposals_xpath:
+                            
+                            for selector in proposals_selectors:
                                 try:
-                                    elem = WebDriverWait(self.driver, 5).until(
-                                        EC.presence_of_element_located((By.XPATH, xp))
-                                    )
-                                    if elem and elem.text:
-                                        match = re.search(r'(\d+)', elem.text.replace('\xa0', ' '))
-                                        if match:
-                                            proposals = int(match.group(1))
-                                            break
+                                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                                    for elem in elements:
+                                        elem_text = elem.text.strip()
+                                        if elem_text:
+                                            # Look for number followed by proposal-related words
+                                            proposals_match = re.search(r'(\d{1,3})\s*(?:отклик|предложен|предложений)', elem_text, re.IGNORECASE)
+                                            if proposals_match:
+                                                proposals = int(proposals_match.group(1))
+                                                # Sanity check: proposals should be reasonable (0-500)
+                                                if 0 <= proposals <= 500:
+                                                    break
+                                    if proposals > 0:
+                                        break
                                 except Exception:
                                     continue
 
+                            # Fallback to page source with improved patterns
                             if proposals == 0 and page_text:
+                                # More specific patterns that avoid false matches
                                 proposals_patterns = [
-                                    r'откликов[:\s]+(\d+)',
-                                    r'предложений[:\s]+(\d+)',
-                                    r'(\d+)\s+отклик',
-                                    r'(\d+)\s+откликов',
-                                    r'(\d+)\s+предложен',
-                                    r'(\d+)\s+предложений'
+                                    r'(?:откликов|предложений)[:\s]+(\d{1,3})(?:\s|</|\n|$)',  # "откликов: 5" or "предложений: 5"
+                                    r'(\d{1,3})\s+(?:отклик(?:ов|а)?|предложен(?:ий|ие)?)(?:\s|</|\n|$)',  # "5 откликов"
+                                    r'>(\d{1,3})</[^>]*отклик',  # HTML tags
+                                    r'>(\d{1,3})</[^>]*предложен'  # HTML tags
                                 ]
                                 for pattern in proposals_patterns:
-                                    match = re.search(pattern, page_text, re.IGNORECASE)
-                                    if match:
-                                        proposals = int(match.group(1))
+                                    matches = re.findall(pattern, page_text, re.IGNORECASE)
+                                    for match in matches:
+                                        proposals_candidate = int(match)
+                                        # Sanity check: reasonable range
+                                        if 0 <= proposals_candidate <= 500:
+                                            proposals = proposals_candidate
+                                            break
+                                    if proposals > 0:
                                         break
                             
-                            # Hired
+                            # Hired percentage - look for "нанято X%" or "X% нанято"
                             if page_text:
                                 hired_patterns = [
-                                    r'(\d+)\s+исполнител',
-                                    r'нанят[:\s]+(\d+)',
-                                    r'исполнитель.*нанят',
-                                    r'нанято[:\s]+(\d+)'
+                                    r'нанято[:\s]+(\d{1,3})\s*%',  # "нанято: 45%"
+                                    r'(\d{1,3})\s*%[:\s]*нанято',  # "45% нанято"
+                                    r'(\d{1,3})\s*исполнител(?:ей|ь|я)?[:\s]*нанято',  # "45 исполнителей нанято"
+                                    r'нанят[:\s]+(\d{1,3})\s*%'  # "нанят: 45%"
                                 ]
                                 for pattern in hired_patterns:
                                     match = re.search(pattern, page_text, re.IGNORECASE)
                                     if match:
-                                        hired = int(match.group(1)) if match.lastindex else 1
-                                        break
+                                        hired_candidate = int(match.group(1))
+                                        # Sanity check: percentage should be 0-100
+                                        if 0 <= hired_candidate <= 100:
+                                            hired = hired_candidate
+                                            break
+                            
+                            # Time left parsing - look for "осталось X часов/дней" or similar
+                            if page_text:
+                                time_patterns = [
+                                    r'осталось[:\s]+(\d{1,2})\s*(?:час|ч\.|ч)',  # "осталось 48 часов" or "осталось 48 ч."
+                                    r'осталось[:\s]+(\d{1,2})\s*дн',  # "осталось 2 дня" (convert to hours)
+                                    r'(\d{1,2})\s*(?:час|ч\.|ч)\s*осталось',  # "48 часов осталось"
+                                    r'(\d{1,2})\s*дн[.\s]*осталось'  # "2 дн. осталось"
+                                ]
+                                for pattern in time_patterns:
+                                    match = re.search(pattern, page_text, re.IGNORECASE)
+                                    if match:
+                                        time_value = int(match.group(1))
+                                        # Check if it's days and convert to hours
+                                        if 'дн' in pattern.lower():
+                                            time_left_hours = time_value * 24
+                                        else:
+                                            time_left_hours = time_value
+                                        # Sanity check: reasonable time (0-720 hours = 30 days)
+                                        if 0 <= time_left_hours <= 720:
+                                            break
                         except Exception:
                             pass
 
@@ -495,17 +544,32 @@ class AgentA:
                             "url": url,
                             "proposals": proposals,
                             "hired": hired,
+                            "time_left_hours": time_left_hours,
                             "found_at": datetime.now().isoformat(),
                             "page": page_num
                         }
 
-                        all_projects.append(project_data)
-                        # Push to live queue for immediate evaluation/notification (from Selenium thread)
-                        try:
-                            if self.live_queue is not None and self._loop is not None:
-                                asyncio.run_coroutine_threadsafe(self.live_queue.put(project_data), self._loop)
-                        except Exception:
-                            pass
+                        # Apply filters if specified
+                        should_add = True
+                        
+                        # Filter by time left (minimum hours)
+                        if self.search_time_left is not None and time_left_hours is not None:
+                            if time_left_hours < self.search_time_left:
+                                should_add = False
+                        
+                        # Filter by hired percentage (minimum percentage)
+                        if self.search_hired_min is not None and hired is not None:
+                            if hired < self.search_hired_min:
+                                should_add = False
+                        
+                        if should_add:
+                            all_projects.append(project_data)
+                            # Push to live queue for immediate evaluation/notification (from Selenium thread)
+                            try:
+                                if self.live_queue is not None and self._loop is not None:
+                                    asyncio.run_coroutine_threadsafe(self.live_queue.put(project_data), self._loop)
+                            except Exception:
+                                pass
 
                         # Human delay between projects
                         self.human_delay(1, 3)
@@ -601,8 +665,13 @@ class AgentA:
         self.found_projects.extend(suitable_projects)
         log_agent_action("Agent A", f"📊 Session complete: {suitable_count} suitable projects")
 
-    async def run_session(self):
-        """Run one search session"""
+    async def run_session(self, keywords=None, timeLeft=None, hiredMin=None):
+        """Run one search session with optional search parameters"""
+        # Store search parameters for this session
+        self.search_keywords = keywords
+        self.search_time_left = timeLeft
+        self.search_hired_min = hiredMin
+        
         # Prepare live streaming pipeline
         self.live_queue = asyncio.Queue()
         self._loop = asyncio.get_running_loop()
@@ -611,7 +680,14 @@ class AgentA:
         self.current_session_start = session_start
         self.session_steps = []
         
-        log_agent_action("Agent A", f"🚀 Starting search session...")
+        log_msg = "🚀 Starting search session"
+        if keywords:
+            log_msg += f" with keywords: {keywords}"
+        if timeLeft is not None:
+            log_msg += f", time left >= {timeLeft}h"
+        if hiredMin is not None:
+            log_msg += f", hired >= {hiredMin}%"
+        log_agent_action("Agent A", log_msg + "...")
         
         if not self.driver:
             self.setup_driver()
@@ -647,6 +723,10 @@ class AgentA:
             self.current_session_end = None
             self.live_queue = None
             self._loop = None
+            # Reset search parameters
+            self.search_keywords = None
+            self.search_time_left = None
+            self.search_hired_min = None
 
     async def _consume_and_notify_live(self, max_notifications: int = 5):
         """

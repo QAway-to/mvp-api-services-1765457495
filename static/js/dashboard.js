@@ -3,6 +3,8 @@
 // DOM Elements
 const agentAButton = document.getElementById('agent-a-button');
 const agentAInput = document.getElementById('agent-a-input');
+const agentATimeLeft = document.getElementById('agent-a-time-left');
+const agentAHiredMin = document.getElementById('agent-a-hired-min');
 const agentAStatus = document.getElementById('agent-a-status');
 const agentAResults = document.getElementById('agent-a-results');
 
@@ -14,11 +16,48 @@ const agentBLogs = document.getElementById('agent-b-logs');
 // SSE EventSource for logs
 let logEventSource = null;
 
+// Validate Cyrillic only input
+function validateCyrillicOnly(text) {
+    // Allow only Cyrillic letters, spaces, commas, and dashes
+    const cyrillicPattern = /^[а-яА-ЯёЁ\s,.-]+$/;
+    return cyrillicPattern.test(text);
+}
+
+// Filter non-Cyrillic characters from input
+function filterCyrillicOnly(text) {
+    // Remove all non-Cyrillic characters (keep only Cyrillic, spaces, commas, dashes)
+    return text.replace(/[^а-яА-ЯёЁ\s,.-]/g, '');
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     initializeEventListeners();
     connectToLogs();
     pollAgentStatus();
+    
+    // Add input validation for Agent A keywords (Cyrillic only)
+    if (agentAInput) {
+        agentAInput.addEventListener('input', (e) => {
+            const originalValue = e.target.value;
+            const filteredValue = filterCyrillicOnly(originalValue);
+            
+            if (originalValue !== filteredValue) {
+                e.target.value = filteredValue;
+                // Show visual feedback
+                e.target.style.borderColor = '#f56565';
+                setTimeout(() => {
+                    e.target.style.borderColor = '';
+                }, 500);
+            }
+        });
+        
+        agentAInput.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            const filteredText = filterCyrillicOnly(pastedText);
+            e.target.value = filteredText;
+        });
+    }
 });
 
 // Event Listeners
@@ -26,9 +65,17 @@ function initializeEventListeners() {
     // Agent A: Execute button
     agentAButton.addEventListener('click', async () => {
         const keyword = agentAInput.value.trim();
+        const timeLeft = agentATimeLeft.value ? parseInt(agentATimeLeft.value) : null;
+        const hiredMin = agentAHiredMin.value ? parseInt(agentAHiredMin.value) : null;
         
         if (!keyword) {
-            alert('Please enter a search keyword');
+            alert('Пожалуйста, введите ключевые слова');
+            return;
+        }
+        
+        // Validate Cyrillic only
+        if (!validateCyrillicOnly(keyword)) {
+            alert('Разрешены только русские буквы (кириллица), пробелы, запятые и дефисы');
             return;
         }
         
@@ -38,11 +85,17 @@ function initializeEventListeners() {
         agentAResults.textContent = 'Starting search session...';
         
         try {
+            const requestBody = {};
+            if (keyword) requestBody.keywords = keyword;
+            if (timeLeft !== null) requestBody.timeLeft = timeLeft;
+            if (hiredMin !== null) requestBody.hiredMin = hiredMin;
+            
             const response = await fetch('/agent/run-session', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                body: JSON.stringify(requestBody),
             });
             
             const data = await response.json();
@@ -98,17 +151,17 @@ function initializeEventListeners() {
             const data = await response.json();
             
             if (data.status === 'error') {
-                agentBLogs.textContent += `\nâŒ Error: ${data.error || 'Unknown error'}`;
+                agentBLogs.textContent += `\n❌ Error: ${data.error || 'Unknown error'}`;
             } else if (data.status === 'success') {
-                agentBLogs.textContent += `\nâœ… ${data.message || 'MVP generated successfully'}`;
+                agentBLogs.textContent += `\n✅ ${data.message || 'MVP generated successfully'}`;
                 if (data.deployUrl) {
-                    agentBLogs.textContent += `\nðŸ”— Deploy URL: ${data.deployUrl}`;
-                    agentBLogs.textContent += `\nðŸ“¦ Template: ${data.template}`;
+                    agentBLogs.textContent += `\n🔗 Deploy URL: ${data.deployUrl}`;
+                    agentBLogs.textContent += `\n📦 Template: ${data.template}`;
                 }
             }
         } catch (error) {
             console.error('Error generating MVP:', error);
-            agentBLogs.textContent += `\nâŒ Error: ${error.message}`;
+            agentBLogs.textContent += `\n❌ Error: ${error.message}`;
         } finally {
             agentBButton.disabled = false;
             agentBButton.textContent = 'Generate';
@@ -214,7 +267,7 @@ function pollAgentResults() {
                         resultsText += `   URL: ${project.url}\n`;
                     }
                     if (project.evaluation && project.evaluation.suitable) {
-                        resultsText += `   âœ“ Suitable\n`;
+                        resultsText += `   ✓ Suitable\n`;
                     }
                     resultsText += '\n';
                 });
@@ -241,3 +294,4 @@ window.addEventListener('beforeunload', () => {
         logEventSource.close();
     }
 });
+

@@ -17,7 +17,15 @@
                 <div class="card-title">Agent A</div>
                 <div class="card-content">
                     <div class="form-group">
-                        <input type="text" id="agent-a-input" class="form-input" placeholder="Enter search keyword">
+                        <input type="text" id="agent-a-input" class="form-input" placeholder="Ключевые слова (только кириллица, запятые, пробелы)" pattern="[а-яА-ЯёЁ\s,.-]*" title="Разрешены только русские буквы, пробелы, запятые и дефисы">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="agent-a-time-left">Осталось (часов, мин):</label>
+                        <input type="number" id="agent-a-time-left" class="form-input" placeholder="например: 48" min="0" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="agent-a-hired-min">Нанято минимум (%):</label>
+                        <input type="number" id="agent-a-hired-min" class="form-input" placeholder="например: 45" min="0" max="100" step="1">
                     </div>
                     <div class="form-group">
                         <button id="agent-a-button" class="btn btn-primary">Execute</button>
@@ -37,41 +45,41 @@
             <div class="agent-card">
                 <div class="card-title">Agent B</div>
                 <div class="card-content">
-                    <div class="form-group">
+            <div class="form-group">
                         <select id="agent-b-dropdown" class="form-select">
-                            <option value="">Select template</option>
-                            <option value="telegram-shop-bot">Telegram Shop Bot</option>
-                            <option value="news-parser">News Parser</option>
-                            <option value="analytics-dashboard">Analytics Dashboard</option>
-                            <option value="email-campaign-manager">Email Campaign Manager</option>
-                            <option value="brand-mention-monitor">Brand Mention Monitor</option>
-                            <option value="data-formatter">Data Formatter</option>
-                            <option value="mini-etl-pipeline">Mini ETL Pipeline</option>
-                            <option value="price-stock-parser">Price & Stock Parser</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
+                    <option value="">Select template</option>
+                    <option value="telegram-shop-bot">Telegram Shop Bot</option>
+                    <option value="news-parser">News Parser</option>
+                    <option value="analytics-dashboard">Analytics Dashboard</option>
+                    <option value="email-campaign-manager">Email Campaign Manager</option>
+                    <option value="brand-mention-monitor">Brand Mention Monitor</option>
+                    <option value="data-formatter">Data Formatter</option>
+                    <option value="mini-etl-pipeline">Mini ETL Pipeline</option>
+                    <option value="price-stock-parser">Price & Stock Parser</option>
+                </select>
+            </div>
+            <div class="form-group">
                         <textarea id="agent-b-textarea" class="form-textarea" placeholder="Enter project description" rows="4"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <div class="radio-group">
+            </div>
+            <div class="form-group">
+                <div class="radio-group">
                             <label class="radio-label">
-                                <input type="radio" name="build-type" value="mock" checked>
+                        <input type="radio" name="build-type" value="mock" checked>
                                 <span>Mock MVP</span>
-                            </label>
+                    </label>
                             <label class="radio-label">
-                                <input type="radio" name="build-type" value="full">
+                        <input type="radio" name="build-type" value="full">
                                 <span>Full MVP</span>
-                            </label>
-                        </div>
-                    </div>
-                    <div class="form-group">
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
                         <button id="agent-b-button" class="btn btn-secondary">Generate</button>
-                    </div>
+            </div>
                     <div class="form-group">
                         <div class="logs-label">Output Logs</div>
                         <div id="agent-b-logs" class="logs-container"></div>
-                    </div>
+                </div>
                 </div>
             </div>
         </div>

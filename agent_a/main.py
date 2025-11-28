@@ -111,8 +111,8 @@ async def start_agent():
         return {"status": "error", "message": str(e)}
 
 @app.post("/agent/run-session")
-async def run_single_session():
-    """Run a single search session"""
+async def run_single_session(request: Request):
+    """Run a single search session with optional filters"""
     try:
         # Check if continuous mode is running
         if agent_a.running:
@@ -130,9 +130,22 @@ async def run_single_session():
                 "agent_status": agent_a.status
             }
         
-        # Run single session
-        asyncio.create_task(agent_a.run_session())
-        log_agent_action("API", "Single session start requested via API")
+        # Parse request body for search parameters
+        search_params = {}
+        try:
+            body = await request.json()
+            if body.get("keywords"):
+                search_params["keywords"] = body["keywords"]
+            if body.get("timeLeft") is not None:
+                search_params["timeLeft"] = int(body["timeLeft"])
+            if body.get("hiredMin") is not None:
+                search_params["hiredMin"] = int(body["hiredMin"])
+        except Exception:
+            pass  # Use default parameters if body parsing fails
+        
+        # Run single session with parameters
+        asyncio.create_task(agent_a.run_session(**search_params))
+        log_agent_action("API", f"Single session start requested via API with params: {search_params}")
         return {
             "status": "session_started",
             "message": "Single search session started",
