@@ -447,53 +447,127 @@ class AgentA:
                             except Exception:
                                 page_text = ""
 
-                            # Improved Proposals parsing - look for specific patterns near proposal-related text
-                            # Try DOM elements first
-                            proposals_selectors = [
-                                "[class*='responses']",
-                                "[class*='proposals']",
-                                "[class*='отклик']",
-                                "[class*='предложен']",
-                                "[data-test-id*='response']"
-                            ]
+                            # Improved Proposals parsing - look for "Предложений: 28" pattern
+                            # Strategy: Find element containing "Предложений:" and extract the number right after it
                             
-                            for selector in proposals_selectors:
-                                try:
-                                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                                    for elem in elements:
-                                        elem_text = elem.text.strip()
-                                        if elem_text:
-                                            # Look for number followed by proposal-related words
-                                            proposals_match = re.search(r'(\d{1,3})\s*(?:отклик|предложен|предложений)', elem_text, re.IGNORECASE)
-                                            if proposals_match:
-                                                proposals = int(proposals_match.group(1))
-                                                # Sanity check: proposals should be reasonable (0-500)
-                                                if 0 <= proposals <= 500:
-                                                    break
-                                    if proposals > 0:
-                                        break
-                                except Exception:
-                                    continue
-
-                            # Fallback to page source with improved patterns
-                            if proposals == 0 and page_text:
-                                # More specific patterns that avoid false matches
-                                proposals_patterns = [
-                                    r'(?:откликов|предложений)[:\s]+(\d{1,3})(?:\s|</|\n|$)',  # "откликов: 5" or "предложений: 5"
-                                    r'(\d{1,3})\s+(?:отклик(?:ов|а)?|предложен(?:ий|ие)?)(?:\s|</|\n|$)',  # "5 откликов"
-                                    r'>(\d{1,3})</[^>]*отклик',  # HTML tags
-                                    r'>(\d{1,3})</[^>]*предложен'  # HTML tags
+                            # First, try to find the exact text pattern in visible elements
+                            try:
+                                # Look for elements containing "Предложений:" followed by a number
+                                proposals_xpath = [
+                                    "//*[contains(text(), 'Предложений:')]",
+                                    "//*[contains(text(), 'предложений:')]",
+                                    "//*[contains(., 'Предложений:')]",
+                                    "//*[contains(., 'предложений:')]"
                                 ]
+                                
+                                for xpath in proposals_xpath:
+                                    try:
+                                        elements = self.driver.find_elements(By.XPATH, xpath)
+                                        for elem in elements:
+                                            elem_text = elem.text.strip()
+                                            if elem_text:
+                                                # Look for exact pattern "Предложений: 28" or "Предложений:28"
+                                                match = re.search(r'Предложений[:\s]+(\d{1,3})', elem_text, re.IGNORECASE)
+                                                if match:
+                                                    proposals_candidate = int(match.group(1))
+                                                    if 0 <= proposals_candidate <= 200:
+                                                        proposals = proposals_candidate
+                                                        log_agent_action("Agent A", f"✓ Parsed proposals from element text: {proposals}")
+                                                        break
+                                            
+                                            # Also check parent element text (sometimes number is in sibling)
+                                            try:
+                                                parent = elem.find_element(By.XPATH, "..")
+                                                parent_text = parent.text.strip()
+                                                if parent_text:
+                                                    match = re.search(r'Предложений[:\s]+(\d{1,3})', parent_text, re.IGNORECASE)
+                                                    if match:
+                                                        proposals_candidate = int(match.group(1))
+                                                        if 0 <= proposals_candidate <= 200:
+                                                            proposals = proposals_candidate
+                                                            log_agent_action("Agent A", f"✓ Parsed proposals from parent text: {proposals}")
+                                                            break
+                                            except Exception:
+                                                pass
+                                            
+                                            # Also check next sibling (number might be in next element)
+                                            try:
+                                                next_sibling = elem.find_element(By.XPATH, "following-sibling::*[1]")
+                                                sibling_text = next_sibling.text.strip()
+                                                if sibling_text and re.match(r'^\d{1,3}$', sibling_text):
+                                                    proposals_candidate = int(sibling_text)
+                                                    if 0 <= proposals_candidate <= 200:
+                                                        proposals = proposals_candidate
+                                                        log_agent_action("Agent A", f"✓ Parsed proposals from sibling: {proposals}")
+                                                        break
+                                            except Exception:
+                                                pass
+                                            
+                                            if proposals > 0:
+                                                break
+                                        if proposals > 0:
+                                            break
+                                    except Exception:
+                                        continue
+                            except Exception:
+                                pass
+                            
+                            # Alternative: Search all visible text on page for the pattern
+                            if proposals == 0:
+                                try:
+                                    body_text = self.driver.find_element(By.TAG_NAME, "body").text
+                                    # Look for pattern in all visible text
+                                    match = re.search(r'Предложений[:\s]+(\d{1,3})', body_text, re.IGNORECASE)
+                                    if match:
+                                        proposals_candidate = int(match.group(1))
+                                        if 0 <= proposals_candidate <= 200:
+                                            proposals = proposals_candidate
+                                            log_agent_action("Agent A", f"✓ Parsed proposals from body text: {proposals}")
+                                except Exception:
+                                    pass
+                            
+                            # Second approach: Search in page source with very specific patterns
+                            if proposals == 0 and page_text:
+                                # Look for exact HTML patterns like "Предложений: 28" or similar
+                                # Be very specific to avoid false matches
+                                proposals_patterns = [
+                                    # Exact pattern "Предложений: 28" or "предложений: 28"
+                                    r'(?:Предложений|предложений)[:\s]+(\d{1,3})(?:\s|</|<|&nbsp|&|$|\.)',
+                                    # Pattern with HTML tags: ">Предложений: 28<"
+                                    r'[>](?:Предложений|предложений)[:\s]+(\d{1,3})[<]',
+                                    # Pattern in attributes or text nodes
+                                    r'["\'](?:Предложений|предложений)[:\s]+(\d{1,3})["\']',
+                                ]
+                                
                                 for pattern in proposals_patterns:
                                     matches = re.findall(pattern, page_text, re.IGNORECASE)
-                                    for match in matches:
-                                        proposals_candidate = int(match)
-                                        # Sanity check: reasonable range
-                                        if 0 <= proposals_candidate <= 500:
-                                            proposals = proposals_candidate
-                                            break
+                                    if matches:
+                                        # Take the first match that looks reasonable
+                                        for match in matches:
+                                            proposals_candidate = int(match)
+                                            if 0 <= proposals_candidate <= 200:
+                                                proposals = proposals_candidate
+                                                break
                                     if proposals > 0:
                                         break
+                                
+                                # If still not found, try finding text node that contains both "Предложений" and number nearby
+                                if proposals == 0:
+                                    # Look for patterns where number and "Предложений" are close together
+                                    combined_patterns = [
+                                        r'(?:Предложений|предложений)[:\s]*(\d{1,3})',
+                                        r'(\d{1,3})\s*(?:Предложений|предложений)',
+                                    ]
+                                    for pattern in combined_patterns:
+                                        matches = re.findall(pattern, page_text, re.IGNORECASE)
+                                        if matches:
+                                            for match in matches:
+                                                proposals_candidate = int(match)
+                                                if 0 <= proposals_candidate <= 200:
+                                                    proposals = proposals_candidate
+                                                    break
+                                        if proposals > 0:
+                                            break
                             
                             # Hired percentage - look for "нанято X%" or "X% нанято"
                             if page_text:
