@@ -109,111 +109,6 @@ class MVPGenerator:
             print("❌ Exception:", str(e))
             raise
 
-    async def improve_mvp(self, repository: str, improvement_command: str) -> Dict[str, Any]:
-        """
-        Improve existing MVP based on user command
-        Uses architect agent to generate improvements and updates existing repository
-        """
-        try:
-            log_agent_action("Agent B", f"🔧 Starting MVP improvement for repository: {repository}")
-            log_agent_action("Agent B", f"📝 Improvement command: {improvement_command}")
-            
-            # Import architect components
-            from architect_agent import push_to_github
-            import google.generativeai as genai
-            from config import Config
-            
-            genai.configure(api_key=Config.GEMINI_API_KEY)
-            architect = genai.GenerativeModel(Config.GEMINI_MODEL)
-            
-            # Create improvement prompt
-            improvement_prompt = f"""
-            You are a senior software architect working on improving an existing MVP project.
-            
-            Current repository: {repository}
-            User request: {improvement_command}
-            
-            Analyze the request and generate a list of specific file changes needed.
-            For each file that needs to be changed:
-            1. Identify the file path
-            2. Describe what needs to be changed
-            3. Generate the updated code
-            
-            Focus on incremental improvements, not complete rewrites.
-            Preserve existing functionality while adding or modifying features.
-            
-            Return a JSON structure with:
-            {{
-                "improvements": [
-                    {{
-                        "file_path": "path/to/file.js",
-                        "description": "What needs to be changed",
-                        "updated_code": "// Full updated file content"
-                    }}
-                ]
-            }}
-            """
-            
-            log_agent_action("Agent B", "🤖 Requesting improvements from architect...")
-            response = architect.generate_content(improvement_prompt)
-            
-            # Parse response
-            response_text = response.text
-            # Try to extract JSON from response
-            import re
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                improvements_data = json.loads(json_match.group())
-            else:
-                # If no JSON found, create a simple structure
-                improvements_data = {
-                    "improvements": [{
-                        "file_path": "README.md",
-                        "description": improvement_command,
-                        "updated_code": f"# {repository}\n\n{improvement_command}\n\nThis MVP has been improved based on user request."
-                    }]
-                }
-            
-            improvements = improvements_data.get("improvements", [])
-            log_agent_action("Agent B", f"📋 Generated {len(improvements)} file improvements")
-            
-            # Apply improvements to repository
-            successful_updates = 0
-            for improvement in improvements:
-                file_path = improvement.get("file_path", "")
-                updated_code = improvement.get("updated_code", "")
-                description = improvement.get("description", improvement_command)
-                
-                if not file_path or not updated_code:
-                    log_agent_action("Agent B", f"⚠️ Skipping invalid improvement: {file_path}")
-                    continue
-                
-                # Push update to GitHub
-                commit_msg = f"Improve: {description[:50]}"
-                success = push_to_github(repository, file_path, updated_code, commit_msg)
-                
-                if success:
-                    successful_updates += 1
-                    log_agent_action("Agent B", f"✅ Updated: {file_path}")
-                else:
-                    log_agent_action("Agent B", f"❌ Failed to update: {file_path}")
-            
-            log_agent_action("Agent B", f"✅ MVP improvement complete: {successful_updates}/{len(improvements)} files updated")
-            
-            return {
-                "status": "success",
-                "repository": repository,
-                "files_updated": successful_updates,
-                "total_files": len(improvements),
-                "message": f"MVP успешно доработан: обновлено {successful_updates} файлов"
-            }
-            
-        except Exception as e:
-            error_msg = str(e)
-            log_agent_action("Agent B", f"❌ MVP improvement failed: {error_msg}")
-            print(f"❌ Exception in improve_mvp: {error_msg}")
-            raise
-
     def _generate_project_name(self, template_id: str) -> str:
         """Generate unique project name"""
         timestamp = int(time.time())
@@ -900,3 +795,182 @@ class MVPGenerator:
 
         if resp.status_code >= 400:
             self._raise_for_status_verbose(resp, "Vercel set env var")
+
+    async def improve_mvp(self, project_name: str, improvement_command: str) -> Dict[str, Any]:
+        """
+        Improve existing MVP based on command
+        Uses architect to generate improvements and applies them to existing repository
+        """
+        try:
+            log_agent_action("Agent B", f"🔧 Starting MVP improvement for: {project_name}")
+            log_agent_action("Agent B", f"📝 Improvement command: {improvement_command}")
+            
+            # Import architect and coder functions
+            from architect_agent import push_to_github
+            from coder_agent import generate_code
+            import google.generativeai as genai
+            
+            # Configure Gemini
+            genai.configure(api_key=Config.GEMINI_API_KEY)
+            architect = genai.GenerativeModel(Config.GEMINI_MODEL)
+            
+            # Get existing repository info
+            repo_name = project_name
+            headers = {
+                "Authorization": f"Bearer {Config.GITHUB_TOKEN}",
+                "Accept": "application/vnd.github+json",
+            }
+            
+            # Check if repository exists
+            repo_url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}"
+            repo_check = requests.get(repo_url, headers=headers, timeout=Config.REQUEST_TIMEOUT)
+            if repo_check.status_code != 200:
+                raise Exception(f"Repository {repo_name} not found")
+            
+            # Get current project structure from GitHub
+            log_agent_action("Agent B", f"📋 Analyzing existing project structure...")
+            
+            # Generate improvement plan using architect
+            improvement_prompt = f"""
+            You are a software architect improving an existing MVP project.
+            
+            Project name: {project_name}
+            Improvement request: {improvement_command}
+            
+            Analyze what needs to be changed and return JSON with this structure:
+            {{
+                "changes": [
+                    {{
+                        "file_path": "path/to/file.js",
+                        "action": "modify|create|delete",
+                        "description": "What to change",
+                        "priority": "high|medium|low"
+                    }}
+                ],
+                "new_files": [
+                    {{
+                        "path": "path/to/newfile.js",
+                        "purpose": "Description of new file"
+                    }}
+                ]
+            }}
+            
+            Focus on practical, incremental improvements. Return JSON only.
+            """
+            
+            response = architect.generate_content(improvement_prompt)
+            improvement_plan_text = response.text
+            
+            # Parse JSON from response
+            try:
+                # Extract JSON from markdown code blocks if present
+                if "```json" in improvement_plan_text:
+                    start = improvement_plan_text.find("```json") + 7
+                    end = improvement_plan_text.find("```", start)
+                    improvement_plan_text = improvement_plan_text[start:end].strip()
+                elif "```" in improvement_plan_text:
+                    start = improvement_plan_text.find("```") + 3
+                    end = improvement_plan_text.find("```", start)
+                    improvement_plan_text = improvement_plan_text[start:end].strip()
+                
+                improvement_plan = json.loads(improvement_plan_text)
+            except json.JSONDecodeError as e:
+                log_agent_action("Agent B", f"⚠️ Failed to parse improvement plan, using direct approach")
+                # Fallback: generate code directly for the improvement
+                improvement_plan = {
+                    "changes": [{"file_path": "pages/index.js", "action": "modify", "description": improvement_command}],
+                    "new_files": []
+                }
+            
+            # Apply improvements
+            files_updated = 0
+            files_created = 0
+            
+            # Process changes to existing files
+            for change in improvement_plan.get("changes", []):
+                file_path = change.get("file_path")
+                action = change.get("action", "modify")
+                description = change.get("description", improvement_command)
+                
+                if action == "delete":
+                    # Skip deletion for now (safety)
+                    log_agent_action("Agent B", f"⚠️ Skipping deletion of {file_path} (safety)")
+                    continue
+                
+                # Get existing file content if modifying
+                existing_content = ""
+                if action == "modify":
+                    try:
+                        file_url = f"https://api.github.com/repos/{Config.GITHUB_USER}/{repo_name}/contents/{file_path}"
+                        file_resp = requests.get(file_url, headers=headers, params={"ref": "main"}, timeout=Config.REQUEST_TIMEOUT)
+                        if file_resp.status_code == 200:
+                            existing_content = base64.b64decode(file_resp.json()["content"]).decode('utf-8')
+                    except Exception as e:
+                        log_agent_action("Agent B", f"⚠️ Could not fetch existing file {file_path}: {e}")
+                
+                # Generate improved code
+                module_info = {
+                    "path": file_path,
+                    "purpose": description
+                }
+                
+                project_context = f"Improving existing MVP project {project_name}. {improvement_command}"
+                if existing_content:
+                    project_context += f"\n\nCurrent file content:\n{existing_content[:1000]}"
+                
+                try:
+                    improved_code = generate_code(module_info, project_context)
+                    if improved_code:
+                        # Push to GitHub
+                        success = push_to_github(
+                            repo_name,
+                            file_path,
+                            improved_code,
+                            f"Improve: {description}"
+                        )
+                        if success:
+                            files_updated += 1
+                            log_agent_action("Agent B", f"✅ Updated {file_path}")
+                except Exception as e:
+                    log_agent_action("Agent B", f"❌ Error improving {file_path}: {e}")
+            
+            # Create new files
+            for new_file in improvement_plan.get("new_files", []):
+                file_path = new_file.get("path")
+                purpose = new_file.get("purpose", "New file")
+                
+                module_info = {
+                    "path": file_path,
+                    "purpose": purpose
+                }
+                
+                project_context = f"Adding new file to existing MVP project {project_name}. {improvement_command}"
+                
+                try:
+                    new_code = generate_code(module_info, project_context)
+                    if new_code:
+                        success = push_to_github(
+                            repo_name,
+                            file_path,
+                            new_code,
+                            f"Add: {purpose}"
+                        )
+                        if success:
+                            files_created += 1
+                            log_agent_action("Agent B", f"✅ Created {file_path}")
+                except Exception as e:
+                    log_agent_action("Agent B", f"❌ Error creating {file_path}: {e}")
+            
+            log_agent_action("Agent B", f"✅ MVP improvement complete: {files_updated} files updated, {files_created} files created")
+            
+            return {
+                "status": "success",
+                "project_name": project_name,
+                "files_updated": files_updated,
+                "files_created": files_created,
+                "message": f"Успешно обновлено {files_updated} файлов, создано {files_created} новых файлов"
+            }
+            
+        except Exception as e:
+            log_agent_action("Agent B", f"❌ MVP improvement failed: {str(e)}")
+            raise

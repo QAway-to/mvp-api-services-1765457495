@@ -258,7 +258,6 @@ async def generate_mvp(request: Request):
                 "template": result["template"],
                 "deployUrl": result["deploy_url"],
                 "projectName": result["project_name"],
-                "repository": result.get("repository", result["project_name"]),
                 "confidence": result["confidence"],
                 "buildType": build_type,
                 "message": "MVP успешно создан и развернут"
@@ -295,50 +294,44 @@ async def generate_mvp(request: Request):
 
 @app.post("/api/improve-mvp")
 async def improve_mvp(request: Request):
-    """Improve existing MVP based on user command"""
+    """Improve existing MVP based on command"""
     try:
         data = await request.json()
-        repository = data.get("repository", "").strip()
+        project_name = data.get("projectName", "").strip()
         command = data.get("command", "").strip()
-
-        if not repository:
-            return {"status": "error", "error": "Репозиторий не указан"}
-
+        
+        if not project_name:
+            return {"status": "error", "error": "Не указано название проекта"}
+        
         if not command:
-            return {"status": "error", "error": "Команда для доработки не указана"}
-
-        log_agent_action("MVP", f"🔧 Improving MVP: {repository}")
+            return {"status": "error", "error": "Не указана команда для доработки"}
+        
+        if len(command) < 10:
+            return {"status": "error", "error": "Команда слишком короткая (минимум 10 символов)"}
+        
+        log_agent_action("MVP", f"🔧 Improving MVP: {project_name}")
         log_agent_action("MVP", f"📝 Command: {command}")
-
+        
         # Import and use MVP generator
         try:
             from mvp_generator import MVPGenerator
             generator = MVPGenerator()
-
-            result = await generator.improve_mvp(repository, command)
+            
+            result = await generator.improve_mvp(project_name, command)
             log_agent_action("MVP", f"✅ MVP improved: {result['message']}")
-
+            
             return {
                 "status": "success",
-                "repository": result["repository"],
-                "files_updated": result["files_updated"],
-                "total_files": result["total_files"],
+                "projectName": result["project_name"],
+                "filesUpdated": result["files_updated"],
+                "filesCreated": result["files_created"],
                 "message": result["message"]
             }
-
+            
         except ImportError:
-            # Fallback to mock response if Agent B is not available
-            log_agent_action("MVP", "⚠️ Agent B not available, using mock mode")
-            await asyncio.sleep(2)  # Simulate work
-
-            return {
-                "status": "success",
-                "repository": repository,
-                "files_updated": 1,
-                "total_files": 1,
-                "message": f"MVP успешно доработан (mock mode)"
-            }
-
+            log_agent_action("MVP", "⚠️ Agent B not available")
+            return {"status": "error", "error": "Agent B не доступен"}
+            
     except Exception as e:
         err_msg = str(e)
         log_agent_action("MVP", f"❌ MVP improvement failed: {err_msg}")

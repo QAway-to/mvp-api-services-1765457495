@@ -10,23 +10,23 @@ const agentAStatus = document.getElementById('agent-a-status');
 const agentAResults = document.getElementById('agent-a-results');
 
 const agentBButton = document.getElementById('agent-b-button');
-const agentBImproveButton = document.getElementById('agent-b-improve-button');
+const agentBProjectSelect = document.getElementById('agent-b-project-select');
 const agentBDropdown = document.getElementById('agent-b-dropdown');
 const agentBTextarea = document.getElementById('agent-b-textarea');
-const agentBProjectSelect = document.getElementById('agent-b-project-select');
 const agentBLogs = document.getElementById('agent-b-logs');
+const agentBImproveButton = document.getElementById('agent-b-improve-button');
 
-// Modal elements
-const architectModal = document.getElementById('architect-modal');
-const architectCommand = document.getElementById('architect-command');
-const currentMvpRepo = document.getElementById('current-mvp-repo');
-const architectApplyButton = document.getElementById('architect-apply-button');
-const architectCancelButton = document.getElementById('architect-cancel-button');
-const modalClose = document.querySelector('.modal-close');
+// Dialog elements
+const improveDialog = document.getElementById('improve-mvp-dialog');
+const dialogCloseBtn = document.getElementById('dialog-close-btn');
+const improveCancelBtn = document.getElementById('improve-cancel-btn');
+const improveSubmitBtn = document.getElementById('improve-submit-btn');
+const improveCommandInput = document.getElementById('improve-command-input');
+const improveProjectNameInput = document.getElementById('improve-project-name');
 
-// Store Agent A projects and current MVP info
+// Store projects from Agent A
 let agentAProjects = [];
-let currentMvpInfo = null;
+let lastGeneratedMVP = null;
 
 // SSE EventSource for logs
 let logEventSource = null;
@@ -75,152 +75,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Setup modal handlers
-    if (modalClose) {
-        modalClose.addEventListener('click', () => {
-            architectModal.style.display = 'none';
-        });
-    }
-    
-    if (architectCancelButton) {
-        architectCancelButton.addEventListener('click', () => {
-            architectModal.style.display = 'none';
-        });
-    }
-    
-    // Close modal when clicking outside
-    if (architectModal) {
-        architectModal.addEventListener('click', (e) => {
-            if (e.target === architectModal) {
-                architectModal.style.display = 'none';
-            }
-        });
-    }
+    // Load projects periodically
+    setInterval(loadAgentAProjects, 5000); // Every 5 seconds
 });
-
-// Load projects from Agent A
-async function loadAgentAProjects() {
-    try {
-        const response = await fetch('/projects');
-        const data = await response.json();
-        
-        if (data.projects && data.projects.length > 0) {
-            agentAProjects = data.projects.slice(0, 5); // Get top 5 projects
-            
-            // Update project select dropdown with project titles
-            if (agentBProjectSelect) {
-                // Clear existing options except first one
-                agentBProjectSelect.innerHTML = '<option value="">-- Выберите проект --</option>';
-                
-                // Add projects A-E
-                const labels = ['A', 'B', 'C', 'D', 'E'];
-                agentAProjects.forEach((project, index) => {
-                    if (index < 5) {
-                        const option = document.createElement('option');
-                        option.value = labels[index];
-                        option.textContent = `${labels[index]}: ${project.title || 'Untitled'}`;
-                        agentBProjectSelect.appendChild(option);
-                    }
-                });
-            }
-        }
-    } catch (error) {
-        console.error('Error loading Agent A projects:', error);
-    }
-}
 
 // Event Listeners
 function initializeEventListeners() {
-    // Agent B: Project selection from Agent A
-    if (agentBProjectSelect) {
-        agentBProjectSelect.addEventListener('change', (e) => {
-            const selectedLabel = e.target.value;
-            if (selectedLabel && agentAProjects.length > 0) {
-                const labels = ['A', 'B', 'C', 'D', 'E'];
-                const projectIndex = labels.indexOf(selectedLabel);
-                
-                if (projectIndex >= 0 && projectIndex < agentAProjects.length) {
-                    const project = agentAProjects[projectIndex];
-                    // Fill description with project title and description
-                    const fullDescription = `${project.title || ''}\n\n${project.description || ''}`;
-                    if (agentBTextarea) {
-                        agentBTextarea.value = fullDescription.trim();
-                        // Visual feedback
-                        agentBTextarea.style.borderColor = '#48bb78';
-                        setTimeout(() => {
-                            agentBTextarea.style.borderColor = '';
-                        }, 1000);
-                    }
-                }
-            }
-        });
-    }
-    
-    // Agent B: Improve MVP button
-    if (agentBImproveButton) {
-        agentBImproveButton.addEventListener('click', () => {
-            if (currentMvpInfo && currentMvpInfo.repository) {
-                currentMvpRepo.value = currentMvpInfo.repository;
-                architectModal.style.display = 'block';
-                architectCommand.focus();
-            } else {
-                alert('Сначала создайте MVP, чтобы его доработать');
-            }
-        });
-    }
-    
-    // Architect: Apply improvements
-    if (architectApplyButton) {
-        architectApplyButton.addEventListener('click', async () => {
-            const command = architectCommand.value.trim();
-            const repoName = currentMvpRepo.value.trim();
-            
-            if (!command) {
-                alert('Пожалуйста, опишите что нужно доработать');
-                return;
-            }
-            
-            if (!repoName) {
-                alert('Репозиторий не указан');
-                return;
-            }
-            
-            architectApplyButton.disabled = true;
-            architectApplyButton.textContent = 'Применяю...';
-            agentBLogs.textContent += '\n\n🔧 Начинаю доработку MVP...\n';
-            agentBLogs.textContent += `📝 Команда: ${command}\n`;
-            
-            try {
-                const response = await fetch('/api/improve-mvp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        repository: repoName,
-                        command: command
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.status === 'error') {
-                    agentBLogs.textContent += `\n❌ Ошибка: ${data.error || 'Unknown error'}`;
-                } else if (data.status === 'success') {
-                    agentBLogs.textContent += `\n✅ ${data.message || 'MVP успешно доработан'}`;
-                    architectModal.style.display = 'none';
-                    architectCommand.value = '';
-                }
-            } catch (error) {
-                console.error('Error improving MVP:', error);
-                agentBLogs.textContent += `\n❌ Ошибка: ${error.message}`;
-            } finally {
-                architectApplyButton.disabled = false;
-                architectApplyButton.textContent = 'Применить доработки';
-            }
-        });
-    }
-    
     // Agent A: Execute button
     agentAButton.addEventListener('click', async () => {
         const keyword = agentAInput.value.trim();
@@ -281,6 +141,31 @@ function initializeEventListeners() {
         }
     });
     
+    // Agent B: Project selection from Agent A
+    if (agentBProjectSelect) {
+        agentBProjectSelect.addEventListener('change', (e) => {
+            const selectedIndex = e.target.value;
+            if (selectedIndex && agentAProjects.length > 0) {
+                const projectIndex = selectedIndex.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3, E=4
+                if (projectIndex >= 0 && projectIndex < agentAProjects.length) {
+                    const project = agentAProjects[projectIndex];
+                    // Fill description with project title and description
+                    let descriptionText = project.title || '';
+                    if (project.description) {
+                        descriptionText += '\n\n' + project.description;
+                    }
+                    if (agentBTextarea) {
+                        agentBTextarea.value = descriptionText;
+                        agentBTextarea.style.borderColor = '#48bb78';
+                        setTimeout(() => {
+                            agentBTextarea.style.borderColor = '';
+                        }, 2000);
+                    }
+                }
+            }
+        });
+    }
+    
     // Agent B: Generate button
     agentBButton.addEventListener('click', async () => {
         const template = agentBDropdown.value;
@@ -289,6 +174,11 @@ function initializeEventListeners() {
         
         if (!template) {
             alert('Please select a template');
+            return;
+        }
+        
+        if (!description || description.length < 10) {
+            alert('Please enter project description (minimum 10 characters)');
             return;
         }
         
@@ -319,21 +209,16 @@ function initializeEventListeners() {
                     agentBLogs.textContent += `\n🔗 Deploy URL: ${data.deployUrl}`;
                     agentBLogs.textContent += `\n📦 Template: ${data.template}`;
                 }
-                
-                // Store MVP info for improvements
-                currentMvpInfo = {
-                    repository: data.repository || data.projectName,
+                // Store last generated MVP info for improvement
+                lastGeneratedMVP = {
+                    projectName: data.projectName || data.template + '-' + Date.now(),
                     deployUrl: data.deployUrl,
                     template: data.template
                 };
-                
                 // Show improve button
                 if (agentBImproveButton) {
                     agentBImproveButton.style.display = 'inline-block';
                 }
-                
-                // Reload projects to update the list
-                loadAgentAProjects();
             }
         } catch (error) {
             console.error('Error generating MVP:', error);
@@ -343,6 +228,140 @@ function initializeEventListeners() {
             agentBButton.textContent = 'Generate';
         }
     });
+    
+    // Agent B: Improve MVP button
+    if (agentBImproveButton) {
+        agentBImproveButton.addEventListener('click', () => {
+            if (!lastGeneratedMVP) {
+                alert('Сначала сгенерируйте MVP');
+                return;
+            }
+            openImproveDialog();
+        });
+    }
+    
+    // Dialog handlers
+    if (dialogCloseBtn) {
+        dialogCloseBtn.addEventListener('click', closeImproveDialog);
+    }
+    if (improveCancelBtn) {
+        improveCancelBtn.addEventListener('click', closeImproveDialog);
+    }
+    if (improveSubmitBtn) {
+        improveSubmitBtn.addEventListener('click', submitImprovement);
+    }
+    // Close dialog on overlay click
+    if (improveDialog) {
+        improveDialog.addEventListener('click', (e) => {
+            if (e.target === improveDialog) {
+                closeImproveDialog();
+            }
+        });
+    }
+}
+
+// Load projects from Agent A
+async function loadAgentAProjects() {
+    try {
+        const response = await fetch('/projects');
+        const data = await response.json();
+        
+        if (data.projects && data.projects.length > 0) {
+            // Take top 5 projects
+            agentAProjects = data.projects.slice(0, 5);
+            
+            // Update dropdown options
+            if (agentBProjectSelect) {
+                // Clear existing options except first
+                while (agentBProjectSelect.options.length > 1) {
+                    agentBProjectSelect.remove(1);
+                }
+                
+                // Add project options
+                agentAProjects.forEach((project, index) => {
+                    const option = document.createElement('option');
+                    option.value = String.fromCharCode(65 + index); // A, B, C, D, E
+                    const title = project.title || 'Untitled';
+                    const shortTitle = title.length > 40 ? title.substring(0, 40) + '...' : title;
+                    option.textContent = `Проект ${String.fromCharCode(65 + index)}: ${shortTitle}`;
+                    agentBProjectSelect.appendChild(option);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error loading Agent A projects:', error);
+    }
+}
+
+// Open improve MVP dialog
+function openImproveDialog() {
+    if (improveDialog && lastGeneratedMVP) {
+        improveDialog.style.display = 'flex';
+        if (improveProjectNameInput) {
+            improveProjectNameInput.value = lastGeneratedMVP.projectName || '';
+        }
+        if (improveCommandInput) {
+            improveCommandInput.value = '';
+            improveCommandInput.focus();
+        }
+    }
+}
+
+// Close improve MVP dialog
+function closeImproveDialog() {
+    if (improveDialog) {
+        improveDialog.style.display = 'none';
+    }
+}
+
+// Submit improvement command
+async function submitImprovement() {
+    const command = improveCommandInput.value.trim();
+    const projectName = improveProjectNameInput.value.trim();
+    
+    if (!command) {
+        alert('Пожалуйста, введите команду для доработки');
+        return;
+    }
+    
+    if (!projectName) {
+        alert('Название проекта не найдено');
+        return;
+    }
+    
+    improveSubmitBtn.disabled = true;
+    improveSubmitBtn.textContent = 'Применяю...';
+    
+    try {
+        const response = await fetch('/api/improve-mvp', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                projectName: projectName,
+                command: command
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'error') {
+            alert(`Ошибка: ${data.error || 'Unknown error'}`);
+        } else if (data.status === 'success') {
+            agentBLogs.textContent += `\n✅ Доработка применена: ${command}`;
+            if (data.message) {
+                agentBLogs.textContent += `\n${data.message}`;
+            }
+            closeImproveDialog();
+        }
+    } catch (error) {
+        console.error('Error improving MVP:', error);
+        alert(`Ошибка: ${error.message}`);
+    } finally {
+        improveSubmitBtn.disabled = false;
+        improveSubmitBtn.textContent = 'Применить доработку';
+    }
 }
 
 // Connect to Server-Sent Events for logs

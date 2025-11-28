@@ -52,14 +52,14 @@
                 <div class="card-title">Agent B</div>
                 <div class="card-content">
                     <div class="form-group">
-                        <label class="form-label" for="agent-b-project-select">Выбрать проект от Agent A:</label>
+                        <label class="form-label" for="agent-b-project-select">Выберите проект из Agent A:</label>
                         <select id="agent-b-project-select" class="form-select">
                             <option value="">-- Выберите проект --</option>
-                            <option value="A">A</option>
-                            <option value="B">B</option>
-                            <option value="C">C</option>
-                            <option value="D">D</option>
-                            <option value="E">E</option>
+                            <option value="A">Проект A</option>
+                            <option value="B">Проект B</option>
+                            <option value="C">Проект C</option>
+                            <option value="D">Проект D</option>
+                            <option value="E">Проект E</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -78,7 +78,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="agent-b-textarea">Описание проекта:</label>
-                        <textarea id="agent-b-textarea" class="form-textarea" placeholder="Enter project description или выберите проект выше" rows="4"></textarea>
+                        <textarea id="agent-b-textarea" class="form-textarea" placeholder="Описание проекта будет заполнено автоматически при выборе проекта из Agent A" rows="4"></textarea>
                     </div>
             <div class="form-group">
                 <div class="radio-group">
@@ -105,26 +105,30 @@
         </div>
     </div>
 
-    <!-- Modal for Architect Commands -->
-    <div id="architect-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Команды архитектору для доработки MVP</h3>
-                <span class="modal-close">&times;</span>
+    <!-- Dialog for MVP improvement commands -->
+    <div id="improve-mvp-dialog" class="dialog-overlay" style="display: none;">
+        <div class="dialog-content">
+            <div class="dialog-header">
+                <h3>Доработка MVP</h3>
+                <button class="dialog-close" id="dialog-close-btn">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="dialog-body">
                 <div class="form-group">
-                    <label class="form-label" for="architect-command">Опишите, что нужно доработать:</label>
-                    <textarea id="architect-command" class="form-textarea" placeholder="Например: Добавь авторизацию пользователей, улучши дизайн главной страницы, добавь фильтрацию по дате..." rows="6"></textarea>
+                    <label class="form-label" for="improve-command-input">Команда для архитектора:</label>
+                    <textarea id="improve-command-input" class="form-textarea" placeholder="Опишите, что нужно доработать в MVP (например: 'Добавить авторизацию пользователей', 'Изменить цветовую схему на темную', 'Добавить экспорт данных в Excel')" rows="5"></textarea>
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="current-mvp-repo">Текущий репозиторий MVP:</label>
-                    <input type="text" id="current-mvp-repo" class="form-input" placeholder="Название репозитория (например: ai-mvp-telegram-shop-bot-1234567890)" readonly>
+                    <label class="form-label" for="improve-project-name">Название проекта (из последнего MVP):</label>
+                    <input type="text" id="improve-project-name" class="form-input" placeholder="Название проекта для доработки" readonly>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button id="architect-apply-button" class="btn btn-primary">Применить доработки</button>
-                <button id="architect-cancel-button" class="btn btn-secondary">Отмена</button>
+            <div class="dialog-footer">
+                <button id="improve-cancel-btn" class="btn btn-secondary">Отмена</button>
+                <button id="improve-submit-btn" class="btn btn-primary">Применить доработку</button>
+            </div>
+        </div>
+    </div>
+                </div>
             </div>
         </div>
     </div>
