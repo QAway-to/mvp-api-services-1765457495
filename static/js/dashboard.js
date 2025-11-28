@@ -3,6 +3,8 @@
 // DOM Elements
 const agentAButton = document.getElementById('agent-a-button');
 const agentAInput = document.getElementById('agent-a-input');
+const agentAKworkUrl = document.getElementById('agent-a-kwork-url');
+const agentALoadUrl = document.getElementById('agent-a-load-url');
 const agentATimeLeft = document.getElementById('agent-a-time-left');
 const agentAHiredMin = document.getElementById('agent-a-hired-min');
 const agentAProposalsMax = document.getElementById('agent-a-proposals-max');
@@ -71,6 +73,101 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Event Listeners
 function initializeEventListeners() {
+    // Agent A: Load project by URL button
+    if (agentALoadUrl) {
+        agentALoadUrl.addEventListener('click', async () => {
+            const url = agentAKworkUrl.value.trim();
+            
+            if (!url) {
+                alert('Пожалуйста, введите ссылку на проект Kwork');
+                return;
+            }
+            
+            // Validate Kwork URL
+            const kworkUrlPattern = /^https:\/\/kwork\.ru\/projects\/\d+\/view$/;
+            if (!kworkUrlPattern.test(url)) {
+                alert('Неверный формат ссылки. Ожидается: https://kwork.ru/projects/XXXXX/view');
+                return;
+            }
+            
+            agentALoadUrl.disabled = true;
+            agentALoadUrl.textContent = 'Загрузка...';
+            agentAStatus.textContent = 'Загрузка проекта...';
+            agentAResults.textContent = 'Парсинг проекта по ссылке...';
+            
+            try {
+                const response = await fetch('/api/parse-kwork-project', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url }),
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'error') {
+                    agentAStatus.textContent = 'Error';
+                    agentAResults.textContent = `Ошибка: ${data.message || 'Не удалось загрузить проект'}`;
+                    agentALoadUrl.disabled = false;
+                    agentALoadUrl.textContent = 'Загрузить проект по ссылке';
+                    return;
+                }
+                
+                if (data.status === 'success' && data.project) {
+                    // Add project to agentAProjects as first item (Project A)
+                    agentAProjects = [data.project];
+                    
+                    // Update dropdown - show only Project A
+                    if (agentBProjectSelect) {
+                        // Clear existing options except first
+                        while (agentBProjectSelect.options.length > 1) {
+                            agentBProjectSelect.remove(1);
+                        }
+                        
+                        // Add Project A - enable and show it
+                        const optionA = agentBProjectSelect.querySelector('option[value="A"]');
+                        if (optionA) {
+                            optionA.disabled = false;
+                            optionA.style.display = '';
+                            const title = data.project.title || 'Untitled';
+                            const shortTitle = title.length > 40 ? title.substring(0, 40) + '...' : title;
+                            optionA.textContent = `Проект A: ${shortTitle}`;
+                        } else {
+                            // Create new option if it doesn't exist
+                            const option = document.createElement('option');
+                            option.value = 'A';
+                            const title = data.project.title || 'Untitled';
+                            const shortTitle = title.length > 40 ? title.substring(0, 40) + '...' : title;
+                            option.textContent = `Проект A: ${shortTitle}`;
+                            agentBProjectSelect.appendChild(option);
+                        }
+                        
+                        // Auto-select Project A
+                        agentBProjectSelect.value = 'A';
+                        
+                        // Auto-fill description
+                        if (agentBTextarea && data.project.description) {
+                            agentBTextarea.value = data.project.description;
+                            // Trigger template selection
+                            selectTemplateAutomatically(data.project.description);
+                        }
+                    }
+                    
+                    agentAStatus.textContent = 'Success';
+                    agentAResults.textContent = `✅ Проект загружен: ${data.project.title || 'Untitled'}`;
+                }
+            } catch (error) {
+                console.error('Error loading project by URL:', error);
+                agentAStatus.textContent = 'Error';
+                agentAResults.textContent = `Ошибка: ${error.message}`;
+            } finally {
+                agentALoadUrl.disabled = false;
+                agentALoadUrl.textContent = 'Загрузить проект по ссылке';
+            }
+        });
+    }
+    
     // Agent A: Execute button
     agentAButton.addEventListener('click', async () => {
         const keyword = agentAInput.value.trim();
@@ -222,25 +319,24 @@ async function loadAgentAProjects() {
         const data = await response.json();
         
         if (data.projects && data.projects.length > 0) {
-            // Take top 5 projects
-            agentAProjects = data.projects.slice(0, 5);
+            // Only update if we don't have a project loaded from URL
+            // If agentAProjects has exactly 1 item and it was loaded from URL, don't overwrite
+            const hasUrlProject = agentAProjects.length === 1 && agentAProjects[0].loadedFromUrl;
             
-            // Update dropdown options
-            if (agentBProjectSelect) {
-                // Clear existing options except first
-                while (agentBProjectSelect.options.length > 1) {
-                    agentBProjectSelect.remove(1);
-                }
+            if (!hasUrlProject) {
+                // Take top 5 projects
+                agentAProjects = data.projects.slice(0, 5);
                 
-                // Add project options
-                agentAProjects.forEach((project, index) => {
-                    const option = document.createElement('option');
-                    option.value = String.fromCharCode(65 + index); // A, B, C, D, E
-                    const title = project.title || 'Untitled';
-                    const shortTitle = title.length > 40 ? title.substring(0, 40) + '...' : title;
-                    option.textContent = `Проект ${String.fromCharCode(65 + index)}: ${shortTitle}`;
-                    agentBProjectSelect.appendChild(option);
-                });
+                // Update dropdown options - hide all by default
+                if (agentBProjectSelect) {
+                    // Clear existing options except first
+                    while (agentBProjectSelect.options.length > 1) {
+                        agentBProjectSelect.remove(1);
+                    }
+                    
+                    // Hide project options by default (they will be shown when Execute is run)
+                    // Don't add them here - they will be added when Execute completes
+                }
             }
         }
     } catch (error) {

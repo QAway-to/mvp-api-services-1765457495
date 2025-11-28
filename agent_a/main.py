@@ -222,6 +222,171 @@ async def get_suitable_projects():
         "projects": suitable
     }
 
+@app.post("/api/parse-kwork-project")
+async def parse_kwork_project(request: Request):
+    """Parse a single Kwork project by URL"""
+    try:
+        data = await request.json()
+        url = data.get("url", "").strip()
+        
+        if not url:
+            return {"status": "error", "message": "URL is required"}
+        
+        # Validate Kwork URL
+        import re
+        kwork_pattern = r'https://kwork\.ru/projects/(\d+)/view'
+        match = re.match(kwork_pattern, url)
+        if not match:
+            return {"status": "error", "message": "Invalid Kwork URL format"}
+        
+        project_id = match.group(1)
+        log_agent_action("Agent A", f"🔍 Parsing Kwork project: {project_id}")
+        
+        # Setup driver if needed
+        if not agent_a.driver:
+            agent_a.setup_driver()
+        
+        if not agent_a.driver:
+            return {"status": "error", "message": "Browser setup failed"}
+        
+        # Navigate to project page
+        agent_a.driver.get(url)
+        agent_a.human_delay(2, 3)
+        
+        # Extract project data using similar logic as in Agent A search
+        from selenium.webdriver.common.by import By
+        import re
+        
+        project_data = {}
+        
+        # Extract title
+        title = "Untitled"
+        try:
+            title_selectors = [
+                "h1",
+                ".wants-card__header-title",
+                "[class*='title']",
+                ".task__title",
+                ".project-title"
+            ]
+            for selector in title_selectors:
+                try:
+                    title_elem = agent_a.driver.find_element(By.CSS_SELECTOR, selector)
+                    title_text = title_elem.text.strip()
+                    if title_text and len(title_text) > 5:
+                        title = title_text
+                        break
+                except:
+                    continue
+        except:
+            pass
+        project_data['title'] = title
+        
+        # Extract description - use same selectors as Agent A
+        description = ""
+        try:
+            desc_selectors = [
+                ".wants-card__description-text",
+                ".task__description",
+                "[class*='description-text']",
+                "[class*='wants-card__text']",
+                ".project-description",
+                "[data-test-id='task-description']",
+                ".break-word"
+            ]
+            
+            for selector in desc_selectors:
+                try:
+                    desc_elements = agent_a.driver.find_elements(By.CSS_SELECTOR, selector)
+                    if desc_elements:
+                        desc_texts = [elem.text.strip() for elem in desc_elements if elem.text.strip()]
+                        if desc_texts:
+                            description = '\n'.join(desc_texts)
+                            if len(description) > 100:
+                                break
+                except Exception:
+                    continue
+            
+            if not description or len(description) < 100:
+                try:
+                    main_content = agent_a.driver.find_element(By.CSS_SELECTOR, "main, .content, .container, [class*='wants-card']")
+                    description = main_content.text.strip()
+                    if title in description:
+                        desc_start = description.find(title) + len(title)
+                        description = description[desc_start:].strip()
+                except Exception:
+                    pass
+        except:
+            pass
+        
+        if not description:
+            description = "Описание не найдено"
+        project_data['description'] = description
+        
+        # Extract budget
+        budget = ""
+        try:
+            budget_selectors = [
+                ".wants-card__header-price",
+                "[class*='price-text']",
+                "[class*='budget']",
+                "[class*='price']",
+                "[data-test-id='task-price']",
+                ".task__price",
+                ".project-price",
+            ]
+            for selector in budget_selectors:
+                try:
+                    budget_elements = agent_a.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for elem in budget_elements:
+                        budget_text = elem.text.strip()
+                        if budget_text and (re.search(r'\d', budget_text) or '₽' in budget_text or 'руб' in budget_text.lower()):
+                            budget = budget_text
+                            break
+                    if budget:
+                        break
+                except Exception:
+                    continue
+            
+            if not budget:
+                try:
+                    page_source = agent_a.driver.page_source
+                    price_patterns = [
+                        r'(\d{1,3}(?:\s?\d{3})*)\s*[₽руб]',
+                        r'[₽руб]\s*(\d{1,3}(?:\s?\d{3})*)',
+                        r'цена[:\s]*(\d{1,3}(?:\s?\d{3})*)',
+                        r'бюджет[:\s]*(\d{1,3}(?:\s?\d{3})*)'
+                    ]
+                    for pattern in price_patterns:
+                        matches = re.findall(pattern, page_source, re.IGNORECASE)
+                        if matches:
+                            price_num = matches[0].replace(' ', '')
+                            budget = f"{price_num} ₽"
+                            break
+                except Exception:
+                    pass
+        except:
+            pass
+        project_data['budget'] = budget if budget else None
+        
+        project_data['url'] = url
+        project_data['project_id'] = project_id
+        project_data['loadedFromUrl'] = True  # Mark as loaded from URL
+        
+        log_agent_action("Agent A", f"✅ Project parsed: {project_data['title']}")
+        
+        return {
+            "status": "success",
+            "project": project_data
+        }
+        
+    except Exception as e:
+        log_agent_action("Agent A", f"❌ Error parsing Kwork project: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Failed to parse project: {str(e)}"
+        }
+
 # MVP Generation API
 @app.post("/api/generate-mvp")
 async def generate_mvp(request: Request):

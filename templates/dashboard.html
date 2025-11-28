@@ -17,6 +17,11 @@
                 <div class="card-title">Agent A</div>
                 <div class="card-content">
             <div class="form-group">
+                        <label class="form-label" for="agent-a-kwork-url">Или вставьте ссылку на проект Kwork:</label>
+                        <input type="url" id="agent-a-kwork-url" class="form-input" placeholder="https://kwork.ru/projects/2996436/view" pattern="https://kwork\.ru/projects/\d+/view">
+                        <button id="agent-a-load-url" class="btn btn-secondary" style="margin-top: 8px; width: 100%;">Загрузить проект по ссылке</button>
+                    </div>
+                    <div class="form-group">
                         <input type="text" id="agent-a-input" class="form-input" placeholder="Ключевые слова (только кириллица, запятые, пробелы)" pattern="[а-яА-ЯёЁ\s,.-]*" title="Разрешены только русские буквы, пробелы, запятые и дефисы">
                     </div>
                     <div class="form-group form-group-row">
@@ -55,11 +60,11 @@
                         <label class="form-label" for="agent-b-project-select">Выберите проект из Agent A:</label>
                         <select id="agent-b-project-select" class="form-select">
                             <option value="">-- Выберите проект --</option>
-                            <option value="A">Проект A</option>
-                            <option value="B">Проект B</option>
-                            <option value="C">Проект C</option>
-                            <option value="D">Проект D</option>
-                            <option value="E">Проект E</option>
+                            <option value="A" disabled style="display: none;">Проект A</option>
+                            <option value="B" disabled style="display: none;">Проект B</option>
+                            <option value="C" disabled style="display: none;">Проект C</option>
+                            <option value="D" disabled style="display: none;">Проект D</option>
+                            <option value="E" disabled style="display: none;">Проект E</option>
                         </select>
                     </div>
                     <div class="form-group">
