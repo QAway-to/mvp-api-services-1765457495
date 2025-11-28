@@ -143,7 +143,7 @@ function initializeEventListeners() {
     
     // Agent B: Project selection from Agent A
     if (agentBProjectSelect) {
-        agentBProjectSelect.addEventListener('change', (e) => {
+        agentBProjectSelect.addEventListener('change', async (e) => {
             const selectedIndex = e.target.value;
             if (selectedIndex && agentAProjects.length > 0) {
                 const projectIndex = selectedIndex.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3, E=4
@@ -160,6 +160,11 @@ function initializeEventListeners() {
                         setTimeout(() => {
                             agentBTextarea.style.borderColor = '';
                         }, 2000);
+                    }
+                    
+                    // Automatically select template using AI
+                    if (descriptionText.length >= 10) {
+                        await selectTemplateAutomatically(descriptionText);
                     }
                 }
             }
@@ -311,6 +316,73 @@ function openImproveDialog() {
 function closeImproveDialog() {
     if (improveDialog) {
         improveDialog.style.display = 'none';
+    }
+}
+
+// Automatically select template based on description
+async function selectTemplateAutomatically(description) {
+    if (!agentBDropdown) return;
+    
+    // Show loading state
+    agentBDropdown.disabled = true;
+    agentBDropdown.style.borderColor = '#4299e1';
+    agentBDropdown.style.backgroundColor = '#ebf8ff';
+    
+    // Show loading message
+    if (agentBLogs) {
+        agentBLogs.textContent = '🤖 Архитектор анализирует описание и выбирает шаблон...\n';
+    }
+    
+    try {
+        const response = await fetch('/api/select-template', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                description: description
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.template) {
+            // Set selected template
+            agentBDropdown.value = data.template;
+            agentBDropdown.style.borderColor = '#48bb78';
+            agentBDropdown.style.backgroundColor = '#f0fff4';
+            
+            // Get template name for display
+            const templateOption = agentBDropdown.options[agentBDropdown.selectedIndex];
+            const templateName = templateOption ? templateOption.text : data.template;
+            
+            // Show success message
+            if (agentBLogs) {
+                const confidencePercent = (data.confidence * 100).toFixed(1);
+                agentBLogs.textContent = `✅ Шаблон автоматически выбран: ${templateName}\n📊 Уверенность: ${confidencePercent}%\n💡 ${data.reasoning || 'Шаблон выбран на основе анализа описания проекта'}\n\nГотово к генерации MVP!`;
+            }
+            
+            setTimeout(() => {
+                agentBDropdown.style.borderColor = '';
+                agentBDropdown.style.backgroundColor = '';
+            }, 4000);
+        } else {
+            // Show error but don't block
+            if (agentBLogs) {
+                agentBLogs.textContent += `\n⚠️ Автоматический выбор шаблона не удался: ${data.error || 'Unknown error'}\nВыберите шаблон вручную.`;
+            }
+            agentBDropdown.style.borderColor = '';
+            agentBDropdown.style.backgroundColor = '';
+        }
+    } catch (error) {
+        console.error('Error selecting template:', error);
+        if (agentBLogs) {
+            agentBLogs.textContent += `\n❌ Ошибка при выборе шаблона: ${error.message}\nВыберите шаблон вручную.`;
+        }
+        agentBDropdown.style.borderColor = '';
+        agentBDropdown.style.backgroundColor = '';
+    } finally {
+        agentBDropdown.disabled = false;
     }
 }
 

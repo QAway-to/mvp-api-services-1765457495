@@ -1,5 +1,7 @@
 import asyncio
 import os
+import sys
+from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
@@ -8,6 +10,12 @@ from fastapi.responses import StreamingResponse
 import logging
 import json
 from datetime import datetime
+
+# Add agent_b to path for template_selector import
+current_dir = Path(__file__).parent.parent
+agent_b_dir = current_dir / "agent_b"
+if str(agent_b_dir) not in sys.path:
+    sys.path.insert(0, str(agent_b_dir))
 
 # Import from root config (unified configuration)
 from config import config
@@ -290,6 +298,47 @@ async def generate_mvp(request: Request):
         except Exception:
             pass
         log_agent_action("MVP", f"❌ MVP generation failed: {err_msg}")
+        return {"status": "error", "error": err_msg}
+
+@app.post("/api/select-template")
+async def select_template(request: Request):
+    """Automatically select template based on project description"""
+    try:
+        data = await request.json()
+        description = data.get("description", "").strip()
+        
+        if not description:
+            return {"status": "error", "error": "Описание проекта не указано"}
+        
+        if len(description) < 10:
+            return {"status": "error", "error": "Описание проекта слишком короткое (минимум 10 символов)"}
+        
+        log_agent_action("MVP", f"🤖 Selecting template for description: {description[:100]}...")
+        
+        # Import and use template selector
+        try:
+            from template_selector import AITemplateSelector
+            selector = AITemplateSelector()
+            
+            template_match = await selector.select_template(description)
+            
+            log_agent_action("MVP", f"✅ Template selected: {template_match.template_id} (confidence: {template_match.confidence:.2f})")
+            
+            return {
+                "status": "success",
+                "template": template_match.template_id,
+                "confidence": template_match.confidence,
+                "reasoning": template_match.reasoning,
+                "category": template_match.category
+            }
+            
+        except ImportError:
+            log_agent_action("MVP", "⚠️ Template selector not available")
+            return {"status": "error", "error": "Template selector не доступен"}
+            
+    except Exception as e:
+        err_msg = str(e)
+        log_agent_action("MVP", f"❌ Template selection failed: {err_msg}")
         return {"status": "error", "error": err_msg}
 
 @app.post("/api/improve-mvp")
