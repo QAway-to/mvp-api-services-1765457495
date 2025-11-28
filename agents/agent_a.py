@@ -39,6 +39,7 @@ class AgentA:
         self.search_keywords = None  # Override keywords if provided
         self.search_time_left = None  # Filter by minimum time left (hours)
         self.search_hired_min = None  # Filter by minimum hired percentage
+        self.search_proposals_max = None  # Filter by maximum proposals count
         self._loop = None  # event loop captured per session for thread-safe puts
 
     def setup_driver(self):
@@ -636,6 +637,11 @@ class AgentA:
                             if hired < self.search_hired_min:
                                 should_add = False
                         
+                        # Filter by proposals count (maximum proposals)
+                        if self.search_proposals_max is not None and proposals is not None:
+                            if proposals > self.search_proposals_max:
+                                should_add = False
+                        
                         if should_add:
                             all_projects.append(project_data)
                             # Push to live queue for immediate evaluation/notification (from Selenium thread)
@@ -739,12 +745,13 @@ class AgentA:
         self.found_projects.extend(suitable_projects)
         log_agent_action("Agent A", f"📊 Session complete: {suitable_count} suitable projects")
 
-    async def run_session(self, keywords=None, timeLeft=None, hiredMin=None):
+    async def run_session(self, keywords=None, timeLeft=None, hiredMin=None, proposalsMax=None):
         """Run one search session with optional search parameters"""
         # Store search parameters for this session
         self.search_keywords = keywords
         self.search_time_left = timeLeft
         self.search_hired_min = hiredMin
+        self.search_proposals_max = proposalsMax
         
         # Prepare live streaming pipeline
         self.live_queue = asyncio.Queue()
@@ -761,6 +768,8 @@ class AgentA:
             log_msg += f", time left >= {timeLeft}h"
         if hiredMin is not None:
             log_msg += f", hired >= {hiredMin}%"
+        if proposalsMax is not None:
+            log_msg += f", proposals <= {proposalsMax}"
         log_agent_action("Agent A", log_msg + "...")
         
         if not self.driver:
@@ -801,6 +810,7 @@ class AgentA:
             self.search_keywords = None
             self.search_time_left = None
             self.search_hired_min = None
+            self.search_proposals_max = None
 
     async def _consume_and_notify_live(self, max_notifications: int = 5):
         """

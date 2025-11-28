@@ -140,6 +140,8 @@ async def run_single_session(request: Request):
                 search_params["timeLeft"] = int(body["timeLeft"])
             if body.get("hiredMin") is not None:
                 search_params["hiredMin"] = int(body["hiredMin"])
+            if body.get("proposalsMax") is not None:
+                search_params["proposalsMax"] = int(body["proposalsMax"])
         except Exception:
             pass  # Use default parameters if body parsing fails
         

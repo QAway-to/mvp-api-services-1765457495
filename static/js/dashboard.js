@@ -5,6 +5,7 @@ const agentAButton = document.getElementById('agent-a-button');
 const agentAInput = document.getElementById('agent-a-input');
 const agentATimeLeft = document.getElementById('agent-a-time-left');
 const agentAHiredMin = document.getElementById('agent-a-hired-min');
+const agentAProposalsMax = document.getElementById('agent-a-proposals-max');
 const agentAStatus = document.getElementById('agent-a-status');
 const agentAResults = document.getElementById('agent-a-results');
 
@@ -67,6 +68,7 @@ function initializeEventListeners() {
         const keyword = agentAInput.value.trim();
         const timeLeft = agentATimeLeft.value ? parseInt(agentATimeLeft.value) : null;
         const hiredMin = agentAHiredMin.value ? parseInt(agentAHiredMin.value) : null;
+        const proposalsMax = agentAProposalsMax.value ? parseInt(agentAProposalsMax.value) : null;
         
         if (!keyword) {
             alert('Пожалуйста, введите ключевые слова');
@@ -89,6 +91,7 @@ function initializeEventListeners() {
             if (keyword) requestBody.keywords = keyword;
             if (timeLeft !== null) requestBody.timeLeft = timeLeft;
             if (hiredMin !== null) requestBody.hiredMin = hiredMin;
+            if (proposalsMax !== null) requestBody.proposalsMax = proposalsMax;
             
             const response = await fetch('/agent/run-session', {
                 method: 'POST',
