@@ -12,16 +12,12 @@ export default function ScrapedDataTable({ data }) {
     );
   }
 
-  // Get unique keys from all rows
-  const allKeys = new Set();
+  // Get all unique column names from all rows
+  const allColumns = new Set();
   data.forEach(row => {
-    if (row.cells) {
-      row.cells.forEach((_, index) => allKeys.add(`Column ${index + 1}`));
-    } else {
-      Object.keys(row).forEach(key => allKeys.add(key));
-    }
+    Object.keys(row).forEach(key => allColumns.add(key));
   });
-  const columns = Array.from(allKeys);
+  const columns = Array.from(allColumns);
 
   const totalPages = Math.ceil(data.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -51,15 +47,10 @@ export default function ScrapedDataTable({ data }) {
             {currentData.map((row, rowIdx) => (
               <tr key={rowIdx} className="hover:bg-gray-50">
                 {columns.map((col, colIdx) => {
-                  let value = '';
-                  if (row.cells) {
-                    value = row.cells[colIdx] || '';
-                  } else {
-                    value = row[col] || '';
-                  }
+                  const value = row[col];
                   return (
                     <td key={colIdx} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {String(value)}
+                      {value !== null && value !== undefined ? String(value) : ''}
                     </td>
                   );
                 })}
@@ -73,7 +64,7 @@ export default function ScrapedDataTable({ data }) {
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50"
+            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
           >
             Previous
           </button>
@@ -83,7 +74,7 @@ export default function ScrapedDataTable({ data }) {
           <button
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50"
+            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
           >
             Next
           </button>

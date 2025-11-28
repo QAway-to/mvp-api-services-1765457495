@@ -5,8 +5,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Head>
-        <title>Web Scraper MVP - Demo</title>
-        <meta name="description" content="Universal Web Scraper Dashboard" />
+        <title>Universal Web Scraper MVP</title>
+        <meta name="description" content="Universal Web Scraper - Extract structured data from web pages" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
@@ -15,7 +15,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-gray-900">🕷️ Web Scraper</h1>
+              <h1 className="text-2xl font-bold text-gray-900">🕷️ Universal Web Scraper</h1>
               <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">
                 DEMO VERSION
               </span>
@@ -33,7 +33,7 @@ export default function Home() {
       <footer className="bg-white border-t mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <p className="text-center text-sm text-gray-500">
-            Web Scraper MVP - Universal scraping tool for any website
+            Universal Web Scraper MVP - Extract structured data from any website
           </p>
         </div>
       </footer>

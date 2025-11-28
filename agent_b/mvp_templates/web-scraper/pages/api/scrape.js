@@ -14,14 +14,30 @@ export default async function handler(req, res) {
     }
 
     let data = [];
+    let metadata = {
+      url: url,
+      type: type,
+      timestamp: new Date().toISOString(),
+    };
 
     if (type === 'match') {
       // Scrape single match
       const fetcher = new Fetcher();
       data = await scrapeMatch(url, fetcher);
+      metadata.matchCount = 1;
+      metadata.rowCount = data ? data.length : 0;
     } else if (type === 'season') {
       // Scrape season
-      data = await scrapeSeason(url, roundNumber || null);
+      const round = roundNumber ? parseInt(roundNumber) : null;
+      data = await scrapeSeason(url, round, 500);
+      metadata.roundNumber = round;
+      metadata.rowCount = data.length;
+      
+      // Extract year from URL for metadata
+      const yearMatch = url.match(/\/seas\/(\d{4})\.html$/);
+      if (yearMatch) {
+        metadata.year = yearMatch[1];
+      }
     } else {
       return res.status(400).json({ error: 'Invalid type. Use "match" or "season"' });
     }
@@ -29,8 +45,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       data: data,
+      metadata: metadata,
       count: data.length,
-      url: url,
     });
   } catch (error) {
     console.error('Scraping error:', error);

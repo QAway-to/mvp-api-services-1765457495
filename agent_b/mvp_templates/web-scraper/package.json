@@ -1,7 +1,7 @@
 {
   "name": "web-scraper-mvp",
   "version": "1.0.0",
-  "description": "Universal Web Scraper MVP - Demo Version",
+  "description": "Universal Web Scraper MVP - Based on AFL Scraper functionality",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -16,8 +16,8 @@
     "tailwindcss": "^3.3.6",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
-    "lucide-react": "^0.294.0",
-    "axios": "^1.6.0"
+    "cheerio": "^1.0.0-rc.12",
+    "lucide-react": "^0.294.0"
   },
   "devDependencies": {
     "eslint": "^8.55.0",

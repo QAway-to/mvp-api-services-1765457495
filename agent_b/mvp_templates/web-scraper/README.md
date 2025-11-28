@@ -1,32 +1,35 @@
-# Web Scraper MVP
+# Universal Web Scraper MVP
 
-Universal web scraper template based on final_scraper architecture.
+Universal web scraper based on AFL Scraper functionality. Extracts structured data from web pages and exports to CSV.
 
 ## Features
 
-- 🌐 Scrape single pages or entire seasons/collections
-- 📊 View scraped data in interactive table
-- 📥 Export data to CSV
-- 🔄 Real-time scraping with progress tracking
-- 🎯 Simple, clean UI
+- **Single Page Scraping**: Extract data from individual pages
+- **Season/Multi-page Scraping**: Scrape multiple pages from a season/index page
+- **Round Filtering**: Optionally filter by round number for season scraping
+- **CSV Export**: Export scraped data to CSV format
+- **Data Table View**: View scraped data in a paginated table
+- **Statistics**: View scraping statistics and metadata
 
-## Structure
+## Technology Stack
 
-- `src/lib/scraper_core.js` - Core scraping logic (based on final_scraper)
-- `pages/api/scrape.js` - API endpoint for scraping
-- `components/` - React components for UI
-- `pages/index.js` - Main dashboard page
+- Next.js 14
+- React 18
+- Tailwind CSS
+- Cheerio (HTML parsing)
+- Server-side rendering for scraping operations
 
 ## Usage
 
-1. Enter target URL
-2. Select scrape type (match/page or season/collection)
-3. Click "Start Scraping"
-4. View results and export to CSV
+1. Enter a target URL
+2. Select scrape type (Match/Page or Season/Multiple Pages)
+3. Optionally specify round number for season scraping
+4. Click "Start Scraping"
+5. View results and export to CSV
 
-## Based on
+## API Endpoints
 
-- final_scraper architecture
-- AFLTables scraper structure
-- Universal design for any web scraping task
+- `POST /api/scrape` - Scrape a URL
+  - Body: `{ url: string, type: 'match' | 'season', roundNumber?: number }`
+  - Returns: `{ success: boolean, data: array, metadata: object, count: number }`
 
