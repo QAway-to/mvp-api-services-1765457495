@@ -116,7 +116,17 @@ class MVPGenerator:
 
     async def _create_project_from_template(self, template_id: str, project_name: str, description: str):
         """Create project directory from template"""
-        log_agent_action("Agent B", f"🔧 Creating project from template: {template_id}")
+        # Validate and sanitize template_id to prevent state leakage
+        template_id = template_id.strip().lower()
+        valid_templates = [
+            "mini-etl-pipeline", "web-scraper", "brand-mention-monitor", "data-formatter",
+            "email-campaign-manager", "price-stock-parser", "news-parser",
+            "analytics-dashboard", "telegram-shop-bot"
+        ]
+        if template_id not in valid_templates:
+            raise ValueError(f"Invalid template_id: {template_id}. Must be one of: {valid_templates}")
+        
+        log_agent_action("Agent B", f"🔧 Creating project from template: {template_id} (validated)")
 
         template_path = self.templates_dir / template_id
         project_path = self.templates_dir.parent / "generated" / project_name
@@ -202,43 +212,8 @@ class MVPGenerator:
                     log_agent_action("Agent B", f"❌ Template file {template_lib_file} does not exist!")
 
         # Verify critical files were copied - with detailed logging (template-specific)
-        critical_files = [
-            "package.json",
-            "pages/index.js",
-        ]
-        
-        # Add template-specific critical files
-        if template_id == "mini-etl-pipeline":
-            critical_files.extend(["src/lib/spacex.js", "next.config.js"])
-        elif template_id == "web-scraper":
-            critical_files.extend(["src/lib/scraper_core.js", "next.config.js", "vercel.json"])
-        elif template_id == "brand-mention-monitor":
-            critical_files.extend(["src/lib/news.js", "vercel.json"])
-            if (project_path / "next.config.js").exists():
-                critical_files.append("next.config.js")
-        elif template_id == "data-formatter":
-            critical_files.extend(["src/lib/quotes.js", "vercel.json"])
-            if (project_path / "next.config.js").exists():
-                critical_files.append("next.config.js")
-        elif template_id in ["email-campaign-manager", "price-stock-parser", "news-parser"]:
-            # These templates may have next.config.js but it's not critical
-            if (project_path / "next.config.js").exists():
-                critical_files.append("next.config.js")
-            # vercel.json is critical for Vercel deployment
-            if (project_path / "vercel.json").exists():
-                critical_files.append("vercel.json")
-        missing_files = []
-        for file_rel in critical_files:
-            file_path = project_path / file_rel
-            if file_path.exists():
-                file_size = file_path.stat().st_size
-                log_agent_action("Agent B", f"✅ Verified copy: {file_rel} exists ({file_size} bytes)")
-            else:
-                missing_files.append(file_rel)
-                log_agent_action("Agent B", f"❌ MISSING: {file_rel} not found after copy!")
-        
-        # Filter missing_files immediately to only include files required for this template
-        # This prevents false errors for files that aren't needed for this specific template
+        # IMPORTANT: Build critical_files list STRICTLY based on template_id to prevent state leakage
+        # Use a dictionary approach to ensure no cross-template contamination
         template_critical_files_map = {
             "mini-etl-pipeline": ["package.json", "pages/index.js", "src/lib/spacex.js", "next.config.js"],
             "web-scraper": ["package.json", "pages/index.js", "src/lib/scraper_core.js", "next.config.js", "vercel.json"],
@@ -250,11 +225,46 @@ class MVPGenerator:
             "analytics-dashboard": ["package.json", "pages/index.js", "vercel.json"],
             "telegram-shop-bot": ["package.json", "pages/index.js", "vercel.json"],
         }
+        
+        # Get critical files for THIS template only - create a fresh list
+        critical_files = template_critical_files_map.get(template_id, ["package.json", "pages/index.js"]).copy()
+        
+        # Add optional files if they exist (for templates that may have them)
+        if template_id in ["brand-mention-monitor", "data-formatter"]:
+            if (project_path / "next.config.js").exists():
+                critical_files.append("next.config.js")
+        elif template_id in ["email-campaign-manager", "price-stock-parser", "news-parser", "analytics-dashboard", "telegram-shop-bot"]:
+            if (project_path / "next.config.js").exists():
+                critical_files.append("next.config.js")
+            if (project_path / "vercel.json").exists():
+                critical_files.append("vercel.json")
+        
+        log_agent_action("Agent B", f"🔍 DEBUG: template_id={template_id}, critical_files={critical_files}")
+        
+        missing_files = []
+        for file_rel in critical_files:
+            file_path = project_path / file_rel
+            if file_path.exists():
+                file_size = file_path.stat().st_size
+                log_agent_action("Agent B", f"✅ Verified copy: {file_rel} exists ({file_size} bytes)")
+            else:
+                missing_files.append(file_rel)
+                log_agent_action("Agent B", f"❌ MISSING: {file_rel} not found after copy!")
+        
+        # Filter missing_files immediately to only include files required for this template
+        # Use the same map to ensure consistency
         required_files_for_template = template_critical_files_map.get(template_id, ["package.json", "pages/index.js"])
         log_agent_action("Agent B", f"🔍 DEBUG: template_id={template_id}, required_files={required_files_for_template}")
         log_agent_action("Agent B", f"🔍 DEBUG: missing_files before filter={missing_files}")
+        # STRICT filtering - only keep files that are in the required list for THIS template
         missing_files = [f for f in missing_files if f in required_files_for_template]
         log_agent_action("Agent B", f"🔍 DEBUG: missing_files after filter={missing_files}")
+        
+        # Double-check: ensure no files from other templates leaked in
+        invalid_files = [f for f in missing_files if f not in required_files_for_template]
+        if invalid_files:
+            log_agent_action("Agent B", f"⚠️ WARNING: Found invalid files in missing_files: {invalid_files} - removing")
+            missing_files = [f for f in missing_files if f in required_files_for_template]
         
         # If lib file is missing, try to copy it explicitly (template-specific)
         lib_file_to_copy = None
