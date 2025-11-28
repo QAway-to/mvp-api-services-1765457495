@@ -181,7 +181,15 @@ class MVPGenerator:
             critical_files.extend(["src/lib/spacex.js", "next.config.js"])
         elif template_id == "web-scraper":
             critical_files.extend(["src/lib/scraper_core.js", "next.config.js", "vercel.json"])
-        elif template_id in ["email-campaign-manager", "brand-mention-monitor", "data-formatter", "price-stock-parser", "news-parser"]:
+        elif template_id == "brand-mention-monitor":
+            critical_files.extend(["src/lib/news.js", "vercel.json"])
+            if (project_path / "next.config.js").exists():
+                critical_files.append("next.config.js")
+        elif template_id == "data-formatter":
+            critical_files.extend(["src/lib/quotes.js", "vercel.json"])
+            if (project_path / "next.config.js").exists():
+                critical_files.append("next.config.js")
+        elif template_id in ["email-campaign-manager", "price-stock-parser", "news-parser"]:
             # These templates may have next.config.js but it's not critical
             if (project_path / "next.config.js").exists():
                 critical_files.append("next.config.js")
@@ -207,6 +215,12 @@ class MVPGenerator:
         elif template_id == "web-scraper" and "src/lib/scraper_core.js" in missing_files:
             lib_file_to_copy = "scraper_core.js"
             template_lib_file = template_path / "src" / "lib" / "scraper_core.js"
+        elif template_id == "brand-mention-monitor" and "src/lib/news.js" in missing_files:
+            lib_file_to_copy = "news.js"
+            template_lib_file = template_path / "src" / "lib" / "news.js"
+        elif template_id == "data-formatter" and "src/lib/quotes.js" in missing_files:
+            lib_file_to_copy = "quotes.js"
+            template_lib_file = template_path / "src" / "lib" / "quotes.js"
         
         if lib_file_to_copy and template_lib_file and template_lib_file.exists():
             log_agent_action("Agent B", f"🔧 Attempting to manually copy src/lib/{lib_file_to_copy}")
@@ -232,20 +246,28 @@ class MVPGenerator:
                 log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
         
         if missing_files:
-            # For web-scraper, if scraper_core.js is missing, try one more time to copy it
-            if template_id == "web-scraper" and "src/lib/scraper_core.js" in missing_files:
-                template_lib_file = template_path / "src" / "lib" / "scraper_core.js"
-                if template_lib_file.exists():
-                    try:
-                        dest_lib_dir = project_path / "src" / "lib"
-                        dest_lib_dir.mkdir(parents=True, exist_ok=True)
-                        dest_file = dest_lib_dir / "scraper_core.js"
-                        shutil.copy2(template_lib_file, dest_file)
-                        if dest_file.exists():
-                            log_agent_action("Agent B", f"✅✅✅ FINAL ATTEMPT SUCCESS: scraper_core.js copied")
-                            missing_files.remove("src/lib/scraper_core.js")
-                    except Exception as e:
-                        log_agent_action("Agent B", f"❌ Final copy attempt failed: {e}")
+            # Final fallback copy attempts for lib files
+            fallback_files = {
+                "web-scraper": ("scraper_core.js", "src/lib/scraper_core.js"),
+                "brand-mention-monitor": ("news.js", "src/lib/news.js"),
+                "data-formatter": ("quotes.js", "src/lib/quotes.js"),
+            }
+            
+            if template_id in fallback_files:
+                lib_file_name, missing_file_path = fallback_files[template_id]
+                if missing_file_path in missing_files:
+                    template_lib_file = template_path / "src" / "lib" / lib_file_name
+                    if template_lib_file.exists():
+                        try:
+                            dest_lib_dir = project_path / "src" / "lib"
+                            dest_lib_dir.mkdir(parents=True, exist_ok=True)
+                            dest_file = dest_lib_dir / lib_file_name
+                            shutil.copy2(template_lib_file, dest_file)
+                            if dest_file.exists():
+                                log_agent_action("Agent B", f"✅✅✅ FINAL ATTEMPT SUCCESS: {lib_file_name} copied")
+                                missing_files.remove(missing_file_path)
+                        except Exception as e:
+                            log_agent_action("Agent B", f"❌ Final copy attempt failed for {lib_file_name}: {e}")
             
             if missing_files:
                 # List all files in src/lib directory for debugging
