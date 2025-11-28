@@ -287,7 +287,7 @@ class MVPGenerator:
                 log_agent_action("Agent B", f"❌ Template file {template_lib_file} does NOT exist - cannot copy!")
         
         if missing_files:
-            # Final fallback copy attempts for lib files
+            # Final fallback copy attempts for lib files (only for templates that need them)
             fallback_files = {
                 "web-scraper": ("scraper_core.js", "src/lib/scraper_core.js"),
                 "brand-mention-monitor": ("news.js", "src/lib/news.js"),
@@ -309,6 +309,24 @@ class MVPGenerator:
                                 missing_files.remove(missing_file_path)
                         except Exception as e:
                             log_agent_action("Agent B", f"❌ Final copy attempt failed for {lib_file_name}: {e}")
+            
+            # Filter out files that are not critical for this template
+            # Only keep files that are actually required for this specific template
+            template_critical_files = {
+                "mini-etl-pipeline": ["package.json", "pages/index.js", "src/lib/spacex.js", "next.config.js"],
+                "web-scraper": ["package.json", "pages/index.js", "src/lib/scraper_core.js", "next.config.js", "vercel.json"],
+                "brand-mention-monitor": ["package.json", "pages/index.js", "src/lib/news.js", "vercel.json"],
+                "data-formatter": ["package.json", "pages/index.js", "src/lib/quotes.js", "vercel.json"],
+                "email-campaign-manager": ["package.json", "pages/index.js"],
+                "price-stock-parser": ["package.json", "pages/index.js"],
+                "news-parser": ["package.json", "pages/index.js"],
+            }
+            
+            # Get critical files for this template
+            required_files = template_critical_files.get(template_id, ["package.json", "pages/index.js"])
+            
+            # Filter missing_files to only include files that are actually required for this template
+            missing_files = [f for f in missing_files if f in required_files]
             
             if missing_files:
                 # List all files in src/lib directory for debugging
