@@ -10,9 +10,23 @@ const agentAStatus = document.getElementById('agent-a-status');
 const agentAResults = document.getElementById('agent-a-results');
 
 const agentBButton = document.getElementById('agent-b-button');
+const agentBImproveButton = document.getElementById('agent-b-improve-button');
 const agentBDropdown = document.getElementById('agent-b-dropdown');
 const agentBTextarea = document.getElementById('agent-b-textarea');
+const agentBProjectSelect = document.getElementById('agent-b-project-select');
 const agentBLogs = document.getElementById('agent-b-logs');
+
+// Modal elements
+const architectModal = document.getElementById('architect-modal');
+const architectCommand = document.getElementById('architect-command');
+const currentMvpRepo = document.getElementById('current-mvp-repo');
+const architectApplyButton = document.getElementById('architect-apply-button');
+const architectCancelButton = document.getElementById('architect-cancel-button');
+const modalClose = document.querySelector('.modal-close');
+
+// Store Agent A projects and current MVP info
+let agentAProjects = [];
+let currentMvpInfo = null;
 
 // SSE EventSource for logs
 let logEventSource = null;
@@ -35,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeEventListeners();
     connectToLogs();
     pollAgentStatus();
+    loadAgentAProjects();
     
     // Add input validation for Agent A keywords (Cyrillic only)
     if (agentAInput) {
@@ -59,10 +74,153 @@ document.addEventListener('DOMContentLoaded', () => {
             e.target.value = filteredText;
         });
     }
+    
+    // Setup modal handlers
+    if (modalClose) {
+        modalClose.addEventListener('click', () => {
+            architectModal.style.display = 'none';
+        });
+    }
+    
+    if (architectCancelButton) {
+        architectCancelButton.addEventListener('click', () => {
+            architectModal.style.display = 'none';
+        });
+    }
+    
+    // Close modal when clicking outside
+    if (architectModal) {
+        architectModal.addEventListener('click', (e) => {
+            if (e.target === architectModal) {
+                architectModal.style.display = 'none';
+            }
+        });
+    }
 });
+
+// Load projects from Agent A
+async function loadAgentAProjects() {
+    try {
+        const response = await fetch('/projects');
+        const data = await response.json();
+        
+        if (data.projects && data.projects.length > 0) {
+            agentAProjects = data.projects.slice(0, 5); // Get top 5 projects
+            
+            // Update project select dropdown with project titles
+            if (agentBProjectSelect) {
+                // Clear existing options except first one
+                agentBProjectSelect.innerHTML = '<option value="">-- Выберите проект --</option>';
+                
+                // Add projects A-E
+                const labels = ['A', 'B', 'C', 'D', 'E'];
+                agentAProjects.forEach((project, index) => {
+                    if (index < 5) {
+                        const option = document.createElement('option');
+                        option.value = labels[index];
+                        option.textContent = `${labels[index]}: ${project.title || 'Untitled'}`;
+                        agentBProjectSelect.appendChild(option);
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error loading Agent A projects:', error);
+    }
+}
 
 // Event Listeners
 function initializeEventListeners() {
+    // Agent B: Project selection from Agent A
+    if (agentBProjectSelect) {
+        agentBProjectSelect.addEventListener('change', (e) => {
+            const selectedLabel = e.target.value;
+            if (selectedLabel && agentAProjects.length > 0) {
+                const labels = ['A', 'B', 'C', 'D', 'E'];
+                const projectIndex = labels.indexOf(selectedLabel);
+                
+                if (projectIndex >= 0 && projectIndex < agentAProjects.length) {
+                    const project = agentAProjects[projectIndex];
+                    // Fill description with project title and description
+                    const fullDescription = `${project.title || ''}\n\n${project.description || ''}`;
+                    if (agentBTextarea) {
+                        agentBTextarea.value = fullDescription.trim();
+                        // Visual feedback
+                        agentBTextarea.style.borderColor = '#48bb78';
+                        setTimeout(() => {
+                            agentBTextarea.style.borderColor = '';
+                        }, 1000);
+                    }
+                }
+            }
+        });
+    }
+    
+    // Agent B: Improve MVP button
+    if (agentBImproveButton) {
+        agentBImproveButton.addEventListener('click', () => {
+            if (currentMvpInfo && currentMvpInfo.repository) {
+                currentMvpRepo.value = currentMvpInfo.repository;
+                architectModal.style.display = 'block';
+                architectCommand.focus();
+            } else {
+                alert('Сначала создайте MVP, чтобы его доработать');
+            }
+        });
+    }
+    
+    // Architect: Apply improvements
+    if (architectApplyButton) {
+        architectApplyButton.addEventListener('click', async () => {
+            const command = architectCommand.value.trim();
+            const repoName = currentMvpRepo.value.trim();
+            
+            if (!command) {
+                alert('Пожалуйста, опишите что нужно доработать');
+                return;
+            }
+            
+            if (!repoName) {
+                alert('Репозиторий не указан');
+                return;
+            }
+            
+            architectApplyButton.disabled = true;
+            architectApplyButton.textContent = 'Применяю...';
+            agentBLogs.textContent += '\n\n🔧 Начинаю доработку MVP...\n';
+            agentBLogs.textContent += `📝 Команда: ${command}\n`;
+            
+            try {
+                const response = await fetch('/api/improve-mvp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        repository: repoName,
+                        command: command
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'error') {
+                    agentBLogs.textContent += `\n❌ Ошибка: ${data.error || 'Unknown error'}`;
+                } else if (data.status === 'success') {
+                    agentBLogs.textContent += `\n✅ ${data.message || 'MVP успешно доработан'}`;
+                    architectModal.style.display = 'none';
+                    architectCommand.value = '';
+                }
+            } catch (error) {
+                console.error('Error improving MVP:', error);
+                agentBLogs.textContent += `\n❌ Ошибка: ${error.message}`;
+            } finally {
+                architectApplyButton.disabled = false;
+                architectApplyButton.textContent = 'Применить доработки';
+            }
+        });
+    }
+    
     // Agent A: Execute button
     agentAButton.addEventListener('click', async () => {
         const keyword = agentAInput.value.trim();
@@ -161,6 +319,21 @@ function initializeEventListeners() {
                     agentBLogs.textContent += `\n🔗 Deploy URL: ${data.deployUrl}`;
                     agentBLogs.textContent += `\n📦 Template: ${data.template}`;
                 }
+                
+                // Store MVP info for improvements
+                currentMvpInfo = {
+                    repository: data.repository || data.projectName,
+                    deployUrl: data.deployUrl,
+                    template: data.template
+                };
+                
+                // Show improve button
+                if (agentBImproveButton) {
+                    agentBImproveButton.style.display = 'inline-block';
+                }
+                
+                // Reload projects to update the list
+                loadAgentAProjects();
             }
         } catch (error) {
             console.error('Error generating MVP:', error);
