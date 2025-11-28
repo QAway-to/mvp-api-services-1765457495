@@ -187,6 +187,8 @@ class MVPGenerator:
         # Add template-specific critical files
         if template_id == "mini-etl-pipeline":
             critical_files.extend(["src/lib/spacex.js", "next.config.js"])
+        elif template_id == "web-scraper":
+            critical_files.extend(["src/lib/scraper_core.js", "next.config.js", "vercel.json"])
         elif template_id in ["email-campaign-manager", "brand-mention-monitor", "data-formatter", "price-stock-parser", "news-parser"]:
             # These templates may have next.config.js but it's not critical
             if (project_path / "next.config.js").exists():
@@ -206,8 +208,13 @@ class MVPGenerator:
         
         # If lib file is missing, try to copy it explicitly (template-specific)
         lib_file_to_copy = None
+        template_lib_file = None
         if template_id == "mini-etl-pipeline" and "src/lib/spacex.js" in missing_files:
             lib_file_to_copy = "spacex.js"
+            template_lib_file = template_path / "src" / "lib" / "spacex.js"
+        elif template_id == "web-scraper" and "src/lib/scraper_core.js" in missing_files:
+            lib_file_to_copy = "scraper_core.js"
+            template_lib_file = template_path / "src" / "lib" / "scraper_core.js"
         
         if lib_file_to_copy and template_lib_file and template_lib_file.exists():
             log_agent_action("Agent B", f"🔧 Attempting to manually copy src/lib/{lib_file_to_copy}")
@@ -262,6 +269,14 @@ class MVPGenerator:
             else:
                 log_agent_action("Agent B", f"❌❌❌ CRITICAL: spacex.js was deleted during customization!")
                 raise FileNotFoundError("spacex.js was deleted during customization")
+        elif template_id == "web-scraper":
+            scraper_core_file = project_path / "src" / "lib" / "scraper_core.js"
+            if scraper_core_file.exists():
+                file_size = scraper_core_file.stat().st_size
+                log_agent_action("Agent B", f"✅ Verified: scraper_core.js still exists after customization ({file_size} bytes)")
+            else:
+                log_agent_action("Agent B", f"❌❌❌ CRITICAL: scraper_core.js was deleted during customization!")
+                raise FileNotFoundError("scraper_core.js was deleted during customization")
 
         log_agent_action("Agent B", f"✅ Project created at: {project_path}")
 

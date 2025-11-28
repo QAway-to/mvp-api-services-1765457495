@@ -1,5 +1,5 @@
 // API endpoint for web scraping
-import { scrapeMatch, scrapeSeason, Fetcher } from '../../src/lib/scraper_core';
+import { scrapeMatch, scrapeSeason, Fetcher } from '../../src/lib/scraper_core.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
