@@ -170,26 +170,39 @@ export async function scrapeMatch(url, fetcher) {
 
 /**
  * Scrape a season (all matches or specific round)
+ * @param {Function} logCallback - Optional callback for logging progress
  */
-export async function scrapeSeason(seasonUrl, roundNumber = null, sleepBetween = 500) {
+export async function scrapeSeason(seasonUrl, roundNumber = null, sleepBetween = 500, logCallback = null) {
+  const log = (msg, type = 'info') => {
+    if (logCallback) logCallback(msg, type);
+    else console.log(`[${type}] ${msg}`);
+  };
+
   const fetcher = new Fetcher();
   try {
+    log(`Fetching season page: ${seasonUrl}`, 'info');
     const matchUrls = await expandSeasonToMatchUrls(seasonUrl, fetcher, roundNumber);
     
     if (matchUrls.length === 0) {
+      log('No match URLs found in season page', 'warning');
       return [];
     }
 
+    log(`Found ${matchUrls.length} match URLs to scrape`, 'info');
     const allRows = [];
     let successCount = 0;
 
     for (let i = 0; i < matchUrls.length; i++) {
       const matchUrl = matchUrls[i];
+      log(`[${i + 1}/${matchUrls.length}] Scraping: ${matchUrl}`, 'info');
       try {
         const rows = await scrapeMatch(matchUrl, fetcher);
         if (rows && rows.length > 0) {
           allRows.push(...rows);
           successCount++;
+          log(`✅ Successfully scraped ${rows.length} rows from match ${i + 1}`, 'success');
+        } else {
+          log(`⚠️ No data extracted from match ${i + 1}`, 'warning');
         }
         
         // Sleep between requests to be polite
@@ -197,12 +210,15 @@ export async function scrapeSeason(seasonUrl, roundNumber = null, sleepBetween =
           await new Promise(resolve => setTimeout(resolve, sleepBetween));
         }
       } catch (error) {
+        log(`❌ Error processing match ${i + 1}: ${error.message}`, 'error');
         console.error(`Error processing ${matchUrl}:`, error);
       }
     }
 
+    log(`✅ Season scraping complete: ${successCount}/${matchUrls.length} matches successful, ${allRows.length} total rows`, 'success');
     return allRows;
   } catch (error) {
+    log(`❌ Fatal error scraping season: ${error.message}`, 'error');
     console.error(`Error scraping season ${seasonUrl}:`, error);
     throw error;
   }

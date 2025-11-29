@@ -54,7 +54,10 @@ export default async function handler(req, res) {
       
       try {
         addLog('Expanding season to match URLs...', 'info');
-        data = await scrapeSeason(url, round, 500);
+        // Pass log callback to scrapeSeason
+        data = await scrapeSeason(url, round, 500, (msg, logType) => {
+          addLog(msg, logType);
+        });
         metadata.roundNumber = round;
         metadata.rowCount = data.length;
         
