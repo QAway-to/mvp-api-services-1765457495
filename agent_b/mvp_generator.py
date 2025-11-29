@@ -65,6 +65,7 @@ class MVPGenerator:
             log_agent_action("Agent B", f"🎯 Starting MVP generation...")
 
             # 1. Use provided template_id or select using AI (fallback)
+            template_match = None
             if template_id:
                 template_id = template_id.strip().lower()
                 log_agent_action("Agent B", f"📋 Using provided template: {template_id}")
@@ -97,8 +98,8 @@ class MVPGenerator:
                 "repository": repo_name,
                 "github_url": github_url,
                 "deploy_url": deploy_url,
-                "confidence": template_match.confidence,
-                "reasoning": template_match.reasoning
+                "confidence": template_match.confidence if template_match else 1.0,
+                "reasoning": template_match.reasoning if template_match else "Template selected manually by user"
             }
 
         except req_exc.HTTPError as e:
@@ -521,7 +522,7 @@ class MVPGenerator:
         response = requests.get(repo_url, headers=headers, timeout=Config.REQUEST_TIMEOUT)
 
         if response.status_code == 200:
-            return response.json()
+            return self._safe_json_parse(response, default={})
 
         log_agent_action("Agent B", f"📦 Repository {repo_name} not found. Creating...")
         create_payload = {
@@ -830,7 +831,9 @@ class MVPGenerator:
         )
         if create.status_code >= 400:
             self._raise_for_status_verbose(create, "Vercel create deployment")
-        deployment = create.json()
+        deployment = self._safe_json_parse(create, default={})
+        if not deployment or "id" not in deployment:
+            raise ValueError(f"Invalid deployment response: {deployment}")
         deployment_id = deployment["id"]
 
         # Poll status until deployment ready
@@ -843,7 +846,7 @@ class MVPGenerator:
             )
             if status_resp.status_code >= 400:
                 self._raise_for_status_verbose(status_resp, "Vercel deployment status")
-            status_data = status_resp.json()
+            status_data = self._safe_json_parse(status_resp, default={})
             state = status_data.get("readyState")
             if state in {"READY", "FROZEN"}:
                 url = status_data.get("url") or deployment.get("url")
@@ -931,7 +934,7 @@ class MVPGenerator:
                 timeout=Config.REQUEST_TIMEOUT,
             )
             list_resp.raise_for_status()
-            envs = list_resp.json().get("envs", [])
+            envs = self._safe_json_parse(list_resp, default={}).get("envs", [])
             for env in envs:
                 if env.get("key") == key:
                     env_id = env.get("id")
