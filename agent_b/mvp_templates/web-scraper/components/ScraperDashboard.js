@@ -2,16 +2,22 @@ import { useState } from 'react';
 import ScraperForm from './ScraperForm';
 import ScrapedDataTable from './ScrapedDataTable';
 import ScraperStats from './ScraperStats';
+import ScraperLogs from './ScraperLogs';
 
 export default function ScraperDashboard() {
   const [scrapedData, setScrapedData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
+  const [logs, setLogs] = useState([]);
 
   const handleScrape = async (url, type, roundNumber) => {
     setIsLoading(true);
     setError(null);
+    setLogs([]);
+    setScrapedData([]);
+    setStats(null);
+    
     try {
       const response = await fetch('/api/scrape', {
         method: 'POST',
@@ -27,6 +33,11 @@ export default function ScraperDashboard() {
 
       const result = await response.json();
 
+      // Always set logs if available
+      if (result.logs && Array.isArray(result.logs)) {
+        setLogs(result.logs);
+      }
+
       if (result.success) {
         setScrapedData(result.data);
         setStats({
@@ -36,13 +47,39 @@ export default function ScraperDashboard() {
           metadata: result.metadata,
         });
       } else {
-        setError(result.error || 'Unknown error');
-        alert(`Error: ${result.error || 'Unknown error'}`);
+        const errorMsg = result.message || result.error || 'Unknown error';
+        const errorDetails = result.details ? `\n\nDetails:\n${result.details}` : '';
+        setError(errorMsg);
+        
+        // Show detailed error in alert with logs
+        const logMessages = result.logs 
+          ? result.logs.map(l => `[${l.type}] ${l.message}`).join('\n')
+          : '';
+        alert(`Error: ${errorMsg}${errorDetails}${logMessages ? '\n\nLogs:\n' + logMessages : ''}`);
       }
     } catch (error) {
       console.error('Scraping error:', error);
-      setError(error.message);
-      alert(`Failed to scrape: ${error.message}`);
+      const errorMsg = error.message || 'Network error or invalid response';
+      setError(errorMsg);
+      
+      // Try to parse error response
+      try {
+        const errorText = await error.response?.text();
+        if (errorText) {
+          try {
+            const errorJson = JSON.parse(errorText);
+            if (errorJson.logs) {
+              setLogs(errorJson.logs);
+            }
+          } catch (e) {
+            // Not JSON, ignore
+          }
+        }
+      } catch (e) {
+        // Ignore
+      }
+      
+      alert(`Failed to scrape: ${errorMsg}\n\nCheck the logs below for details.`);
     } finally {
       setIsLoading(false);
     }
@@ -85,10 +122,19 @@ export default function ScraperDashboard() {
         <ScraperForm onScrape={handleScrape} isLoading={isLoading} />
         {error && (
           <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700">
-            ❌ {error}
+            <div className="font-semibold">❌ Error: {error}</div>
+            {logs.length > 0 && (
+              <div className="mt-2 text-sm opacity-90">
+                Check logs below for detailed information
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {logs.length > 0 && (
+        <ScraperLogs logs={logs} />
+      )}
 
       {stats && (
         <ScraperStats stats={stats} onExport={handleExport} />
