@@ -197,6 +197,18 @@ class MVPGenerator:
                 raise RuntimeError(f"Failed to remove existing project directory: {project_path}")
             log_agent_action("Agent B", f"✅ Existing directory removed successfully")
         
+        # Special handling for api-services: copy adapters directory BEFORE main copytree
+        # This ensures files are copied even if they're in .gitignore
+        if template_id == "api-services":
+            adapters_src = template_path / "src" / "lib" / "adapters"
+            if adapters_src.exists():
+                log_agent_action("Agent B", f"🔧 Pre-copying adapters directory for api-services from {adapters_src}")
+                # List all files to ensure they exist
+                wayback_dir = adapters_src / "wayback"
+                if wayback_dir.exists():
+                    wayback_files = list(wayback_dir.glob("*.js"))
+                    log_agent_action("Agent B", f"🔍 Found wayback files: {[f.name for f in wayback_files]}")
+        
         log_agent_action("Agent B", f"📋 Copying template from {template_path} to {project_path}")
         try:
             shutil.copytree(template_path, project_path, dirs_exist_ok=False)
@@ -210,33 +222,43 @@ class MVPGenerator:
         # Immediately after copy, ensure src/lib files are copied for templates that need them
         # This is a proactive approach - copy before verification
         
-        # Special handling for api-services: copy entire adapters directory
+        # Special handling for api-services: ensure adapters directory is copied
         if template_id == "api-services":
             adapters_src = template_path / "src" / "lib" / "adapters"
             adapters_dest = project_path / "src" / "lib" / "adapters"
             
             if adapters_src.exists():
-                log_agent_action("Agent B", f"🔧 Copying adapters directory for api-services from {adapters_src} to {adapters_dest}")
-                try:
-                    # Remove destination if exists to ensure clean copy
+                log_agent_action("Agent B", f"🔧 Post-verifying adapters directory for api-services")
+                # Check if adapters were copied
+                if not adapters_dest.exists():
+                    log_agent_action("Agent B", f"⚠️ Adapters directory not found after copytree, copying now...")
+                    try:
+                        adapters_dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copytree(adapters_src, adapters_dest)
+                        log_agent_action("Agent B", f"✅✅✅ Successfully copied adapters directory after copytree")
+                    except Exception as e:
+                        log_agent_action("Agent B", f"❌❌❌ CRITICAL: Error copying adapters directory: {e}")
+                        import traceback
+                        log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
+                        raise
+                
+                # Verify critical adapter files
+                wayback_index = adapters_dest / "wayback" / "index.js"
+                wayback_client = adapters_dest / "wayback" / "waybackClient.js"
+                if wayback_index.exists() and wayback_client.exists():
+                    log_agent_action("Agent B", f"✅✅✅ Verified Wayback adapter files exist: {wayback_index.exists()}, {wayback_client.exists()}")
+                    log_agent_action("Agent B", f"🔍 Wayback index size: {wayback_index.stat().st_size if wayback_index.exists() else 0} bytes")
+                    log_agent_action("Agent B", f"🔍 Wayback client size: {wayback_client.stat().st_size if wayback_client.exists() else 0} bytes")
+                else:
+                    log_agent_action("Agent B", f"❌❌❌ CRITICAL: Adapter files missing! index: {wayback_index.exists()}, client: {wayback_client.exists()}")
+                    # List what's actually in the directory
                     if adapters_dest.exists():
-                        shutil.rmtree(adapters_dest)
-                    # Copy entire adapters directory recursively
-                    shutil.copytree(adapters_src, adapters_dest)
-                    log_agent_action("Agent B", f"✅✅✅ Successfully copied adapters directory")
-                    
-                    # Verify critical adapter files
-                    wayback_index = adapters_dest / "wayback" / "index.js"
-                    wayback_client = adapters_dest / "wayback" / "waybackClient.js"
-                    if wayback_index.exists() and wayback_client.exists():
-                        log_agent_action("Agent B", f"✅✅✅ Verified Wayback adapter files exist")
-                    else:
-                        log_agent_action("Agent B", f"⚠️ Warning: Some adapter files missing")
-                except Exception as e:
-                    log_agent_action("Agent B", f"❌❌❌ CRITICAL: Error copying adapters directory: {e}")
-                    import traceback
-                    log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
-                    raise
+                        all_files = list(adapters_dest.rglob("*"))
+                        log_agent_action("Agent B", f"🔍 Files in adapters dir: {[str(f.relative_to(adapters_dest)) for f in all_files if f.is_file()]}")
+                    raise FileNotFoundError(f"Wayback adapter files not found after copy. Index exists: {wayback_index.exists()}, Client exists: {wayback_client.exists()}")
+            else:
+                log_agent_action("Agent B", f"❌❌❌ CRITICAL: Adapters source directory does not exist: {adapters_src}")
+                raise FileNotFoundError(f"Adapters source directory does not exist: {adapters_src}")
         
         if template_id in ["web-scraper", "brand-mention-monitor", "data-formatter"]:
             lib_files_map = {
@@ -650,6 +672,11 @@ class MVPGenerator:
                     critical_files_to_upload.append(relative_path)
                     file_size = file_path.stat().st_size
                     log_agent_action("Agent B", f"🎯 CRITICAL FILE FOUND: {relative_path} ({file_size} bytes) - will upload")
+                elif 'wayback' in relative_path and 'adapters' in relative_path and relative_path.endswith('.js'):
+                    # Track wayback adapter files as critical for api-services template
+                    critical_files_to_upload.append(relative_path)
+                    file_size = file_path.stat().st_size
+                    log_agent_action("Agent B", f"🎯 CRITICAL WAYBACK FILE FOUND: {relative_path} ({file_size} bytes) - will upload")
                 elif relative_path == "next.config.js" or relative_path == "vercel.json":
                     # Also track next.config.js and vercel.json as critical for templates that have them
                     critical_files_to_upload.append(relative_path)
@@ -675,7 +702,7 @@ class MVPGenerator:
                 # Read file content
                 try:
                     content_bytes = file_path.read_bytes()
-                    if 'spacex.js' in relative_path or 'randomuser.js' in relative_path:
+                    if 'spacex.js' in relative_path or 'randomuser.js' in relative_path or ('wayback' in relative_path and 'adapters' in relative_path):
                         log_agent_action("Agent B", f"📖 Reading {relative_path}: {len(content_bytes)} bytes")
                 except Exception as e:
                     log_agent_action("Agent B", f"⚠️ Failed to read {relative_path}: {e}")
@@ -685,7 +712,7 @@ class MVPGenerator:
                 # Encode to base64
                 try:
                     encoded = base64.b64encode(content_bytes).decode('utf-8')
-                    if 'spacex.js' in relative_path or 'randomuser.js' in relative_path:
+                    if 'spacex.js' in relative_path or 'randomuser.js' in relative_path or ('wayback' in relative_path and 'adapters' in relative_path):
                         log_agent_action("Agent B", f"🔐 Encoded {relative_path}: {len(encoded)} chars")
                 except Exception as e:
                     log_agent_action("Agent B", f"⚠️ Failed to encode {relative_path}: {e}")
@@ -705,7 +732,7 @@ class MVPGenerator:
                 put_resp = requests.put(url, headers=headers, json=data, timeout=Config.REQUEST_TIMEOUT)
                 
                 if put_resp.status_code >= 400:
-                    if 'spacex.js' in relative_path or 'randomuser.js' in relative_path:
+                    if 'spacex.js' in relative_path or 'randomuser.js' in relative_path or ('wayback' in relative_path and 'adapters' in relative_path):
                         log_agent_action("Agent B", f"❌ FAILED to upload {relative_path}: {put_resp.status_code}")
                         try:
                             error_detail = put_resp.json()
@@ -715,7 +742,7 @@ class MVPGenerator:
                     self._raise_for_status_verbose(put_resp, f"Upload {relative_path}")
                 else:
                     uploaded_count += 1
-                    if 'spacex.js' in relative_path or 'randomuser.js' in relative_path:
+                    if 'spacex.js' in relative_path or 'randomuser.js' in relative_path or ('wayback' in relative_path and 'adapters' in relative_path):
                         log_agent_action("Agent B", f"✅✅✅ SUCCESS: Uploaded {relative_path} to GitHub (status: {put_resp.status_code})")
                         # Verify immediately
                         verify_resp = requests.get(url, headers=headers, params={"ref": branch}, timeout=Config.REQUEST_TIMEOUT)
@@ -730,7 +757,7 @@ class MVPGenerator:
                         log_agent_action("Agent B", f"📤 Uploaded {uploaded_count} files...")
                         
             except Exception as e:
-                if 'spacex.js' in relative_path or 'randomuser.js' in relative_path:
+                if 'spacex.js' in relative_path or 'randomuser.js' in relative_path or ('wayback' in relative_path and 'adapters' in relative_path):
                     log_agent_action("Agent B", f"❌❌❌ EXCEPTION uploading {relative_path}: {e}")
                     import traceback
                     log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
@@ -750,6 +777,16 @@ class MVPGenerator:
         critical_files_to_verify = ["pages/index.js", "package.json"]
         if template_id == "mini-etl-pipeline":
             critical_files_to_verify.extend(["src/lib/spacex.js", "next.config.js"])
+        elif template_id == "api-services":
+            # Verify wayback adapter files for api-services
+            if (project_path / "src/lib/adapters/wayback/index.js").exists():
+                critical_files_to_verify.append("src/lib/adapters/wayback/index.js")
+            if (project_path / "src/lib/adapters/wayback/waybackClient.js").exists():
+                critical_files_to_verify.append("src/lib/adapters/wayback/waybackClient.js")
+            if (project_path / "next.config.js").exists():
+                critical_files_to_verify.append("next.config.js")
+            if (project_path / "vercel.json").exists():
+                critical_files_to_verify.append("vercel.json")
         else:
             # For other templates, only check next.config.js if it exists in the project
             # Check if next.config.js was actually uploaded by verifying it exists in project_path
