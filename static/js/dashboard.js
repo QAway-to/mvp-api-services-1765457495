@@ -149,8 +149,7 @@ function initializeEventListeners() {
                         // Auto-fill description
                         if (agentBTextarea && data.project.description) {
                             agentBTextarea.value = data.project.description;
-                            // Trigger template selection
-                            selectTemplateAutomatically(data.project.description);
+                            // User selects template manually - no auto-selection
                         }
                     }
                     
@@ -249,10 +248,7 @@ function initializeEventListeners() {
                         }, 2000);
                     }
                     
-                    // Automatically select template using AI
-                    if (descriptionText.length >= 10) {
-                        await selectTemplateAutomatically(descriptionText);
-                    }
+                    // User selects template manually - no auto-selection
                 }
             }
         });

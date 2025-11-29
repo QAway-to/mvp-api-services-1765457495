@@ -419,11 +419,13 @@ async def generate_mvp(request: Request):
                     "brand-mention-monitor": "Создать систему мониторинга упоминаний бренда в новостях, блогах и форумах",
                     "data-formatter": "Собрать сервис нормализации CSV/Excel с маппингом полей и предпросмотром преобразований",
                     "mini-etl-pipeline": "Создать mini-ETL конвейер с шагами Extract/Transform/Load и аналитикой выполнения",
-                    "price-stock-parser": "Сделать мониторинг цен и наличия товаров по SKU с алертами и историей изменений"
+                    "price-stock-parser": "Сделать мониторинг цен и наличия товаров по SKU с алертами и историей изменений",
+                    "web-scraper": "Создать универсальный веб-скрапер для извлечения структурированных данных с веб-страниц"
                 }
                 description = template_descriptions.get(template, f"Создать MVP на основе шаблона {template}")
 
-            result = await generator.generate_mvp(description)
+            # Pass template_id directly to generator (user selects template manually)
+            result = await generator.generate_mvp(description, template_id=template)
             log_agent_action("MVP", f"✅ MVP created: {result['deploy_url']}")
 
             return {

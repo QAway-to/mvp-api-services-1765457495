@@ -59,14 +59,20 @@ class MVPGenerator:
         log_agent_action("Agent B", f"❌ {context} failed: HTTP {resp.status_code} - {parsed}")
         resp.raise_for_status()
 
-    async def generate_mvp(self, project_description: str) -> Dict[str, Any]:
-        """Generate MVP application based on project description"""
+    async def generate_mvp(self, project_description: str, template_id: str = None) -> Dict[str, Any]:
+        """Generate MVP application based on project description and template_id"""
         try:
             log_agent_action("Agent B", f"🎯 Starting MVP generation...")
 
-            # 1. Select template using AI
-            template_match = await self.template_selector.select_template(project_description)
-            template_id = template_match.template_id
+            # 1. Use provided template_id or select using AI (fallback)
+            if template_id:
+                template_id = template_id.strip().lower()
+                log_agent_action("Agent B", f"📋 Using provided template: {template_id}")
+            else:
+                # Fallback to AI selection if no template provided
+                template_match = await self.template_selector.select_template(project_description)
+                template_id = template_match.template_id
+                log_agent_action("Agent B", f"🤖 AI selected template: {template_id}")
 
             # 2. Generate unique project name
             project_name = self._generate_project_name(template_id)
@@ -166,9 +172,14 @@ class MVPGenerator:
             file_size = template_lib_file.stat().st_size
             log_agent_action("Agent B", f"✅ Template file exists: src/lib/{lib_file_name} ({file_size} bytes)")
 
-        # Copy template
+        # Copy template - ALWAYS remove existing directory first to prevent file contamination
         if project_path.exists():
+            log_agent_action("Agent B", f"🧹 Removing existing project directory: {project_path}")
             shutil.rmtree(project_path)
+            # Verify removal
+            if project_path.exists():
+                raise RuntimeError(f"Failed to remove existing project directory: {project_path}")
+            log_agent_action("Agent B", f"✅ Existing directory removed successfully")
         
         log_agent_action("Agent B", f"📋 Copying template from {template_path} to {project_path}")
         try:
