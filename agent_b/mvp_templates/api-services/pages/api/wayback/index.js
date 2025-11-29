@@ -1,5 +1,5 @@
 // API endpoint for Wayback Machine
-import { waybackAdapter } from '../../../../src/lib/adapters/wayback/index.js';
+import { waybackAdapter } from '../../../src/lib/adapters/wayback/index.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
