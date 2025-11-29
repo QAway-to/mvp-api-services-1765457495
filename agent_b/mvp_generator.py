@@ -205,13 +205,25 @@ class MVPGenerator:
                 dest_lib_dir = project_path / "src" / "lib"
                 dest_file = dest_lib_dir / lib_file_name
                 
-                # Check if template file exists FIRST
+                # Check if template file exists FIRST - with detailed logging
+                log_agent_action("Agent B", f"🔍 Checking template file: {template_lib_file}")
+                log_agent_action("Agent B", f"🔍 Template path exists: {template_path.exists()}")
+                log_agent_action("Agent B", f"🔍 Template lib file exists: {template_lib_file.exists()}")
+                log_agent_action("Agent B", f"🔍 Template lib file path: {template_lib_file.absolute()}")
+                
                 if not template_lib_file.exists():
+                    # List all files in src/lib to debug
+                    lib_dir = template_path / "src" / "lib"
+                    if lib_dir.exists():
+                        lib_files = list(lib_dir.glob("*"))
+                        log_agent_action("Agent B", f"🔍 Files in template src/lib: {[f.name for f in lib_files]}")
+                    else:
+                        log_agent_action("Agent B", f"🔍 Template src/lib directory does NOT exist!")
+                    
                     log_agent_action("Agent B", f"❌❌❌ CRITICAL: Template file {template_lib_file} does NOT exist in template!")
                     raise FileNotFoundError(f"Template file src/lib/{lib_file_name} does not exist in template {template_id}")
                 
                 log_agent_action("Agent B", f"🔍 Checking {lib_file_name} after copytree...")
-                log_agent_action("Agent B", f"🔍 Template file exists: {template_lib_file.exists()}")
                 log_agent_action("Agent B", f"🔍 Dest file exists: {dest_file.exists()}")
                 log_agent_action("Agent B", f"🔍 Dest dir exists: {dest_lib_dir.exists()}")
                 
