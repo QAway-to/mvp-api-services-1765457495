@@ -209,6 +209,35 @@ class MVPGenerator:
 
         # Immediately after copy, ensure src/lib files are copied for templates that need them
         # This is a proactive approach - copy before verification
+        
+        # Special handling for api-services: copy entire adapters directory
+        if template_id == "api-services":
+            adapters_src = template_path / "src" / "lib" / "adapters"
+            adapters_dest = project_path / "src" / "lib" / "adapters"
+            
+            if adapters_src.exists():
+                log_agent_action("Agent B", f"🔧 Copying adapters directory for api-services from {adapters_src} to {adapters_dest}")
+                try:
+                    # Remove destination if exists to ensure clean copy
+                    if adapters_dest.exists():
+                        shutil.rmtree(adapters_dest)
+                    # Copy entire adapters directory recursively
+                    shutil.copytree(adapters_src, adapters_dest)
+                    log_agent_action("Agent B", f"✅✅✅ Successfully copied adapters directory")
+                    
+                    # Verify critical adapter files
+                    wayback_index = adapters_dest / "wayback" / "index.js"
+                    wayback_client = adapters_dest / "wayback" / "waybackClient.js"
+                    if wayback_index.exists() and wayback_client.exists():
+                        log_agent_action("Agent B", f"✅✅✅ Verified Wayback adapter files exist")
+                    else:
+                        log_agent_action("Agent B", f"⚠️ Warning: Some adapter files missing")
+                except Exception as e:
+                    log_agent_action("Agent B", f"❌❌❌ CRITICAL: Error copying adapters directory: {e}")
+                    import traceback
+                    log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
+                    raise
+        
         if template_id in ["web-scraper", "brand-mention-monitor", "data-formatter"]:
             lib_files_map = {
                 "web-scraper": "scraper_core.js",
@@ -275,7 +304,7 @@ class MVPGenerator:
             "news-parser": ["package.json", "pages/index.js", "vercel.json"],
             "analytics-dashboard": ["package.json", "pages/index.js", "vercel.json"],
             "telegram-shop-bot": ["package.json", "pages/index.js", "vercel.json"],
-            "api-services": ["package.json", "pages/index.js", "pages/api/wayback/index.js", "vercel.json", "next.config.js"],
+            "api-services": ["package.json", "pages/index.js", "pages/api/wayback/index.js", "src/lib/adapters/wayback/index.js", "src/lib/adapters/wayback/waybackClient.js", "vercel.json", "next.config.js"],
         }
         
         # Get critical files for THIS template only - create a fresh list
