@@ -43,6 +43,24 @@ class MVPGenerator:
 
         raise RuntimeError(f"GitHub repo '{repo_name}' is not ready within {timeout}s")
 
+    def _safe_json_parse(self, resp: Response, default=None):
+        """Safely parse JSON response, return default if not JSON."""
+        try:
+            content_type = resp.headers.get('content-type', '').lower()
+            if 'application/json' in content_type:
+                return resp.json()
+            # Try to parse anyway
+            return resp.json()
+        except (ValueError, TypeError):
+            # Not JSON - return default or text preview
+            if default is not None:
+                return default
+            try:
+                text = resp.text[:200]  # Limit length
+                return {"error": "Not JSON", "preview": text}
+            except Exception:
+                return {"error": "Failed to parse response"}
+
     def _raise_for_status_verbose(self, resp: Response, context: str):
         """Log verbose HTTP error details before raising."""
         try:
@@ -50,12 +68,9 @@ class MVPGenerator:
         except Exception:
             body_text = "<no response text>"
         # Print to console (helps on Render logs)
-        print("❌", resp.status_code, body_text)
+        print("❌", resp.status_code, body_text[:200])
         # Log to shared logger (UI)
-        try:
-            parsed = resp.json()
-        except Exception:
-            parsed = body_text
+        parsed = self._safe_json_parse(resp, default=body_text[:500])
         log_agent_action("Agent B", f"❌ {context} failed: HTTP {resp.status_code} - {parsed}")
         resp.raise_for_status()
 
