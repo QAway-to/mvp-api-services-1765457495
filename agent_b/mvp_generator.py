@@ -205,22 +205,34 @@ class MVPGenerator:
                 dest_lib_dir = project_path / "src" / "lib"
                 dest_file = dest_lib_dir / lib_file_name
                 
-                if template_lib_file.exists():
-                    if not dest_file.exists():
-                        log_agent_action("Agent B", f"🔧 Proactively copying {lib_file_name} (not found after copytree)")
-                        try:
-                            dest_lib_dir.mkdir(parents=True, exist_ok=True)
-                            shutil.copy2(template_lib_file, dest_file)
-                            if dest_file.exists():
-                                log_agent_action("Agent B", f"✅✅✅ Proactively copied: {lib_file_name}")
-                            else:
-                                log_agent_action("Agent B", f"❌ Failed to proactively copy {lib_file_name}")
-                        except Exception as e:
-                            log_agent_action("Agent B", f"❌ Error proactively copying {lib_file_name}: {e}")
+                # Check if template file exists FIRST
+                if not template_lib_file.exists():
+                    log_agent_action("Agent B", f"❌❌❌ CRITICAL: Template file {template_lib_file} does NOT exist in template!")
+                    raise FileNotFoundError(f"Template file src/lib/{lib_file_name} does not exist in template {template_id}")
+                
+                log_agent_action("Agent B", f"🔍 Checking {lib_file_name} after copytree...")
+                log_agent_action("Agent B", f"🔍 Template file exists: {template_lib_file.exists()}")
+                log_agent_action("Agent B", f"🔍 Dest file exists: {dest_file.exists()}")
+                log_agent_action("Agent B", f"🔍 Dest dir exists: {dest_lib_dir.exists()}")
+                
+                # ALWAYS copy the file, even if it exists (to ensure it's there)
+                log_agent_action("Agent B", f"🔧 Copying {lib_file_name} to {dest_file}")
+                try:
+                    dest_lib_dir.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(template_lib_file, dest_file)
+                    
+                    # Verify copy immediately
+                    if dest_file.exists():
+                        file_size = dest_file.stat().st_size
+                        log_agent_action("Agent B", f"✅✅✅ Successfully copied {lib_file_name} ({file_size} bytes)")
                     else:
-                        log_agent_action("Agent B", f"✅ {lib_file_name} already exists after copytree")
-                else:
-                    log_agent_action("Agent B", f"❌ Template file {template_lib_file} does not exist!")
+                        log_agent_action("Agent B", f"❌❌❌ CRITICAL: File {lib_file_name} does NOT exist after copy!")
+                        raise FileNotFoundError(f"Failed to copy {lib_file_name} - file does not exist after copy")
+                except Exception as e:
+                    log_agent_action("Agent B", f"❌❌❌ CRITICAL: Error copying {lib_file_name}: {e}")
+                    import traceback
+                    log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
+                    raise
 
         # Verify critical files were copied - with detailed logging (template-specific)
         # IMPORTANT: Build critical_files list STRICTLY based on template_id to prevent state leakage
