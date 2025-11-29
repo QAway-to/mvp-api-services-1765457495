@@ -8,7 +8,9 @@
  */
 export async function parseMatchClean(html, url) {
   const cheerio = await import('cheerio');
-  const $ = cheerio.default.load(html);
+  // Handle both ESM and CommonJS exports
+  const cheerioModule = cheerio.default || cheerio;
+  const $ = cheerioModule.load(html);
   const results = [];
 
   // Find all sortable tables
@@ -100,7 +102,18 @@ export async function parseMatchClean(html, url) {
  */
 export async function parsePlayerDetails(html, url) {
   const cheerio = await import('cheerio');
-  const $ = cheerio.default.load(html);
+  // Handle both ESM and CommonJS exports - cheerio v1.0.0-rc.12 uses default export
+  let cheerioModule;
+  if (typeof cheerio === 'function') {
+    cheerioModule = cheerio;
+  } else if (cheerio.default && typeof cheerio.default === 'function') {
+    cheerioModule = cheerio.default;
+  } else if (cheerio.load) {
+    cheerioModule = cheerio;
+  } else {
+    throw new Error('Cannot load cheerio module');
+  }
+  const $ = cheerioModule.load(html);
   const results = [];
 
   $('table.sortable').each((i, table) => {

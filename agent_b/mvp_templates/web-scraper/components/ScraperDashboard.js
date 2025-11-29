@@ -48,14 +48,8 @@ export default function ScraperDashboard() {
         });
       } else {
         const errorMsg = result.message || result.error || 'Unknown error';
-        const errorDetails = result.details ? `\n\nDetails:\n${result.details}` : '';
         setError(errorMsg);
-        
-        // Show detailed error in alert with logs
-        const logMessages = result.logs 
-          ? result.logs.map(l => `[${l.type}] ${l.message}`).join('\n')
-          : '';
-        alert(`Error: ${errorMsg}${errorDetails}${logMessages ? '\n\nLogs:\n' + logMessages : ''}`);
+        // Logs already set above, no alert needed
       }
     } catch (error) {
       console.error('Scraping error:', error);
@@ -72,14 +66,22 @@ export default function ScraperDashboard() {
               setLogs(errorJson.logs);
             }
           } catch (e) {
-            // Not JSON, ignore
+            // Not JSON, add error to logs
+            setLogs([{
+              timestamp: new Date().toISOString(),
+              type: 'error',
+              message: `Network error: ${errorMsg}`
+            }]);
           }
         }
       } catch (e) {
-        // Ignore
+        // Add error to logs
+        setLogs([{
+          timestamp: new Date().toISOString(),
+          type: 'error',
+          message: `Failed to scrape: ${errorMsg}`
+        }]);
       }
-      
-      alert(`Failed to scrape: ${errorMsg}\n\nCheck the logs below for details.`);
     } finally {
       setIsLoading(false);
     }

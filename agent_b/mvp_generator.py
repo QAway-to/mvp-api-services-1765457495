@@ -408,8 +408,9 @@ class MVPGenerator:
         else:
             log_agent_action("Agent B", f"✅ All critical files copied successfully")
 
-        # Customize project
-        await self._customize_project(project_path, project_name, description)
+        # Skip customization - use template as-is (strict template implementation)
+        # await self._customize_project(project_path, project_name, description)
+        log_agent_action("Agent B", "📋 Using template as-is (no customization)")
 
         # Verify critical files still exist after customization (template-specific)
         if template_id == "mini-etl-pipeline":
