@@ -145,6 +145,17 @@ class AITemplateSelector:
                 complexity="low",
                 estimated_completion="75%"
             ),
+
+            # API Services
+            "api-services": TemplateInfo(
+                id="api-services",
+                name="API Services Manager",
+                category="api",
+                description="Менеджер для интеграций с внешними API. Работа с Wayback Machine и другими API сервисами",
+                features=["wayback machine", "api integration", "snapshots", "cdx api"],
+                complexity="low",
+                estimated_completion="75%"
+            ),
         }
 
     async def select_template(self, project_description: str) -> TemplateMatch:
@@ -282,6 +293,15 @@ class AITemplateSelector:
 
         elif "аналитик" in desc_lower or "dashboard" in desc_lower or "дашборд" in desc_lower:
             return TemplateMatch("analytics-dashboard", 0.8, "Keyword match: Analytics dashboard", "analytics", ["charts", "reports"])
+
+        elif any(keyword in desc_lower for keyword in ["api", "wayback", "архив", "снимок", "snapshot", "archive"]):
+            return TemplateMatch(
+                "api-services",
+                0.85,
+                "Keyword match: API services / Wayback Machine",
+                "api",
+                ["wayback", "api integration"]
+            )
 
         else:
             return TemplateMatch("analytics-dashboard", 0.5, "Fallback: General analytics dashboard", "analytics", ["charts", "reports"])

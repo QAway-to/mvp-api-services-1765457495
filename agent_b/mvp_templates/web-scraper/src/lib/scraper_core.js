@@ -1,6 +1,9 @@
 // Universal Web Scraper Core - Based on AFL Scraper functionality
 // Adapted for Next.js server-side execution
 
+// Import adapter registry
+import { findAdapter } from './adapters/index.js';
+
 /**
  * Fetcher class - HTTP client for fetching web pages
  */
@@ -155,8 +158,17 @@ export async function collectRoundMatchLinksFromSeason(html, seasonUrl, roundNum
 /**
  * Expand season URL to list of match URLs
  * If roundNumber is provided, only returns matches for that round
+ * Uses adapter if available, otherwise falls back to direct implementation
  */
 export async function expandSeasonToMatchUrls(seasonUrl, fetcher, roundNumber = null) {
+  // Try to find adapter for this URL
+  const adapter = findAdapter(seasonUrl);
+  if (adapter) {
+    const urls = await adapter.expandUrl(seasonUrl, fetcher, { roundNumber });
+    return urls;
+  }
+  
+  // Fallback to direct implementation (backward compatibility)
   const html = await fetcher.get(seasonUrl);
   const year = extractYearFromSeasonUrl(seasonUrl);
   
@@ -177,10 +189,20 @@ export async function expandSeasonToMatchUrls(seasonUrl, fetcher, roundNumber = 
 
 /**
  * Scrape a single match
+ * Uses adapter if available, otherwise falls back to direct parser import
  */
 export async function scrapeMatch(url, fetcher) {
   try {
     const html = await fetcher.get(url);
+    
+    // Try to find adapter for this URL
+    const adapter = findAdapter(url);
+    if (adapter) {
+      const rows = await adapter.parsePage(html, url);
+      return rows;
+    }
+    
+    // Fallback to direct parser import (backward compatibility)
     const { parseMatchClean } = await import('./parsers.js');
     const rows = await parseMatchClean(html, url);
     return rows;
