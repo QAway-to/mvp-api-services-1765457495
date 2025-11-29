@@ -17,40 +17,40 @@ export default function ScraperLogs({ logs }) {
     }
   };
 
-  const getLogColor = (type) => {
+  const getLogClass = (type) => {
     switch (type) {
       case 'success':
-        return 'text-green-700 bg-green-50';
+        return 'log-entry log-entry-success';
       case 'error':
-        return 'text-red-700 bg-red-50';
+        return 'log-entry log-entry-error';
       case 'warning':
-        return 'text-yellow-700 bg-yellow-50';
+        return 'log-entry log-entry-warning';
       case 'info':
       default:
-        return 'text-blue-700 bg-blue-50';
+        return 'log-entry log-entry-info';
     }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold mb-4">📋 Scraping Logs</h3>
-      <div className="space-y-2 max-h-96 overflow-y-auto">
+    <div className="card">
+      <header className="card-header">
+        <h3>📋 Scraping Logs</h3>
+        <p>{logs.length} log entries</p>
+      </header>
+      <div className="logs-container">
         {logs.map((log, index) => {
           const time = new Date(log.timestamp).toLocaleTimeString();
           return (
-            <div
-              key={index}
-              className={`p-2 rounded text-sm ${getLogColor(log.type)}`}
-            >
-              <div className="flex items-start gap-2">
-                <span className="flex-shrink-0">{getLogIcon(log.type)}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs opacity-70">{time}</span>
-                    <span className="font-medium">{log.type.toUpperCase()}</span>
-                  </div>
-                  <div className="mt-1 break-words">{log.message}</div>
+            <div key={index} className={getLogClass(log.type)}>
+              <span style={{ flexShrink: 0 }}>{getLogIcon(log.type)}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span className="log-time">{time}</span>
+                  <span style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', opacity: 0.8 }}>
+                    {log.type}
+                  </span>
                 </div>
+                <div style={{ wordBreak: 'break-word' }}>{log.message}</div>
               </div>
             </div>
           );

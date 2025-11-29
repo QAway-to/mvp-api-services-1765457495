@@ -25,31 +25,29 @@ export default function ScrapedDataTable({ data }) {
   const currentData = data.slice(startIndex, endIndex);
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-semibold">Scraped Data ({data.length} rows)</h3>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+    <div className="card">
+      <header className="card-header">
+        <h3>📊 Scraped Data</h3>
+        <p>{data.length} rows extracted</p>
+      </header>
+      <div style={{ overflowX: 'auto', marginTop: '16px' }}>
+        <table className="data-table">
+          <thead>
             <tr>
               {columns.map((col, idx) => (
-                <th
-                  key={idx}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
+                <th key={idx}>
                   {col}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody>
             {currentData.map((row, rowIdx) => (
-              <tr key={rowIdx} className="hover:bg-gray-50">
+              <tr key={rowIdx}>
                 {columns.map((col, colIdx) => {
                   const value = row[col];
                   return (
-                    <td key={colIdx} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td key={colIdx} style={{ whiteSpace: 'nowrap' }}>
                       {value !== null && value !== undefined ? String(value) : ''}
                     </td>
                   );
@@ -60,23 +58,23 @@ export default function ScrapedDataTable({ data }) {
         </table>
       </div>
       {totalPages > 1 && (
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+        <div className="pagination">
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            className="btn"
           >
-            Previous
+            ← Previous
           </button>
-          <span className="text-sm text-gray-700">
+          <span className="pagination-info">
             Page {currentPage} of {totalPages}
           </span>
           <button
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            className="btn"
           >
-            Next
+            Next →
           </button>
         </div>
       )}

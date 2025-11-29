@@ -118,15 +118,18 @@ export default function ScraperDashboard() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold mb-4">🌐 Universal Web Scraper</h2>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Main Form Card */}
+      <div className="card">
+        <header className="card-header">
+          <h2>Scrape Configuration</h2>
+        </header>
         <ScraperForm onScrape={handleScrape} isLoading={isLoading} />
         {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700">
-            <div className="font-semibold">❌ Error: {error}</div>
+          <div className="alert alert-error" style={{ marginTop: '20px' }}>
+            <div style={{ fontWeight: 600, marginBottom: '4px' }}>❌ Error: {error}</div>
             {logs.length > 0 && (
-              <div className="mt-2 text-sm opacity-90">
+              <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>
                 Check logs below for detailed information
               </div>
             )}
@@ -134,14 +137,17 @@ export default function ScraperDashboard() {
         )}
       </div>
 
+      {/* Logs */}
       {logs.length > 0 && (
         <ScraperLogs logs={logs} />
       )}
 
+      {/* Stats */}
       {stats && (
         <ScraperStats stats={stats} onExport={handleExport} />
       )}
 
+      {/* Data Table */}
       {scrapedData.length > 0 && (
         <ScrapedDataTable data={scrapedData} />
       )}

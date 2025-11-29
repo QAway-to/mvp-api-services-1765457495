@@ -3,41 +3,35 @@ import ScraperDashboard from '../components/ScraperDashboard';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       <Head>
         <title>Universal Web Scraper MVP</title>
         <meta name="description" content="Universal Web Scraper - Extract structured data from web pages" />
         <link rel="icon" href="/favicon.ico" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </Head>
-
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-gray-900">🕷️ Universal Web Scraper</h1>
-              <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">
-                DEMO VERSION
-              </span>
-            </div>
+      <main className="page">
+        <header className="page-header">
+          <div>
+            <h1>🕷️ Universal Web Scraper</h1>
+            <p className="subtitle">
+              Extract structured data from any website. Enter a URL, choose scrape type, and get clean CSV-ready data.
+            </p>
           </div>
-        </div>
-      </header>
+          <div className="status-badge status-info">
+            DEMO VERSION
+          </div>
+        </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <ScraperDashboard />
-      </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <p className="text-center text-sm text-gray-500">
-            Universal Web Scraper MVP - Extract structured data from any website
-          </p>
-        </div>
-      </footer>
-    </div>
+        <footer className="page-footer">
+          <p>Universal Web Scraper MVP - Extract structured data from any website</p>
+        </footer>
+      </main>
+    </>
   );
 }
 
