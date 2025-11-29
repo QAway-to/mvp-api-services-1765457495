@@ -6,7 +6,7 @@ export default function ScrapedDataTable({ data }) {
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-6 text-center text-gray-500">
+      <div className="card" style={{ textAlign: 'center', color: '#9ca3af' }}>
         No data to display
       </div>
     );
