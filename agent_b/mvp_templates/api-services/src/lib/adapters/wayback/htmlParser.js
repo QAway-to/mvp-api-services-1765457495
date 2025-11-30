@@ -171,6 +171,13 @@ export async function analyzeHtmlForSpam(html, stopWords, domainToIgnore = null)
   const textContent = await extractTextContent(html, domainToIgnore);
   const metaTags = await extractMetaTags(html, domainToIgnore);
   
+  // DEBUG: логируем что было извлечено (первые 200 символов)
+  if (textContent.length > 0) {
+    console.log(`[DEBUG] Extracted text preview (${textContent.length} chars): ${textContent.substring(0, 200)}...`);
+  } else {
+    console.log(`[DEBUG] WARNING: Extracted text is EMPTY!`);
+  }
+  
   // Combine all text sources for analysis (excluding meta tags that might contain domain)
   let allText = textContent;
   
@@ -185,7 +192,19 @@ export async function analyzeHtmlForSpam(html, stopWords, domainToIgnore = null)
     allText += ' ' + metaTags.keywords.toLowerCase();
   }
   
+  // DEBUG: логируем финальный текст для поиска (первые 300 символов)
+  console.log(`[DEBUG] Final text for analysis (${allText.length} chars): ${allText.substring(0, 300)}...`);
+  console.log(`[DEBUG] Searching for stop words: ${stopWords.slice(0, 5).join(', ')}...`);
+  console.log(`[DEBUG] Domain to ignore: ${domainToIgnore || 'none'}`);
+  
   const stopWordsCheck = checkStopWords(allText, stopWords);
+  
+  // DEBUG: результат поиска
+  if (stopWordsCheck.count > 0) {
+    console.log(`[DEBUG] Found stop words: ${stopWordsCheck.found.map(s => `${s.word}(${s.count})`).join(', ')}`);
+  } else {
+    console.log(`[DEBUG] No stop words found. Text length: ${allText.length}, Stop words count: ${stopWords.length}`);
+  }
   
   return {
     textLength: textContent.length,

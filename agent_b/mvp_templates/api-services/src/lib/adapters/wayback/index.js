@@ -131,12 +131,22 @@ export class WaybackMachineAdapter {
           
           log(`[${i + 1}/${snapshots.length}] HTML fetched: ${htmlResult.length} bytes`);
           
+          // ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: проверяем что передаётся в анализ
+          log(`[${i + 1}/${snapshots.length}] Domain to ignore: ${domainName}, Stop words: ${stopWords.slice(0, 5).join(', ')}${stopWords.length > 5 ? '...' : ''}`);
+          
           // ПЕРЕДАЁМ domainName для исключения из поиска стоп-слов
           const analysis = await analyzeHtmlForSpam(htmlResult.html, stopWords, domainName);
           
           successfullyAnalyzed++;
           
+          // ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: что было найдено
+          log(`[${i + 1}/${snapshots.length}] Text extracted: ${analysis.textLength} chars, Meta: title=${analysis.metaTags.title ? analysis.metaTags.title.substring(0, 50) : 'none'}`);
           log(`[${i + 1}/${snapshots.length}] Analysis complete: spam=${analysis.isSpam}, score=${analysis.spamScore}, found=${analysis.stopWords.count} stop words`);
+          
+          // Если стоп-слов не найдено, но должны были быть - выводим предупреждение
+          if (analysis.stopWords.count === 0 && stopWords.length > 0 && analysis.textLength > 100) {
+            log(`[${i + 1}/${snapshots.length}] ⚠️ WARNING: No stop words found but text length is ${analysis.textLength} chars. Possible issues: domain filtering too aggressive or text extraction failed.`);
+          }
           
           if (analysis.isSpam) {
             spamSnapshots++;
