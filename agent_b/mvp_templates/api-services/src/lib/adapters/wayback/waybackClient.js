@@ -31,9 +31,9 @@ export class WaybackClient {
   }
 
   /**
-   * Fetch snapshots from CDX API
+   * Fetch snapshots from CDX API with retry logic for rate limiting
    */
-  async getSnapshots(target, limit = 10) {
+  async getSnapshots(target, limit = 10, retryCount = 0, maxRetries = 3) {
     const normalizedTarget = this.normalizeTarget(target);
     
     const params = new URLSearchParams({
@@ -61,6 +61,18 @@ export class WaybackClient {
         });
       } finally {
         clearTimeout(timeoutId);
+      }
+
+      // Handle rate limiting (429) with retry and exponential backoff
+      if (response && response.status === 429) {
+        if (retryCount < maxRetries) {
+          const waitTime = Math.pow(2, retryCount) * 2000; // Exponential backoff: 2s, 4s, 8s
+          console.log(`Rate limited (429). Waiting ${waitTime/1000}s before retry ${retryCount + 1}/${maxRetries}...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          return await this.getSnapshots(target, limit, retryCount + 1, maxRetries);
+        } else {
+          throw new Error(`CDX API rate limit exceeded after ${maxRetries} retries. Please try again later.`);
+        }
       }
 
       if (!response || !response.ok) {
@@ -118,9 +130,9 @@ export class WaybackClient {
   }
 
   /**
-   * Fetch HTML for a specific snapshot
+   * Fetch HTML for a specific snapshot with retry logic for rate limiting
    */
-  async getSnapshotHtml(snapshot) {
+  async getSnapshotHtml(snapshot, retryCount = 0, maxRetries = 3) {
     const { timestamp, originalUrl } = snapshot;
     
     if (!timestamp || !originalUrl) {
@@ -146,6 +158,18 @@ export class WaybackClient {
         });
       } finally {
         clearTimeout(timeoutId);
+      }
+
+      // Handle rate limiting (429) with retry and exponential backoff
+      if (response && response.status === 429) {
+        if (retryCount < maxRetries) {
+          const waitTime = Math.pow(2, retryCount) * 2000; // Exponential backoff: 2s, 4s, 8s
+          console.log(`Rate limited (429) fetching snapshot. Waiting ${waitTime/1000}s before retry ${retryCount + 1}/${maxRetries}...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          return await this.getSnapshotHtml(snapshot, retryCount + 1, maxRetries);
+        } else {
+          throw new Error(`Rate limit exceeded after ${maxRetries} retries. Please try again later.`);
+        }
       }
 
       if (!response || !response.ok) {

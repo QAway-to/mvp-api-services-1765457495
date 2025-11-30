@@ -129,9 +129,10 @@ export class WaybackMachineAdapter {
             }
           }
           
-          // Small delay between requests to be polite
+          // Delay between snapshot requests to avoid rate limiting
+          // Increased delay for spam analysis (was 500ms, now 1.5s)
           if (i < snapshots.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
         } catch (error) {
           log(`⚠️ Error analyzing snapshot ${snapshot.timestamp}: ${error.message}`);
@@ -204,9 +205,10 @@ export class WaybackMachineAdapter {
         });
       }
       
-      // Small delay between domains
+      // Delay between domains to avoid rate limiting
+      // Increased delay to reduce 429 errors (was 1s, now 3s)
       if (i < domains.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
     }
     
