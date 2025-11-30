@@ -209,6 +209,17 @@ class MVPGenerator:
                     wayback_files = list(wayback_dir.glob("*.js"))
                     log_agent_action("Agent B", f"🔍 Found wayback files: {[f.name for f in wayback_files]}")
         
+        # Special handling for web-scraper: verify adapters directory BEFORE main copytree
+        if template_id == "web-scraper":
+            adapters_src = template_path / "src" / "lib" / "adapters"
+            if adapters_src.exists():
+                log_agent_action("Agent B", f"🔧 Pre-checking adapters directory for web-scraper from {adapters_src}")
+                # List all files to ensure they exist
+                afltables_dir = adapters_src / "afltables"
+                if afltables_dir.exists():
+                    afltables_files = list(afltables_dir.glob("*.js"))
+                    log_agent_action("Agent B", f"🔍 Found afltables files: {[f.name for f in afltables_files]}")
+        
         log_agent_action("Agent B", f"📋 Copying template from {template_path} to {project_path}")
         try:
             shutil.copytree(template_path, project_path, dirs_exist_ok=False)
@@ -256,6 +267,52 @@ class MVPGenerator:
                         all_files = list(adapters_dest.rglob("*"))
                         log_agent_action("Agent B", f"🔍 Files in adapters dir: {[str(f.relative_to(adapters_dest)) for f in all_files if f.is_file()]}")
                     raise FileNotFoundError(f"Wayback adapter files not found after copy. Index exists: {wayback_index.exists()}, Client exists: {wayback_client.exists()}")
+            else:
+                log_agent_action("Agent B", f"❌❌❌ CRITICAL: Adapters source directory does not exist: {adapters_src}")
+                raise FileNotFoundError(f"Adapters source directory does not exist: {adapters_src}")
+        
+        # Special handling for web-scraper: ensure adapters directory is copied
+        if template_id == "web-scraper":
+            adapters_src = template_path / "src" / "lib" / "adapters"
+            adapters_dest = project_path / "src" / "lib" / "adapters"
+            
+            if adapters_src.exists():
+                log_agent_action("Agent B", f"🔧 Post-verifying adapters directory for web-scraper")
+                # Check if adapters were copied
+                if not adapters_dest.exists():
+                    log_agent_action("Agent B", f"⚠️ Adapters directory not found after copytree, copying now...")
+                    try:
+                        adapters_dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copytree(adapters_src, adapters_dest)
+                        log_agent_action("Agent B", f"✅✅✅ Successfully copied adapters directory after copytree")
+                    except Exception as e:
+                        log_agent_action("Agent B", f"❌❌❌ CRITICAL: Error copying adapters directory: {e}")
+                        import traceback
+                        log_agent_action("Agent B", f"❌ Traceback: {traceback.format_exc()}")
+                        raise
+                
+                # Verify critical adapter files
+                adapters_index = adapters_dest / "index.js"
+                adapters_base = adapters_dest / "base.js"
+                afltables_index = adapters_dest / "afltables" / "index.js"
+                afltables_parser = adapters_dest / "afltables" / "parser.js"
+                afltables_urlExpander = adapters_dest / "afltables" / "urlExpander.js"
+                
+                if (adapters_index.exists() and adapters_base.exists() and 
+                    afltables_index.exists() and afltables_parser.exists() and 
+                    afltables_urlExpander.exists()):
+                    log_agent_action("Agent B", f"✅✅✅ Verified web-scraper adapter files exist")
+                    log_agent_action("Agent B", f"🔍 Adapters index size: {adapters_index.stat().st_size if adapters_index.exists() else 0} bytes")
+                    log_agent_action("Agent B", f"🔍 Adapters base size: {adapters_base.stat().st_size if adapters_base.exists() else 0} bytes")
+                else:
+                    log_agent_action("Agent B", f"❌❌❌ CRITICAL: Adapter files missing!")
+                    log_agent_action("Agent B", f"   index: {adapters_index.exists()}, base: {adapters_base.exists()}")
+                    log_agent_action("Agent B", f"   afltables/index: {afltables_index.exists()}, parser: {afltables_parser.exists()}, urlExpander: {afltables_urlExpander.exists()}")
+                    # List what's actually in the directory
+                    if adapters_dest.exists():
+                        all_files = list(adapters_dest.rglob("*"))
+                        log_agent_action("Agent B", f"🔍 Files in adapters dir: {[str(f.relative_to(adapters_dest)) for f in all_files if f.is_file()]}")
+                    raise FileNotFoundError(f"Web-scraper adapter files not found after copy. Index: {adapters_index.exists()}, Base: {adapters_base.exists()}, AFLTables index: {afltables_index.exists()}, parser: {afltables_parser.exists()}, urlExpander: {afltables_urlExpander.exists()}")
             else:
                 log_agent_action("Agent B", f"❌❌❌ CRITICAL: Adapters source directory does not exist: {adapters_src}")
                 raise FileNotFoundError(f"Adapters source directory does not exist: {adapters_src}")
@@ -318,7 +375,18 @@ class MVPGenerator:
         # Use a dictionary approach to ensure no cross-template contamination
         template_critical_files_map = {
             "mini-etl-pipeline": ["package.json", "pages/index.js", "src/lib/spacex.js", "next.config.js"],
-            "web-scraper": ["package.json", "pages/index.js", "src/lib/scraper_core.js", "next.config.js", "vercel.json"],
+            "web-scraper": [
+                "package.json", 
+                "pages/index.js", 
+                "src/lib/scraper_core.js", 
+                "src/lib/adapters/index.js",
+                "src/lib/adapters/base.js",
+                "src/lib/adapters/afltables/index.js",
+                "src/lib/adapters/afltables/parser.js",
+                "src/lib/adapters/afltables/urlExpander.js",
+                "next.config.js", 
+                "vercel.json"
+            ],
             "brand-mention-monitor": ["package.json", "pages/index.js", "src/lib/news.js", "vercel.json"],
             "data-formatter": ["package.json", "pages/index.js", "src/lib/quotes.js", "vercel.json"],
             "email-campaign-manager": ["package.json", "pages/index.js", "vercel.json"],
