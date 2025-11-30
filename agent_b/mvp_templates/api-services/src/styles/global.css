@@ -97,6 +97,8 @@ a {
   flex-direction: column;
   gap: 16px;
   box-shadow: 0 40px 80px -40px rgba(15, 23, 42, 0.65);
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .card-header h2,
@@ -185,6 +187,7 @@ a {
   color: #f8f9fc;
   font-size: 0.95rem;
   transition: border 0.2s ease;
+  box-sizing: border-box;
 }
 
 .form-input:focus,
@@ -370,6 +373,7 @@ a {
   font-family: inherit;
   resize: vertical;
   transition: border 0.2s ease;
+  box-sizing: border-box;
 }
 
 .form-textarea:focus {

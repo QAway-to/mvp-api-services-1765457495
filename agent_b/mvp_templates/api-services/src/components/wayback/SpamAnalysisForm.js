@@ -51,7 +51,7 @@ export default function SpamAnalysisForm({ onAnalyze, isLoading }) {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} style={{ width: '100%', boxSizing: 'border-box' }}>
       <div className="form-group">
         <label className="form-label">
           Domains to Analyze (one per line)
@@ -101,9 +101,9 @@ export default function SpamAnalysisForm({ onAnalyze, isLoading }) {
         type="submit"
         disabled={isLoading || !domains.trim()}
         className="btn btn-primary"
-        style={{ width: '100%' }}
+        style={{ width: '100%', boxSizing: 'border-box' }}
       >
-        {isLoading ? '🔄 Analyzing...' : '🔍 Analyze for Spam'}
+        {isLoading ? 'Analyzing...' : 'Analyze for Spam'}
       </button>
     </form>
   );
