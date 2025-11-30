@@ -293,14 +293,14 @@ export default function WaybackPage() {
       <main className="page">
         <header className="page-header">
           <div>
-            <h1>📚 Wayback Machine</h1>
+            <h1>Wayback Machine</h1>
             <p className="subtitle">
-              Получение архивных снимков сайтов и анализ дроп-доменов на спам
+              Access archived website snapshots and analyze historical content
             </p>
           </div>
           <div className="header-actions">
             <Link href="/" className="btn">
-              ← Back to APIs
+              ← Back
             </Link>
           </div>
         </header>
@@ -316,11 +316,12 @@ export default function WaybackPage() {
                 setSpamSummary(null);
                 setError(null);
                 setLogs([]);
+                setDomainStatuses([]);
               }}
               className={mode === 'test' ? 'btn btn-primary' : 'btn'}
               style={{ flex: 1 }}
             >
-              🔍 Test Snapshots
+              Test Snapshots
             </button>
             <button
               onClick={() => {
@@ -330,11 +331,12 @@ export default function WaybackPage() {
                 setSpamSummary(null);
                 setError(null);
                 setLogs([]);
+                setDomainStatuses([]);
               }}
               className={mode === 'analyze' ? 'btn btn-primary' : 'btn'}
               style={{ flex: 1 }}
             >
-              🛡️ Analyze for Spam
+              Analyze for Spam
             </button>
           </div>
         </div>
@@ -342,12 +344,7 @@ export default function WaybackPage() {
         {/* Form Card */}
         <div className="card">
           <header className="card-header">
-            <h2>{mode === 'test' ? 'Test Configuration' : 'Spam Analysis Configuration'}</h2>
-            <p>
-              {mode === 'test' 
-                ? 'Enter a URL or domain to find archived snapshots'
-                : 'Enter domains to analyze for spam content in historical snapshots'}
-            </p>
+            <h2>{mode === 'test' ? 'Test Snapshots' : 'Spam Analysis'}</h2>
           </header>
           {mode === 'test' ? (
             <WaybackForm onTest={handleTest} isLoading={isLoading} />
@@ -397,9 +394,6 @@ export default function WaybackPage() {
           </div>
         )}
 
-        <footer className="page-footer">
-          <p>API Services MVP - Wayback Machine Integration</p>
-        </footer>
       </main>
     </>
   );

@@ -24,11 +24,21 @@ const STATUS_LABELS = {
 
 export default function DomainStatusList({ domains, summary }) {
   const containerRef = useRef(null);
+  const wasAtBottomRef = useRef(true);
 
-  // Auto-scroll to bottom when new domains are added
+  // Track if user is at bottom, and only auto-scroll if they were
   useEffect(() => {
     if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      const container = containerRef.current;
+      const threshold = 50; // pixels from bottom
+      const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+      
+      wasAtBottomRef.current = isAtBottom;
+      
+      // Only auto-scroll if user was at bottom (not manually scrolled up)
+      if (wasAtBottomRef.current) {
+        container.scrollTop = container.scrollHeight;
+      }
     }
   }, [domains]);
 
@@ -120,22 +130,36 @@ export default function DomainStatusList({ domains, summary }) {
       )}
 
       {/* Domain List */}
-      <div className="card">
+      <div className="card" style={{ overflow: 'hidden' }}>
         <header className="card-header">
           <h2>Domain Analysis Status</h2>
-          <p style={{ fontSize: '0.9rem', color: '#9ca3af', marginTop: '8px' }}>
-            Real-time analysis progress for each domain
-          </p>
         </header>
         <div
           ref={containerRef}
           style={{
             maxHeight: '600px',
             overflowY: 'auto',
+            overflowX: 'hidden',
             padding: '16px',
+            boxSizing: 'border-box',
+            margin: '0 -24px -24px',
+          }}
+          onScroll={(e) => {
+            // Track if user manually scrolls away from bottom
+            const container = e.target;
+            const threshold = 50;
+            const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+            wasAtBottomRef.current = isAtBottom;
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '12px',
+            padding: '0 24px 24px',
+            boxSizing: 'border-box',
+            width: '100%',
+          }}>
             {domains.map((domain, index) => (
               <div
                 key={index}
@@ -145,6 +169,8 @@ export default function DomainStatusList({ domains, summary }) {
                   border: '1px solid #374151',
                   backgroundColor: '#1f2937',
                   transition: 'all 0.2s',
+                  boxSizing: 'border-box',
+                  minWidth: 0,
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>

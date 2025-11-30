@@ -66,9 +66,6 @@ export default function SpamAnalysisForm({ onAnalyze, isLoading }) {
           disabled={isLoading}
           style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}
         />
-        <small style={{ color: '#9ca3af', fontSize: '0.85rem' }}>
-          Enter domain names, one per line. Each domain will be analyzed for spam content.
-        </small>
       </div>
 
       <div className="form-group">
@@ -83,9 +80,6 @@ export default function SpamAnalysisForm({ onAnalyze, isLoading }) {
           rows="3"
           disabled={isLoading}
         />
-        <small style={{ color: '#9ca3af', fontSize: '0.85rem' }}>
-          Default stop words will be used if not provided. Add custom keywords to detect spam.
-        </small>
       </div>
 
       <div className="form-group">
@@ -101,9 +95,6 @@ export default function SpamAnalysisForm({ onAnalyze, isLoading }) {
           className="form-input"
           disabled={isLoading}
         />
-        <small style={{ color: '#9ca3af', fontSize: '0.85rem' }}>
-          Number of historical snapshots to check per domain (1-50, default: 10)
-        </small>
       </div>
 
       <button
