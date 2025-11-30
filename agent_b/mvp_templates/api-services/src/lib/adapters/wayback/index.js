@@ -121,12 +121,27 @@ export class WaybackMachineAdapter {
       for (let i = 0; i < snapshots.length; i++) {
         const snapshot = snapshots[i];
         try {
-          log(`[${i + 1}/${snapshots.length}] Checking snapshot ${snapshot.timestamp} (${snapshot.originalUrl})...`);
+          // Log original URL properly formatted
+          const originalUrlDisplay = snapshot.originalUrl || 'unknown';
+          log(`[${i + 1}/${snapshots.length}] Checking snapshot ${originalUrlDisplay} (${snapshot.timestamp})...`);
+          
+          // DEBUG: Log details for first snapshot
+          if (i === 0) {
+            log(`[DEBUG] First snapshot - originalUrl: ${snapshot.originalUrl}, timestamp: ${snapshot.timestamp}`);
+          }
           
           const htmlResult = await this.getSnapshotHtml(snapshot);
           
           if (!htmlResult || !htmlResult.html) {
             throw new Error('Empty HTML result from snapshot');
+          }
+          
+          // DEBUG: Log HTML preview for first snapshot
+          if (i === 0) {
+            const htmlPreview = htmlResult.html.substring(0, 200).replace(/\s+/g, ' ');
+            log(`[DEBUG] First snapshot HTML preview (${htmlResult.html.length} bytes): ${htmlPreview}...`);
+            log(`[DEBUG] First snapshot rawUrl: https://web.archive.org/web/${snapshot.timestamp}id_/${snapshot.originalUrl}`);
+            log(`[DEBUG] First snapshot wrapperUrl: https://web.archive.org/web/${snapshot.timestamp}/${snapshot.originalUrl}`);
           }
           
           log(`[${i + 1}/${snapshots.length}] HTML fetched: ${htmlResult.length} bytes`);

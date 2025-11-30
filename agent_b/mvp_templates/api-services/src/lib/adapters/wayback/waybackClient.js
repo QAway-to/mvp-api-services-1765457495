@@ -37,6 +37,7 @@ export class WaybackClient {
 
   /**
    * Fetch snapshots from CDX API with retry logic for rate limiting
+   * Uses field list (fl) to get only needed fields: timestamp, original, statuscode, mime, length
    */
   async getSnapshots(target, limit = 10, retryCount = 0, maxRetries = 3) {
     const normalizedTarget = this.normalizeTarget(target);
@@ -44,6 +45,7 @@ export class WaybackClient {
     const params = new URLSearchParams({
       url: normalizedTarget,
       output: 'json',
+      fl: 'timestamp,original,statuscode,mime,length',
       filter: 'statuscode:200',
       limit: limit.toString(),
     });
@@ -88,23 +90,39 @@ export class WaybackClient {
       const data = await response.json();
 
       // CDX API returns array of arrays
-      // First row is headers: [timestamp, original, ...]
+      // With fl parameter: [timestamp, original, statuscode, mime, length]
+      // First row might be headers, skip if it doesn't look like data
       if (!Array.isArray(data) || data.length === 0) {
         return [];
       }
 
-      // Skip header row if it exists
-      const rows = data.slice(1);
+      // Determine if first row is header or data
+      const firstRow = data[0];
+      const hasHeaders = firstRow && typeof firstRow[0] === 'string' && 
+                         (firstRow[0] === 'timestamp' || firstRow[0] === 'Timestamp');
+      
+      const rows = hasHeaders ? data.slice(1) : data;
 
       return rows.map(row => {
-        // CDX format: [timestamp, original, mimetype, statuscode, digest, length, ...]
+        // With fl=timestamp,original,statuscode,mime,length:
+        // row[0] = timestamp
+        // row[1] = original (the actual URL, e.g. "http://www.paydayloan.com/")
+        // row[2] = statuscode
+        // row[3] = mime
+        // row[4] = length
         const timestamp = row[0] || '';
-        const originalUrl = row[1] || '';
-        const statusCode = row[3] ? parseInt(row[3], 10) : null;
+        const originalUrl = row[1] || ''; // This should be the actual URL, not SURT format
+        const statusCode = row[2] ? parseInt(row[2], 10) : null;
+
+        // Verify that originalUrl is a proper URL (starts with http:// or https://)
+        // If not, it might be SURT format and we need to handle it
+        if (!originalUrl.startsWith('http://') && !originalUrl.startsWith('https://')) {
+          console.warn(`Warning: originalUrl doesn't start with http:// or https://: "${originalUrl}"`);
+        }
 
         return {
           timestamp: timestamp,
-          originalUrl: originalUrl,
+          originalUrl: originalUrl, // Should be full URL like "http://www.paydayloan.com/"
           statusCode: statusCode,
         };
       }).filter(snapshot => snapshot.timestamp && snapshot.originalUrl);
@@ -118,19 +136,19 @@ export class WaybackClient {
 
   /**
    * Build Wayback Machine snapshot URL
+   * @param {string} timestamp - Snapshot timestamp (14 digits)
+   * @param {string} originalUrl - Original URL (should start with http:// or https://)
    */
   buildSnapshotUrl(timestamp, originalUrl) {
-    // Ensure originalUrl doesn't start with protocol for Wayback URL construction
-    let urlPath = originalUrl;
-    if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
-      try {
-        const url = new URL(urlPath);
-        urlPath = url.hostname + url.pathname;
-      } catch (e) {
-        // Keep original if URL parsing fails
-      }
+    // originalUrl should be a full URL like "http://www.paydayloan.com/" or "https://888casino.com/"
+    // Wayback Machine expects it in the format: /web/{timestamp}/{originalUrl}
+    // where originalUrl can include protocol
+    if (!originalUrl) {
+      throw new Error('originalUrl is required');
     }
     
+    // Use originalUrl as-is (Wayback handles it correctly)
+    // If it starts with http:// or https://, that's fine
     return `${this.webBaseUrl}/${timestamp}/${originalUrl}`;
   }
 
