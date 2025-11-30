@@ -111,18 +111,32 @@ export class WaybackMachineAdapter {
       
       let spamSnapshots = 0;
       let totalSpamScore = 0;
+      let successfullyAnalyzed = 0; // Счётчик успешно проанализированных снапшотов
+      let failedSnapshots = 0; // Счётчик неудачных попыток
       const allFoundStopWords = new Map(); // word -> count
       let firstSpamDate = null;
+      const snapshotErrors = []; // Детальные ошибки для каждого снапшота
 
       // Analyze each snapshot
       for (let i = 0; i < snapshots.length; i++) {
         const snapshot = snapshots[i];
         try {
-          log(`[${i + 1}/${snapshots.length}] Checking snapshot ${snapshot.timestamp}...`);
+          log(`[${i + 1}/${snapshots.length}] Checking snapshot ${snapshot.timestamp} (${snapshot.originalUrl})...`);
           
           const htmlResult = await this.getSnapshotHtml(snapshot);
+          
+          if (!htmlResult || !htmlResult.html) {
+            throw new Error('Empty HTML result from snapshot');
+          }
+          
+          log(`[${i + 1}/${snapshots.length}] HTML fetched: ${htmlResult.length} bytes`);
+          
           // ПЕРЕДАЁМ domainName для исключения из поиска стоп-слов
           const analysis = await analyzeHtmlForSpam(htmlResult.html, stopWords, domainName);
+          
+          successfullyAnalyzed++;
+          
+          log(`[${i + 1}/${snapshots.length}] Analysis complete: spam=${analysis.isSpam}, score=${analysis.spamScore}, found=${analysis.stopWords.count} stop words`);
           
           if (analysis.isSpam) {
             spamSnapshots++;
@@ -133,6 +147,8 @@ export class WaybackMachineAdapter {
               const current = allFoundStopWords.get(item.word) || 0;
               allFoundStopWords.set(item.word, current + item.count);
             });
+            
+            log(`[${i + 1}/${snapshots.length}] ⚠️ SPAM DETECTED: ${analysis.stopWords.found.map(s => s.word).join(', ')}`);
             
             // Track first spam date
             if (!firstSpamDate) {
@@ -146,13 +162,24 @@ export class WaybackMachineAdapter {
             await new Promise(resolve => setTimeout(resolve, 3000));
           }
         } catch (error) {
-          log(`⚠️ Error analyzing snapshot ${snapshot.timestamp}: ${error.message}`);
+          failedSnapshots++;
+          const errorMsg = error.message || String(error);
+          log(`❌ Error analyzing snapshot ${snapshot.timestamp}: ${errorMsg}`);
+          snapshotErrors.push({
+            timestamp: snapshot.timestamp,
+            originalUrl: snapshot.originalUrl,
+            error: errorMsg,
+            stack: error.stack || null
+          });
           // Continue with next snapshot
         }
       }
 
-      // Calculate overall spam score (percentage of snapshots with spam)
-      const spamPercentage = (spamSnapshots / snapshots.length) * 100;
+      // Calculate overall spam score (percentage of SUCCESSFULLY ANALYZED snapshots with spam)
+      // ИСПРАВЛЕНО: используем successfullyAnalyzed вместо snapshots.length
+      const spamPercentage = successfullyAnalyzed > 0 
+        ? (spamSnapshots / successfullyAnalyzed) * 100 
+        : 0;
       const avgSpamScore = spamSnapshots > 0 ? totalSpamScore / spamSnapshots : 0;
 
       // Convert stop words map to array
@@ -171,9 +198,12 @@ export class WaybackMachineAdapter {
       // Calculate domain spam score (0-10) as average of spam snapshot scores
       const domainSpamScore = spamSnapshots > 0 ? Math.round((totalSpamScore / spamSnapshots) * 10) / 10 : 0;
 
-      return {
+      // Добавляем детальную информацию об ошибках
+      const result = {
         domain: domain,
         snapshotsChecked: snapshots.length,
+        successfullyAnalyzed: successfullyAnalyzed,
+        failedSnapshots: failedSnapshots,
         spamSnapshots: spamSnapshots,
         spamPercentage: Math.round(spamPercentage * 100) / 100,
         avgSpamScore: Math.round(avgSpamScore * 100) / 100,
@@ -184,6 +214,22 @@ export class WaybackMachineAdapter {
         firstSpamDate: firstSpamDate,
         status: status,
       };
+      
+      // Добавляем детальные ошибки если есть
+      if (snapshotErrors.length > 0) {
+        result.snapshotErrors = snapshotErrors;
+        log(`⚠️ ${failedSnapshots} snapshot(s) failed to analyze out of ${snapshots.length} total`);
+      }
+      
+      if (successfullyAnalyzed === 0) {
+        log(`❌ CRITICAL: No snapshots were successfully analyzed! All ${snapshots.length} attempts failed.`);
+        result.status = 'error';
+        result.error = `Failed to analyze any snapshots. ${failedSnapshots} errors occurred.`;
+      } else if (successfullyAnalyzed < snapshots.length) {
+        log(`⚠️ Only ${successfullyAnalyzed} out of ${snapshots.length} snapshots were successfully analyzed`);
+      }
+      
+      return result;
     } catch (error) {
       throw new Error(`Domain analysis failed: ${error.message}`);
     }
