@@ -326,7 +326,18 @@ class MVPGenerator:
             "news-parser": ["package.json", "pages/index.js", "vercel.json"],
             "analytics-dashboard": ["package.json", "pages/index.js", "vercel.json"],
             "telegram-shop-bot": ["package.json", "pages/index.js", "vercel.json"],
-            "api-services": ["package.json", "pages/index.js", "pages/api/wayback/index.js", "src/lib/adapters/wayback/index.js", "src/lib/adapters/wayback/waybackClient.js", "vercel.json", "next.config.js"],
+            "api-services": [
+                "package.json", 
+                "pages/index.js", 
+                "pages/api/wayback/index.js",
+                "pages/api/wayback/analyze-spam.js",
+                "src/lib/adapters/wayback/index.js", 
+                "src/lib/adapters/wayback/waybackClient.js",
+                "src/lib/adapters/wayback/htmlParser.js",
+                "src/lib/adapters/wayback/stopWords.js",
+                "vercel.json", 
+                "next.config.js"
+            ],
         }
         
         # Get critical files for THIS template only - create a fresh list
