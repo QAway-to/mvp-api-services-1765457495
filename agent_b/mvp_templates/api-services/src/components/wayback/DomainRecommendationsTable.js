@@ -45,6 +45,7 @@ export default function DomainRecommendationsTable({ domains }) {
               <th style={{ padding: '12px', textAlign: 'center', color: '#9ca3af', fontWeight: 600 }}>Topic Stability</th>
               <th style={{ padding: '12px', textAlign: 'center', color: '#9ca3af', fontWeight: 600 }}>Risk Level</th>
               <th style={{ padding: '12px', textAlign: 'center', color: '#9ca3af', fontWeight: 600 }}>Recommendation</th>
+              <th style={{ padding: '12px', textAlign: 'left', color: '#9ca3af', fontWeight: 600 }}>Reason</th>
             </tr>
           </thead>
           <tbody>
@@ -56,6 +57,7 @@ export default function DomainRecommendationsTable({ domains }) {
               const riskScore = domain.overallRiskScore || 0;
               const recommendation = domain.recommendation || 'REVIEW';
               const riskLevel = domain.riskLevel || 'MEDIUM';
+              const recommendationReason = domain.recommendationReason || 'No reason provided';
 
               return (
                 <tr key={index} style={{ borderBottom: '1px solid #374151' }}>
@@ -146,6 +148,18 @@ export default function DomainRecommendationsTable({ domains }) {
                     >
                       {recommendation}
                     </span>
+                  </td>
+                  <td style={{ padding: '12px', color: '#9ca3af', fontSize: '0.875rem', maxWidth: '300px' }}>
+                    <div style={{ 
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      lineHeight: '1.4'
+                    }}>
+                      {recommendationReason}
+                    </div>
                   </td>
                 </tr>
               );

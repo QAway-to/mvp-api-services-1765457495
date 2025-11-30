@@ -425,10 +425,15 @@ export class WaybackMachineAdapter {
 
     try {
       log(`Starting complete analysis for ${domain}...`);
-      updateStatus('ANALYZING_SPAM', { lastMessage: 'Analyzing spam content...' });
+      updateStatus('FETCHING_SNAPSHOTS', { lastMessage: 'Fetching historical snapshots...' });
 
       // Step 1: Get snapshots and analyze spam
       const snapshots = await this.client.getSnapshots(domain, maxSnapshots);
+      
+      updateStatus('ANALYZING_SPAM', { 
+        lastMessage: `Analyzing spam content in ${snapshots.length} snapshot(s)...`,
+        snapshotsFound: snapshots.length,
+      });
       
       if (snapshots.length === 0) {
         return {
@@ -474,70 +479,142 @@ export class WaybackMachineAdapter {
       updateStatus('ANALYZING_METRICS', { lastMessage: 'Fetching domain metrics...' });
       const metrics = await getDomainMetrics(domain, backlinkAnalysis);
 
-      // Calculate overall risk score (0-100)
-      let riskScore = 0;
-      let factors = 0;
-
-      // Spam score contribution (higher spam = higher risk)
-      if (spamAnalysis.maxSpamScore !== undefined) {
-        riskScore += spamAnalysis.maxSpamScore * 10; // Scale 0-10 to 0-100
-        factors++;
+      // Calculate overall risk score (0-100) with clear logic
+      const riskFactors = [];
+      
+      // 1. Spam score (0-100, higher = worse)
+      const spamRisk = spamAnalysis.maxSpamScore !== undefined ? spamAnalysis.maxSpamScore * 10 : null;
+      if (spamRisk !== null) {
+        riskFactors.push({ name: 'Spam Content', value: spamRisk, weight: 0.35 });
       }
-
-      // Low quality backlinks = higher risk
-      if (backlinkAnalysis.averageQualityScore !== undefined) {
-        riskScore += (100 - backlinkAnalysis.averageQualityScore); // Invert: low quality = high risk
-        factors++;
+      
+      // 2. Backlink quality (invert: 0 = bad, 100 = good -> 100 = bad, 0 = good)
+      const backlinkRisk = backlinkAnalysis.averageQualityScore !== undefined 
+        ? (100 - backlinkAnalysis.averageQualityScore) 
+        : null;
+      if (backlinkRisk !== null) {
+        riskFactors.push({ name: 'Backlink Quality', value: backlinkRisk, weight: 0.25 });
       }
-
-      // Low metrics = higher risk
-      if (metrics.overallQualityScore !== null) {
-        riskScore += (100 - metrics.overallQualityScore); // Invert: low quality = high risk
-        factors++;
+      
+      // 3. Domain metrics (invert: low metrics = high risk)
+      const metricsRisk = metrics.overallQualityScore !== null 
+        ? (100 - metrics.overallQualityScore) 
+        : null;
+      if (metricsRisk !== null) {
+        riskFactors.push({ name: 'Domain Metrics', value: metricsRisk, weight: 0.25 });
       }
-
-      // Topic instability = higher risk
-      if (topicAnalysis.stabilityScore !== null) {
-        riskScore += (100 - topicAnalysis.stabilityScore); // Invert: low stability = high risk
-        factors++;
+      
+      // 4. Topic stability (invert: low stability = high risk)
+      const topicRisk = topicAnalysis.stabilityScore !== null 
+        ? (100 - topicAnalysis.stabilityScore) 
+        : null;
+      if (topicRisk !== null) {
+        riskFactors.push({ name: 'Topic Stability', value: topicRisk, weight: 0.15 });
       }
-
-      // Red flags add to risk
-      if (topicAnalysis.redFlags) {
-        topicAnalysis.redFlags.forEach(flag => {
-          if (flag.severity === 'high') riskScore += 15;
-          else if (flag.severity === 'medium') riskScore += 8;
-          else riskScore += 3;
-        });
+      
+      // Calculate weighted average risk score
+      let overallRiskScore = 0;
+      let totalWeight = 0;
+      
+      riskFactors.forEach(factor => {
+        overallRiskScore += factor.value * factor.weight;
+        totalWeight += factor.weight;
+      });
+      
+      // Add red flags penalty (separate from weighted average)
+      let redFlagPenalty = 0;
+      if (topicAnalysis.redFlags && topicAnalysis.redFlags.length > 0) {
+        redFlagPenalty = topicAnalysis.redFlags.reduce((sum, flag) => {
+          if (flag.severity === 'high') return sum + 15;
+          if (flag.severity === 'medium') return sum + 8;
+          return sum + 3;
+        }, 0);
+        // Cap red flag penalty at 30
+        redFlagPenalty = Math.min(30, redFlagPenalty);
       }
-
-      const overallRiskScore = factors > 0 ? Math.min(100, Math.round(riskScore / (factors + (topicAnalysis.redFlags?.length || 0) * 0.1))) : 0;
-
-      // Determine recommendation
-      let recommendation = 'REVIEW';
-      if (overallRiskScore < 30) {
-        recommendation = 'BUY';
-      } else if (overallRiskScore < 50) {
-        recommendation = 'REVIEW';
-      } else if (overallRiskScore < 70) {
-        recommendation = 'CAUTION';
+      
+      // Normalize and add penalty
+      if (totalWeight > 0) {
+        overallRiskScore = Math.round((overallRiskScore / totalWeight) + redFlagPenalty);
       } else {
-        recommendation = 'AVOID';
+        // If no factors available, use spam analysis only
+        overallRiskScore = spamRisk !== null ? Math.round(spamRisk + redFlagPenalty) : 0;
       }
-
-      // Determine risk level
-      let riskLevel = 'LOW';
-      if (overallRiskScore >= 70) {
-        riskLevel = 'HIGH';
+      
+      // Cap at 100
+      overallRiskScore = Math.min(100, Math.max(0, overallRiskScore));
+      
+      // Determine recommendation based on clear criteria
+      let recommendation = 'REVIEW';
+      let recommendationReason = [];
+      
+      // Critical issues - always AVOID
+      if (spamRisk !== null && spamRisk >= 80) {
+        recommendation = 'AVOID';
+        recommendationReason.push('Very high spam score detected');
+      } else if (spamRisk !== null && spamRisk >= 50) {
+        recommendation = 'AVOID';
+        recommendationReason.push('High spam content detected');
+      } else if (redFlagPenalty >= 20) {
+        recommendation = 'AVOID';
+        recommendationReason.push('Multiple high-severity red flags detected');
+      }
+      // High risk
+      else if (overallRiskScore >= 70) {
+        recommendation = 'AVOID';
+        recommendationReason.push(`High overall risk score (${overallRiskScore})`);
+      } else if (overallRiskScore >= 55) {
+        recommendation = 'CAUTION';
+        recommendationReason.push(`Elevated risk score (${overallRiskScore})`);
       } else if (overallRiskScore >= 40) {
+        recommendation = 'REVIEW';
+        recommendationReason.push(`Moderate risk (${overallRiskScore}) - review carefully`);
+      } else if (overallRiskScore >= 25) {
+        recommendation = 'REVIEW';
+        recommendationReason.push(`Low-moderate risk (${overallRiskScore})`);
+      } else {
+        recommendation = 'BUY';
+        recommendationReason.push(`Low risk score (${overallRiskScore})`);
+      }
+      
+      // Additional factors for recommendation
+      if (metricsRisk !== null && metricsRisk > 70) {
+        recommendation = recommendation === 'BUY' ? 'REVIEW' : recommendation;
+        if (recommendationReason.length === 1 && recommendationReason[0].includes('Low risk')) {
+          recommendationReason.push('Poor domain metrics detected');
+        }
+      }
+      
+      if (backlinkRisk !== null && backlinkRisk > 60) {
+        recommendation = recommendation === 'BUY' ? 'REVIEW' : recommendation;
+        if (recommendationReason.length === 1 && recommendationReason[0].includes('Low risk')) {
+          recommendationReason.push('Low backlink quality detected');
+        }
+      }
+      
+      // Determine risk level (must match recommendation)
+      let riskLevel = 'LOW';
+      if (overallRiskScore >= 70 || recommendation === 'AVOID') {
+        riskLevel = 'HIGH';
+      } else if (overallRiskScore >= 40 || recommendation === 'CAUTION') {
         riskLevel = 'MEDIUM';
+      } else {
+        riskLevel = 'LOW';
+      }
+      
+      // Ensure consistency: if recommendation is AVOID but risk is LOW, fix it
+      if (recommendation === 'AVOID' && riskLevel === 'LOW') {
+        riskLevel = 'HIGH';
       }
 
       log(`Complete analysis finished for ${domain}`);
+      const reasonText = recommendationReason.join('; ');
       updateStatus('COMPLETE', {
-        lastMessage: `Analysis complete. Risk: ${riskLevel}, Recommendation: ${recommendation}`,
+        lastMessage: `Analysis complete. Risk: ${riskLevel}, Recommendation: ${recommendation}. ${reasonText}`,
         overallRiskScore,
         recommendation,
+        recommendationReason: reasonText,
+        riskFactors,
       });
 
       return {
@@ -550,6 +627,8 @@ export class WaybackMachineAdapter {
         overallRiskScore,
         riskLevel,
         recommendation,
+        recommendationReason: reasonText,
+        riskFactors: riskFactors.map(f => ({ name: f.name, risk: f.value })),
         analyzedAt: new Date().toISOString(),
       };
     } catch (error) {

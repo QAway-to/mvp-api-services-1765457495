@@ -30,25 +30,43 @@ export default async function handler(req, res) {
   res.write(`data: ${JSON.stringify({ type: 'connected', sessionId })}\n\n`);
 
   // Polling interval
-  const pollInterval = 500;
+  const pollInterval = 300; // Faster polling for real-time updates
   let lastUpdateTime = Date.now();
-
+  
+  let lastStatusHash = '';
+  let lastResultsHash = '';
+  
   const checkAndSendUpdates = () => {
     try {
+      if (res.closed) {
+        return;
+      }
+      
       const statuses = global.domainStatusStorage.get(sessionId);
       const results = global.completeAnalysisResults.get(sessionId);
       
       if (statuses) {
         const statusArray = Array.from(statuses.values());
         
+        // Create hash of current status to detect changes (include more details)
+        const statusHash = JSON.stringify(statusArray.map(d => ({ 
+          domain: d.domain, 
+          status: d.status,
+          lastMessage: d.lastMessage,
+          snapshotsFound: d.snapshotsFound,
+          snapshotsAnalyzed: d.snapshotsAnalyzed,
+        })));
+        
         // Check if we have complete results
         if (results && results.length > 0) {
+          const resultsHash = JSON.stringify(results.map(r => ({ domain: r.domain, status: r.status })));
+          
           // Check if all domains are complete
           const allComplete = statusArray.every(d => 
-            ['COMPLETE', 'UNAVAILABLE', 'NO_SNAPSHOTS'].includes(d.status) || d.status?.includes('COMPLETE')
+            ['COMPLETE', 'UNAVAILABLE', 'NO_SNAPSHOTS'].includes(d.status)
           );
           
-          if (allComplete) {
+          if (allComplete && resultsHash !== lastResultsHash) {
             // Send complete results
             res.write(`data: ${JSON.stringify({ 
               type: 'complete', 
@@ -59,18 +77,27 @@ export default async function handler(req, res) {
               }))
             })}\n\n`);
             
-            // Clear results after sending
-            global.completeAnalysisResults.delete(sessionId);
+            lastResultsHash = resultsHash;
+            // Don't clear immediately - allow client to see final status
+            setTimeout(() => {
+              global.completeAnalysisResults.delete(sessionId);
+            }, 5000);
             return;
           }
         }
         
-        res.write(`data: ${JSON.stringify({ type: 'update', domains: statusArray })}\n\n`);
-        lastUpdateTime = Date.now();
+        // Send status updates if changed (always send updates for real-time feel)
+        if (statusHash !== lastStatusHash || statusArray.length > 0) {
+          res.write(`data: ${JSON.stringify({ type: 'status', domains: statusArray })}\n\n`);
+          lastStatusHash = statusHash;
+          lastUpdateTime = Date.now();
+        }
       }
     } catch (error) {
       console.error('Error sending SSE update:', error);
-      res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+      if (!res.closed) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+      }
     }
   };
 

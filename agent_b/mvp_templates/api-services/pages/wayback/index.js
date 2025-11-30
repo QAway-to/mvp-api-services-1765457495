@@ -183,18 +183,35 @@ export default function WaybackPage() {
             return;
           }
           
-          // Handle spam analysis status (original logic - batch updates)
-          if (update.type === 'status' && update.domains) {
-            // Update domain statuses
+          // Handle status updates (both spam and complete mode - batch updates)
+          if (update.type === 'status' && update.domains && Array.isArray(update.domains)) {
+            // Update domain statuses (real-time update)
             setDomainStatuses(prevStatuses => {
-              // Merge with previous to preserve order
-              const statusMap = new Map(update.domains.map(d => [d.domain, d]));
-              return update.domains;
+              // Create a map of new statuses
+              const newStatusMap = new Map(update.domains.map(d => [d.domain, d]));
+              
+              // Merge with previous to preserve order and update only changed domains
+              const updated = prevStatuses.map(prev => {
+                const updatedDomain = newStatusMap.get(prev.domain);
+                if (updatedDomain) {
+                  return { ...prev, ...updatedDomain };
+                }
+                return prev;
+              });
+              
+              // Add any new domains that weren't in previous list
+              update.domains.forEach(newDomain => {
+                if (!prevStatuses.find(d => d.domain === newDomain.domain)) {
+                  updated.push(newDomain);
+                }
+              });
+              
+              return updated;
             });
             
-            // Check if all domains are complete
+            // Check if all domains are complete (for spam analysis)
             const allComplete = update.domains.every(d => 
-              ['CLEAN', 'SUSPICIOUS', 'SPAM', 'UNAVAILABLE', 'NO_SNAPSHOTS'].includes(d.status)
+              ['CLEAN', 'SUSPICIOUS', 'SPAM', 'UNAVAILABLE', 'NO_SNAPSHOTS', 'COMPLETE'].includes(d.status)
             );
             
             if (allComplete) {
