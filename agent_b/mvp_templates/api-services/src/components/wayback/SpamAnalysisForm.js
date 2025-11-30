@@ -26,6 +26,7 @@ export default function SpamAnalysisForm({ onAnalyze, isLoading }) {
   const [domains, setDomains] = useState(DEFAULT_DOMAINS);
   const [stopWords, setStopWords] = useState(DEFAULT_STOP_WORDS);
   const [maxSnapshots, setMaxSnapshots] = useState(10);
+  const [analysisMode, setAnalysisMode] = useState('spam'); // 'spam' or 'complete'
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -47,6 +48,7 @@ export default function SpamAnalysisForm({ onAnalyze, isLoading }) {
       domains: domainList,
       stopWords: stopWords.trim() || null,
       maxSnapshots: parseInt(maxSnapshots) || 10,
+      analysisMode: analysisMode,
     });
   };
 
@@ -97,13 +99,55 @@ export default function SpamAnalysisForm({ onAnalyze, isLoading }) {
         />
       </div>
 
+      <div className="form-group">
+        <label className="form-label">Analysis Mode</label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px', borderRadius: '8px', background: analysisMode === 'spam' ? 'rgba(37, 99, 235, 0.1)' : 'transparent' }}>
+            <input
+              type="radio"
+              name="analysisMode"
+              value="spam"
+              checked={analysisMode === 'spam'}
+              onChange={(e) => setAnalysisMode(e.target.value)}
+              disabled={isLoading}
+            />
+            <div>
+              <div style={{ fontWeight: 500 }}>Spam Analysis Only (Fast)</div>
+              <div style={{ fontSize: '0.85rem', color: '#9ca3af', marginTop: '2px' }}>
+                Checks historical snapshots for spam content only
+              </div>
+            </div>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px', borderRadius: '8px', background: analysisMode === 'complete' ? 'rgba(37, 99, 235, 0.1)' : 'transparent' }}>
+            <input
+              type="radio"
+              name="analysisMode"
+              value="complete"
+              checked={analysisMode === 'complete'}
+              onChange={(e) => setAnalysisMode(e.target.value)}
+              disabled={isLoading}
+            />
+            <div>
+              <div style={{ fontWeight: 500 }}>Complete Analysis (Comprehensive)</div>
+              <div style={{ fontSize: '0.85rem', color: '#9ca3af', marginTop: '2px' }}>
+                Spam + Backlinks + Topics + Domain Metrics (DR, Trust Flow, etc.)
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <button
         type="submit"
         disabled={isLoading || !domains.trim()}
         className="btn btn-primary"
         style={{ width: '100%', boxSizing: 'border-box' }}
       >
-        {isLoading ? 'Analyzing...' : 'Analyze for Spam'}
+        {isLoading 
+          ? 'Analyzing...' 
+          : analysisMode === 'complete' 
+            ? 'Start Complete Analysis' 
+            : 'Analyze for Spam'}
       </button>
     </form>
   );

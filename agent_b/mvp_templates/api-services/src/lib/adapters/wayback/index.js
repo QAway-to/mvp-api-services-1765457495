@@ -1,6 +1,9 @@
 // Wayback Machine adapter
 import { WaybackClient } from './waybackClient.js';
 import { analyzeHtmlForSpam } from './htmlParser.js';
+import { analyzeBacklinksHistory } from './backlinkAnalyzer.js';
+import { getDomainMetrics } from './metricsAnalyzer.js';
+import { analyzeTopicStability } from './topicAnalyzer.js';
 
 export class WaybackMachineAdapter {
   constructor() {
@@ -394,6 +397,252 @@ export class WaybackMachineAdapter {
     });
     
     return sortedResults;
+  }
+
+  /**
+   * Complete domain analysis - spam, backlinks, topics, metrics
+   * @param {string} domain - Domain to analyze
+   * @param {Array<string>} stopWords - List of spam keywords
+   * @param {number} maxSnapshots - Max snapshots to check (default: 10)
+   * @param {Function} progressCallback - Optional callback for progress updates
+   * @param {Function} statusCallback - Optional callback for status updates
+   * @returns {Promise<Object>} Complete analysis result
+   */
+  async analyzeDomainComplete(domain, stopWords = [], maxSnapshots = 10, progressCallback = null, statusCallback = null) {
+    const log = (msg) => {
+      if (progressCallback) progressCallback(msg);
+    };
+    
+    const updateStatus = (status, data = {}) => {
+      if (statusCallback) {
+        statusCallback({
+          domain,
+          status,
+          ...data,
+        });
+      }
+    };
+
+    try {
+      log(`Starting complete analysis for ${domain}...`);
+      updateStatus('ANALYZING_SPAM', { lastMessage: 'Analyzing spam content...' });
+
+      // Step 1: Get snapshots and analyze spam
+      const snapshots = await this.client.getSnapshots(domain, maxSnapshots);
+      
+      if (snapshots.length === 0) {
+        return {
+          domain,
+          status: 'NO_SNAPSHOTS',
+          error: 'No snapshots found',
+          snapshotsFound: 0,
+        };
+      }
+
+      // Fetch HTML for all snapshots (for backlink and topic analysis)
+      const snapshotsWithHtml = [];
+      for (let i = 0; i < snapshots.length; i++) {
+        const snapshot = snapshots[i];
+        try {
+          const htmlResult = await this.client.getSnapshotHtml(snapshot);
+          snapshotsWithHtml.push({
+            ...snapshot,
+            html: htmlResult.html,
+          });
+          log(`Fetched HTML for snapshot ${i + 1}/${snapshots.length}`);
+        } catch (error) {
+          log(`Failed to fetch HTML for snapshot ${snapshot.timestamp}: ${error.message}`);
+        }
+      }
+
+      // Step 2: Spam analysis
+      log('Analyzing spam content...');
+      const spamAnalysis = await this.analyzeDomainForSpam(domain, stopWords, maxSnapshots, log, updateStatus);
+
+      // Step 3: Backlink analysis
+      log('Analyzing backlinks...');
+      updateStatus('ANALYZING_BACKLINKS', { lastMessage: 'Analyzing backlink profile...' });
+      const backlinkAnalysis = await analyzeBacklinksHistory(snapshotsWithHtml, stopWords, domain);
+
+      // Step 4: Topic analysis
+      log('Analyzing topic stability...');
+      updateStatus('ANALYZING_TOPICS', { lastMessage: 'Analyzing topic shifts...' });
+      const topicAnalysis = await analyzeTopicStability(snapshotsWithHtml);
+
+      // Step 5: Metrics analysis
+      log('Fetching domain metrics...');
+      updateStatus('ANALYZING_METRICS', { lastMessage: 'Fetching domain metrics...' });
+      const metrics = await getDomainMetrics(domain, backlinkAnalysis);
+
+      // Calculate overall risk score (0-100)
+      let riskScore = 0;
+      let factors = 0;
+
+      // Spam score contribution (higher spam = higher risk)
+      if (spamAnalysis.maxSpamScore !== undefined) {
+        riskScore += spamAnalysis.maxSpamScore * 10; // Scale 0-10 to 0-100
+        factors++;
+      }
+
+      // Low quality backlinks = higher risk
+      if (backlinkAnalysis.averageQualityScore !== undefined) {
+        riskScore += (100 - backlinkAnalysis.averageQualityScore); // Invert: low quality = high risk
+        factors++;
+      }
+
+      // Low metrics = higher risk
+      if (metrics.overallQualityScore !== null) {
+        riskScore += (100 - metrics.overallQualityScore); // Invert: low quality = high risk
+        factors++;
+      }
+
+      // Topic instability = higher risk
+      if (topicAnalysis.stabilityScore !== null) {
+        riskScore += (100 - topicAnalysis.stabilityScore); // Invert: low stability = high risk
+        factors++;
+      }
+
+      // Red flags add to risk
+      if (topicAnalysis.redFlags) {
+        topicAnalysis.redFlags.forEach(flag => {
+          if (flag.severity === 'high') riskScore += 15;
+          else if (flag.severity === 'medium') riskScore += 8;
+          else riskScore += 3;
+        });
+      }
+
+      const overallRiskScore = factors > 0 ? Math.min(100, Math.round(riskScore / (factors + (topicAnalysis.redFlags?.length || 0) * 0.1))) : 0;
+
+      // Determine recommendation
+      let recommendation = 'REVIEW';
+      if (overallRiskScore < 30) {
+        recommendation = 'BUY';
+      } else if (overallRiskScore < 50) {
+        recommendation = 'REVIEW';
+      } else if (overallRiskScore < 70) {
+        recommendation = 'CAUTION';
+      } else {
+        recommendation = 'AVOID';
+      }
+
+      // Determine risk level
+      let riskLevel = 'LOW';
+      if (overallRiskScore >= 70) {
+        riskLevel = 'HIGH';
+      } else if (overallRiskScore >= 40) {
+        riskLevel = 'MEDIUM';
+      }
+
+      log(`Complete analysis finished for ${domain}`);
+      updateStatus('COMPLETE', {
+        lastMessage: `Analysis complete. Risk: ${riskLevel}, Recommendation: ${recommendation}`,
+        overallRiskScore,
+        recommendation,
+      });
+
+      return {
+        domain,
+        status: 'COMPLETE',
+        spamAnalysis,
+        backlinkAnalysis,
+        topicAnalysis,
+        metrics,
+        overallRiskScore,
+        riskLevel,
+        recommendation,
+        analyzedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      const errorMsg = error.message || String(error);
+      log(`❌ Complete analysis failed: ${errorMsg}`);
+      updateStatus('UNAVAILABLE', {
+        lastMessage: `Analysis failed: ${errorMsg}`,
+        error: errorMsg,
+      });
+      return {
+        domain,
+        status: 'UNAVAILABLE',
+        error: errorMsg,
+      };
+    }
+  }
+
+  /**
+   * Analyze multiple domains with complete analysis
+   * @param {Array<string>} domains - Array of domains
+   * @param {Array<string>} stopWords - List of spam keywords
+   * @param {number} maxSnapshots - Max snapshots per domain
+   * @param {Function} progressCallback - Optional callback
+   * @param {Function} statusCallback - Optional callback for domain status updates
+   * @param {number} maxConcurrent - Max concurrent analyses (default: 2 - slower due to API calls)
+   * @returns {Promise<Array<Object>>} Array of complete analysis results
+   */
+  async analyzeDomainsComplete(domains, stopWords = [], maxSnapshots = 10, progressCallback = null, statusCallback = null, maxConcurrent = 2) {
+    const results = [];
+    const domainList = domains.map(d => d.trim()).filter(d => d.length > 0);
+    const queue = [...domainList];
+    const active = new Set();
+    const promises = [];
+
+    const processDomain = async (domain) => {
+      active.add(domain);
+      
+      const log = (msg) => {
+        if (progressCallback) {
+          const index = domainList.indexOf(domain) + 1;
+          progressCallback(`[${index}/${domainList.length}] ${domain}: ${msg}`);
+        }
+      };
+      
+      const statusUpdate = (statusData) => {
+        if (statusCallback) {
+          statusCallback(statusData);
+        }
+      };
+      
+      try {
+        const result = await this.analyzeDomainComplete(domain, stopWords, maxSnapshots, log, statusUpdate);
+        results.push(result);
+      } catch (error) {
+        log(`❌ Error: ${error.message}`);
+        results.push({
+          domain: domain,
+          status: 'UNAVAILABLE',
+          error: error.message,
+        });
+        statusUpdate({
+          domain,
+          status: 'UNAVAILABLE',
+          error: error.message,
+        });
+      } finally {
+        active.delete(domain);
+        
+        if (queue.length > 0) {
+          const nextDomain = queue.shift();
+          promises.push(processDomain(nextDomain));
+        }
+      }
+    };
+
+    // Start initial batch
+    for (let i = 0; i < Math.min(maxConcurrent, domainList.length); i++) {
+      const domain = queue.shift();
+      if (domain) {
+        promises.push(processDomain(domain));
+      }
+    }
+
+    await Promise.all(promises);
+
+    // Sort results to match input order
+    return domainList.map(domain => {
+      return results.find(r => r.domain === domain) || {
+        domain: domain,
+        status: 'UNAVAILABLE',
+        error: 'Analysis not completed',
+      };
+    });
   }
 }
 

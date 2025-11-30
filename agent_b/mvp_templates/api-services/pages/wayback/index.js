@@ -7,6 +7,10 @@ import WaybackLogs from '../../src/components/wayback/WaybackLogs';
 import SpamAnalysisForm from '../../src/components/wayback/SpamAnalysisForm';
 import SpamAnalysisResults from '../../src/components/wayback/SpamAnalysisResults';
 import DomainStatusList from '../../src/components/wayback/DomainStatusList';
+import DomainMetricsPanel from '../../src/components/wayback/DomainMetricsPanel';
+import BacklinkAnalysisPanel from '../../src/components/wayback/BacklinkAnalysisPanel';
+import TopicAnalysisPanel from '../../src/components/wayback/TopicAnalysisPanel';
+import DomainRecommendationsTable from '../../src/components/wayback/DomainRecommendationsTable';
 
 export default function WaybackPage() {
   const [mode, setMode] = useState('test'); // 'test' or 'analyze'
@@ -14,6 +18,8 @@ export default function WaybackPage() {
   const [spamResults, setSpamResults] = useState(null);
   const [spamSummary, setSpamSummary] = useState(null);
   const [domainStatuses, setDomainStatuses] = useState([]);
+  const [completeAnalysisResults, setCompleteAnalysisResults] = useState([]);
+  const [analysisMode, setAnalysisMode] = useState('spam');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -87,7 +93,7 @@ export default function WaybackPage() {
     };
   }, []);
 
-  const handleSpamAnalysis = async ({ domains, stopWords, maxSnapshots }) => {
+  const handleSpamAnalysis = async ({ domains, stopWords, maxSnapshots, analysisMode = 'spam' }) => {
     // Close any existing SSE connection
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -101,6 +107,8 @@ export default function WaybackPage() {
     setSpamResults(null);
     setSpamSummary(null);
     setDomainStatuses([]);
+    setCompleteAnalysisResults([]);
+    setAnalysisMode(analysisMode || 'spam');
 
     // Generate session ID for real-time updates
     const sessionId = `spam-analysis-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -116,8 +124,13 @@ export default function WaybackPage() {
     setDomainStatuses(initialStatuses);
 
     try {
+      // Choose API endpoint based on analysis mode
+      const apiEndpoint = analysisMode === 'complete' 
+        ? '/api/wayback/analyze-complete' 
+        : '/api/wayback/analyze-spam';
+      
       // Start analysis (returns immediately)
-      const response = await fetch('/api/wayback/analyze-spam', {
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,13 +148,42 @@ export default function WaybackPage() {
       }
 
       // Connect to SSE endpoint for real-time updates
-      const eventSource = new EventSource(`/api/wayback/analyze-spam-status?sessionId=${sessionId}`);
+      const statusEndpoint = analysisMode === 'complete' 
+        ? `/api/wayback/analyze-complete-status?sessionId=${sessionId}`
+        : `/api/wayback/analyze-spam-status?sessionId=${sessionId}`;
+      
+      const eventSource = new EventSource(statusEndpoint);
       eventSourceRef.current = eventSource;
 
       eventSource.onmessage = (event) => {
         try {
           const update = JSON.parse(event.data);
           
+          // Handle complete analysis results (specific to complete mode)
+          if (update.type === 'complete' && update.domains) {
+            setCompleteAnalysisResults(update.domains);
+            setIsLoading(false);
+            eventSource.close();
+            eventSourceRef.current = null;
+            return;
+          }
+          
+          // Handle domain status updates (for complete mode - single domain update)
+          if (update.type === 'update' && update.domain) {
+            setDomainStatuses(prevStatuses => {
+              const existing = prevStatuses.find(d => d.domain === update.domain);
+              if (existing) {
+                return prevStatuses.map(d => 
+                  d.domain === update.domain ? { ...d, ...update } : d
+                );
+              } else {
+                return [...prevStatuses, update];
+              }
+            });
+            return;
+          }
+          
+          // Handle spam analysis status (original logic - batch updates)
           if (update.type === 'status' && update.domains) {
             // Update domain statuses
             setDomainStatuses(prevStatuses => {
@@ -401,7 +443,7 @@ export default function WaybackPage() {
         )}
 
         {/* Legacy Spam Analysis Results (for CSV export) */}
-        {mode === 'analyze' && spamResults && spamResults.length > 0 && (
+        {mode === 'analyze' && analysisMode === 'spam' && spamResults && spamResults.length > 0 && (
           <div style={{ marginTop: '20px' }}>
             <button
               onClick={handleExportCSV}
@@ -411,6 +453,33 @@ export default function WaybackPage() {
               📥 Export to CSV
             </button>
           </div>
+        )}
+
+        {/* Complete Analysis Results */}
+        {mode === 'analyze' && analysisMode === 'complete' && completeAnalysisResults.length > 0 && (
+          <>
+            <DomainRecommendationsTable domains={completeAnalysisResults} />
+            
+            {completeAnalysisResults.map((domainResult, index) => (
+              <div key={index} style={{ marginTop: '24px' }}>
+                <h2 style={{ marginBottom: '16px', fontSize: '1.5rem', color: '#f1f5f9' }}>
+                  {domainResult.domain}
+                </h2>
+                
+                {domainResult.metrics && (
+                  <DomainMetricsPanel metrics={domainResult} />
+                )}
+                
+                {domainResult.backlinkAnalysis && (
+                  <BacklinkAnalysisPanel backlinkAnalysis={domainResult} />
+                )}
+                
+                {domainResult.topicAnalysis && (
+                  <TopicAnalysisPanel topicAnalysis={domainResult} />
+                )}
+              </div>
+            ))}
+          </>
         )}
 
       </main>
