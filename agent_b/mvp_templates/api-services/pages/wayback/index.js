@@ -167,17 +167,30 @@ export default function WaybackPage() {
               };
               
               // Convert to results format
-              const results = update.domains.map(d => ({
-                domain: d.domain,
-                status: d.status,
-                lastMessage: d.lastMessage,
-                snapshotsFound: d.snapshotsFound || 0,
-                snapshotsAnalyzed: d.snapshotsAnalyzed || 0,
-                maxSpamScore: d.maxSpamScore,
-                avgSpamScore: d.avgSpamScore,
-                stopWordsFound: d.stopWordsFound || [],
-                error: d.error,
-              }));
+              const results = update.domains.map(d => {
+                // Calculate spam percentage
+                const spamPercentage = d.snapshotsAnalyzed > 0 && d.spamSnapshots > 0
+                  ? (d.spamSnapshots / d.snapshotsAnalyzed) * 100
+                  : 0;
+                
+                return {
+                  domain: d.domain,
+                  status: d.status,
+                  lastMessage: d.lastMessage,
+                  snapshotsFound: d.snapshotsFound || 0,
+                  snapshotsAnalyzed: d.snapshotsAnalyzed || 0,
+                  spamSnapshots: d.spamSnapshots || 0,
+                  maxSpamScore: d.maxSpamScore,
+                  avgSpamScore: d.avgSpamScore,
+                  spamPercentage: Math.round(spamPercentage * 100) / 100,
+                  totalStopWordsFound: d.totalStopWordsFound !== undefined 
+                    ? d.totalStopWordsFound 
+                    : (d.stopWordsFound && d.stopWordsFound.length ? d.stopWordsFound.length : 0),
+                  stopWordsFound: d.stopWordsFound || [],
+                  firstSpamDate: d.firstSpamDate || null,
+                  error: d.error || null,
+                };
+              });
               
               setSpamResults(results);
               setSpamSummary(summary);
@@ -250,11 +263,17 @@ export default function WaybackPage() {
       return [
         result.domain || '',
         result.status || '',
-        result.snapshotsChecked || '',
-        result.spamSnapshots || '',
-        result.spamPercentage !== undefined ? `${result.spamPercentage}%` : '',
-        result.avgSpamScore || '',
-        result.totalStopWordsFound || '',
+        result.snapshotsAnalyzed || 0,
+        result.spamSnapshots || 0,
+        result.spamPercentage !== undefined && result.spamPercentage > 0 
+          ? `${result.spamPercentage}%` 
+          : '',
+        result.avgSpamScore !== undefined && result.avgSpamScore !== null && result.avgSpamScore > 0
+          ? result.avgSpamScore
+          : '',
+        result.totalStopWordsFound !== undefined && result.totalStopWordsFound !== null
+          ? result.totalStopWordsFound
+          : (result.stopWordsFound && result.stopWordsFound.length > 0 ? result.stopWordsFound.length : 0),
         stopWordsList,
         result.firstSpamDate ? formatDate(result.firstSpamDate) : '',
         result.error || '',
