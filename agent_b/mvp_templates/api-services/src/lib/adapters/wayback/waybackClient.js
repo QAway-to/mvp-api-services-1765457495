@@ -2,7 +2,9 @@
 // Handles CDX API requests and snapshot HTML fetching
 
 export class WaybackClient {
-  constructor(timeout = 30000) {
+  constructor(timeout = 120000) {
+    // УВЕЛИЧЕНО: 120 секунд (2 минуты) timeout для обработки медленных запросов
+    // Расчет: 10 snapshots × 3s delay = 30s + запросы ~2-5s каждый = 50-80s минимум
     this.timeout = timeout;
     this.cdxBaseUrl = 'https://web.archive.org/cdx/search/cdx';
     this.webBaseUrl = 'https://web.archive.org/web';

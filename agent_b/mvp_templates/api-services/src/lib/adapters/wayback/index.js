@@ -81,6 +81,16 @@ export class WaybackMachineAdapter {
     try {
       log(`Analyzing domain: ${domain}`);
       
+      // Extract domain name for exclusion from stop word matching
+      let domainName = domain;
+      try {
+        const url = new URL(domain.startsWith('http') ? domain : `https://${domain}`);
+        domainName = url.hostname;
+      } catch (e) {
+        // Use domain as-is
+        domainName = domain.replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+      }
+      
       // Get snapshots
       const snapshots = await this.getSnapshots(domain, maxSnapshots);
       
@@ -111,7 +121,8 @@ export class WaybackMachineAdapter {
           log(`[${i + 1}/${snapshots.length}] Checking snapshot ${snapshot.timestamp}...`);
           
           const htmlResult = await this.getSnapshotHtml(snapshot);
-          const analysis = await analyzeHtmlForSpam(htmlResult.html, stopWords);
+          // ПЕРЕДАЁМ domainName для исключения из поиска стоп-слов
+          const analysis = await analyzeHtmlForSpam(htmlResult.html, stopWords, domainName);
           
           if (analysis.isSpam) {
             spamSnapshots++;
@@ -130,9 +141,9 @@ export class WaybackMachineAdapter {
           }
           
           // Delay between snapshot requests to avoid rate limiting
-          // Increased delay for spam analysis (was 500ms, now 1.5s)
+          // УВЕЛИЧЕНО: 3 секунды между snapshot-ами (для 10 snapshots = 30 секунд только на задержки)
           if (i < snapshots.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            await new Promise(resolve => setTimeout(resolve, 3000));
           }
         } catch (error) {
           log(`⚠️ Error analyzing snapshot ${snapshot.timestamp}: ${error.message}`);
@@ -157,12 +168,16 @@ export class WaybackMachineAdapter {
         status = 'suspicious';
       }
 
+      // Calculate domain spam score (0-10) as average of spam snapshot scores
+      const domainSpamScore = spamSnapshots > 0 ? Math.round((totalSpamScore / spamSnapshots) * 10) / 10 : 0;
+
       return {
         domain: domain,
         snapshotsChecked: snapshots.length,
         spamSnapshots: spamSnapshots,
         spamPercentage: Math.round(spamPercentage * 100) / 100,
         avgSpamScore: Math.round(avgSpamScore * 100) / 100,
+        domainSpamScore: domainSpamScore, // Добавлено: агрегированный score домена (0-10)
         spamDetected: spamSnapshots > 0,
         totalStopWordsFound: allFoundStopWords.size,
         stopWordsFound: stopWordsFound,
@@ -206,9 +221,9 @@ export class WaybackMachineAdapter {
       }
       
       // Delay between domains to avoid rate limiting
-      // Increased delay to reduce 429 errors (was 1s, now 3s)
+      // УВЕЛИЧЕНО: 5 секунд между доменами для надёжности
       if (i < domains.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
     }
     

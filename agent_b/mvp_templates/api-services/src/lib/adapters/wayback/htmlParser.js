@@ -3,8 +3,10 @@
 
 /**
  * Extract text content from HTML (removes scripts, styles, etc.)
+ * @param {string} html - HTML content
+ * @param {string} domainToIgnore - Optional domain to exclude from text extraction
  */
-export async function extractTextContent(html) {
+export async function extractTextContent(html, domainToIgnore = null) {
   try {
     // Dynamic import for cheerio
     const cheerio = await import('cheerio');
@@ -24,27 +26,52 @@ export async function extractTextContent(html) {
     // Remove script, style, and other non-content elements
     $('script, style, noscript, iframe, embed, object').remove();
     
+    // Remove domain from href attributes to prevent domain name matching
+    if (domainToIgnore) {
+      $('a[href]').each((i, el) => {
+        const href = $(el).attr('href');
+        if (href && href.includes(domainToIgnore)) {
+          $(el).attr('href', '#'); // Replace with placeholder
+        }
+      });
+    }
+    
     // Extract text
-    const text = $('body').text() || $('html').text();
+    let text = $('body').text() || $('html').text();
+    
+    // Remove domain name from text if provided
+    if (domainToIgnore) {
+      const domainRegex = new RegExp(domainToIgnore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      text = text.replace(domainRegex, '');
+    }
     
     // Clean up whitespace
     return text.replace(/\s+/g, ' ').trim().toLowerCase();
   } catch (error) {
     // Fallback: basic text extraction without cheerio
-    const text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-                     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-                     .replace(/<[^>]+>/g, ' ')
-                     .replace(/\s+/g, ' ')
-                     .trim()
-                     .toLowerCase();
+    let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                   .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                   .replace(/<[^>]+>/g, ' ')
+                   .replace(/\s+/g, ' ')
+                   .trim()
+                   .toLowerCase();
+    
+    // Remove domain name if provided
+    if (domainToIgnore) {
+      const domainRegex = new RegExp(domainToIgnore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      text = text.replace(domainRegex, '');
+    }
+    
     return text;
   }
 }
 
 /**
  * Extract meta tags (description, keywords)
+ * @param {string} html - HTML content
+ * @param {string} domainToIgnore - Optional domain to exclude from meta tags
  */
-export async function extractMetaTags(html) {
+export async function extractMetaTags(html, domainToIgnore = null) {
   try {
     const cheerio = await import('cheerio');
     // Handle both ESM and CommonJS exports
@@ -60,10 +87,22 @@ export async function extractMetaTags(html) {
     }
     const $ = cheerioModule.load(html);
     
+    let title = $('title').text().trim() || '';
+    let description = $('meta[name="description"]').attr('content') || '';
+    let keywords = $('meta[name="keywords"]').attr('content') || '';
+    
+    // Remove domain name from meta tags if provided
+    if (domainToIgnore) {
+      const domainRegex = new RegExp(domainToIgnore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      title = title.replace(domainRegex, '').trim();
+      description = description.replace(domainRegex, '').trim();
+      keywords = keywords.replace(domainRegex, '').trim();
+    }
+    
     return {
-      title: $('title').text().trim() || '',
-      description: $('meta[name="description"]').attr('content') || '',
-      keywords: $('meta[name="keywords"]').attr('content') || '',
+      title: title,
+      description: description,
+      keywords: keywords,
     };
   } catch (error) {
     return { title: '', description: '', keywords: '' };
@@ -87,9 +126,9 @@ export function checkStopWords(text, stopWords) {
   stopWords.forEach(word => {
     const wordLower = word.toLowerCase().trim();
     if (wordLower && textLower.includes(wordLower)) {
-      // Count occurrences
-      const regex = new RegExp(wordLower, 'gi');
-      const matches = text.match(regex);
+      // Count occurrences - ИСПРАВЛЕНО: используем textLower вместо text
+      const regex = new RegExp(wordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      const matches = textLower.match(regex);
       const count = matches ? matches.length : 0;
       
       if (!found.find(item => item.word === wordLower)) {
@@ -101,16 +140,23 @@ export function checkStopWords(text, stopWords) {
     }
   });
   
-  // Calculate spam score (0-100) based on found words
-  // Simple formula: (found_words / total_words) * 100
-  const totalWords = text.split(/\s+/).length;
-  const foundWordsCount = found.reduce((sum, item) => sum + item.count, 0);
-  const score = totalWords > 0 ? Math.min(100, (foundWordsCount / totalWords) * 100) : 0;
+  // Calculate spam score (0-10) based on found words
+  // НОВАЯ ФОРМУЛА: простая шкала 0-10
+  let score = 0;
+  if (found.length > 0) {
+    // Базовая оценка: количество уникальных стоп-слов
+    score = Math.min(10, found.length * 2); // 1 слово = 2 балла, макс 10
+    
+    // Бонус за частоту вхождений
+    const totalOccurrences = found.reduce((sum, item) => sum + item.count, 0);
+    if (totalOccurrences > 10) score = 10; // Много вхождений = максимум
+    else if (totalOccurrences > 5) score = Math.min(10, score + 2);
+  }
   
   return {
     found: found,
     count: found.length,
-    score: Math.round(score * 100) / 100, // Round to 2 decimals
+    score: Math.round(score * 10) / 10, // Round to 1 decimal
   };
 }
 
@@ -118,19 +164,26 @@ export function checkStopWords(text, stopWords) {
  * Analyze HTML content for spam
  * @param {string} html - HTML content
  * @param {Array<string>} stopWords - Array of stop words
+ * @param {string} domainToIgnore - Optional domain name to exclude from analysis
  * @returns {Promise<Object>} - Analysis result
  */
-export async function analyzeHtmlForSpam(html, stopWords) {
-  const textContent = await extractTextContent(html);
-  const metaTags = await extractMetaTags(html);
+export async function analyzeHtmlForSpam(html, stopWords, domainToIgnore = null) {
+  const textContent = await extractTextContent(html, domainToIgnore);
+  const metaTags = await extractMetaTags(html, domainToIgnore);
   
-  // Combine all text sources for analysis
-  const allText = [
-    textContent,
-    metaTags.title,
-    metaTags.description,
-    metaTags.keywords,
-  ].filter(Boolean).join(' ');
+  // Combine all text sources for analysis (excluding meta tags that might contain domain)
+  let allText = textContent;
+  
+  // Only add meta tags if they don't contain the domain name
+  if (metaTags.title && (!domainToIgnore || !metaTags.title.toLowerCase().includes(domainToIgnore.toLowerCase()))) {
+    allText += ' ' + metaTags.title.toLowerCase();
+  }
+  if (metaTags.description && (!domainToIgnore || !metaTags.description.toLowerCase().includes(domainToIgnore.toLowerCase()))) {
+    allText += ' ' + metaTags.description.toLowerCase();
+  }
+  if (metaTags.keywords && (!domainToIgnore || !metaTags.keywords.toLowerCase().includes(domainToIgnore.toLowerCase()))) {
+    allText += ' ' + metaTags.keywords.toLowerCase();
+  }
   
   const stopWordsCheck = checkStopWords(allText, stopWords);
   
@@ -138,7 +191,7 @@ export async function analyzeHtmlForSpam(html, stopWords) {
     textLength: textContent.length,
     metaTags: metaTags,
     stopWords: stopWordsCheck,
-    isSpam: stopWordsCheck.count > 0 || stopWordsCheck.score > 5, // Threshold: 5% or any stop word
+    isSpam: stopWordsCheck.count > 0, // Упрощено: любое стоп-слово = спам
     spamScore: stopWordsCheck.score,
   };
 }
