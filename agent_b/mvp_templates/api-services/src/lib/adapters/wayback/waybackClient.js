@@ -246,50 +246,136 @@ export class WaybackClient {
     try {
       const parsed = this.parseWaybackSnapshotUrl(snapshotUrl);
       if (!parsed) {
-        console.warn('Could not parse snapshot URL, returning wrapper HTML as-is');
+        console.warn('[Wayback] Could not parse snapshot URL, returning wrapper HTML as-is');
         return wrapperHtml;
       }
 
       const { timestamp, originalUrl } = parsed;
+      console.log(`[Wayback] Extracting original HTML from wrapper. Timestamp: ${timestamp}, Original URL: ${originalUrl}`);
 
-      // Try to extract iframe#playback src
+      // Try multiple strategies to get original HTML
       const cheerio = await import('cheerio');
       const cheerioModule = cheerio.default || cheerio;
       const $ = cheerioModule.load(wrapperHtml);
 
+      // Strategy 1: Try iframe#playback src directly
       const iframe = $('#playback');
       if (iframe.length > 0) {
         const iframeSrc = iframe.attr('src');
+        console.log(`[Wayback] Found iframe#playback with src: ${iframeSrc}`);
+        
         if (iframeSrc) {
-          // Construct raw URL using id_ flag for direct access
-          const rawUrl = `https://web.archive.org/web/${timestamp}id_/${originalUrl}`;
+          // Try to fetch iframe src directly (may be absolute or relative)
+          let iframeUrl = iframeSrc;
+          if (!iframeSrc.startsWith('http')) {
+            iframeUrl = `https://web.archive.org${iframeSrc}`;
+          }
           
           try {
-            const response = await this.createFetchWithTimeout(rawUrl, {
+            console.log(`[Wayback] Fetching iframe src: ${iframeUrl}`);
+            const iframeResponse = await this.createFetchWithTimeout(iframeUrl, {
               headers: {
                 'User-Agent': 'WebScraper-MVP/1.0',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
               },
             });
 
-            if (response && response.ok) {
-              const rawHtml = await response.text();
-              // Verify we got actual content, not another wrapper
-              if (rawHtml && rawHtml.length > 100 && !this.isWaybackWrapperHtml(rawHtml)) {
-                return rawHtml;
+            if (iframeResponse && iframeResponse.ok) {
+              const iframeHtml = await iframeResponse.text();
+              console.log(`[Wayback] Fetched HTML from iframe: ${iframeHtml.length} bytes`);
+              
+              // Verify we got actual content
+              if (iframeHtml && iframeHtml.length > 100 && !this.isWaybackWrapperHtml(iframeHtml)) {
+                console.log(`[Wayback] Successfully extracted original HTML from iframe (${iframeHtml.length} bytes)`);
+                return iframeHtml;
+              } else {
+                console.warn(`[Wayback] Iframe HTML appears to be wrapper or too short (${iframeHtml.length} bytes)`);
               }
             }
-          } catch (rawError) {
-            console.warn('Failed to fetch raw HTML from iframe src:', rawError.message);
+          } catch (iframeError) {
+            console.warn(`[Wayback] Failed to fetch iframe src: ${iframeError.message}`);
+          }
+        }
+      } else {
+        console.warn('[Wayback] iframe#playback not found in wrapper HTML');
+      }
+
+      // Strategy 2: Try raw URL with id_ flag
+      const rawUrl = `https://web.archive.org/web/${timestamp}id_/${originalUrl}`;
+      console.log(`[Wayback] Trying raw URL: ${rawUrl}`);
+      
+      try {
+        const rawResponse = await this.createFetchWithTimeout(rawUrl, {
+          headers: {
+            'User-Agent': 'WebScraper-MVP/1.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          },
+        });
+
+        if (rawResponse && rawResponse.ok) {
+          const rawHtml = await rawResponse.text();
+          console.log(`[Wayback] Fetched HTML from raw URL: ${rawHtml.length} bytes`);
+          
+          // Verify we got actual content, not another wrapper
+          if (rawHtml && rawHtml.length > 100 && !this.isWaybackWrapperHtml(rawHtml)) {
+            console.log(`[Wayback] Successfully extracted original HTML from raw URL (${rawHtml.length} bytes)`);
+            return rawHtml;
+          } else {
+            console.warn(`[Wayback] Raw URL HTML appears to be wrapper or too short (${rawHtml.length} bytes)`);
+          }
+        } else {
+          console.warn(`[Wayback] Raw URL returned HTTP ${rawResponse?.status || 'Unknown'}`);
+        }
+      } catch (rawError) {
+        console.warn(`[Wayback] Failed to fetch raw URL: ${rawError.message}`);
+      }
+
+      // Strategy 3: Try extracting content from wrapper HTML directly
+      // Look for content in common Wayback wrapper structures
+      const contentSelectors = [
+        '#wm-ipp-base + iframe',
+        'iframe[src*="/web/"]',
+        '#playback',
+      ];
+      
+      for (const selector of contentSelectors) {
+        const element = $(selector);
+        if (element.length > 0) {
+          const src = element.attr('src');
+          if (src) {
+            let contentUrl = src;
+            if (!contentUrl.startsWith('http')) {
+              contentUrl = `https://web.archive.org${contentUrl}`;
+            }
+            
+            try {
+              console.log(`[Wayback] Trying content URL from selector ${selector}: ${contentUrl}`);
+              const contentResponse = await this.createFetchWithTimeout(contentUrl, {
+                headers: {
+                  'User-Agent': 'WebScraper-MVP/1.0',
+                  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                },
+              });
+              
+              if (contentResponse && contentResponse.ok) {
+                const contentHtml = await contentResponse.text();
+                if (contentHtml && contentHtml.length > 100 && !this.isWaybackWrapperHtml(contentHtml)) {
+                  console.log(`[Wayback] Successfully extracted HTML from ${selector} (${contentHtml.length} bytes)`);
+                  return contentHtml;
+                }
+              }
+            } catch (contentError) {
+              console.warn(`[Wayback] Failed to fetch content from ${selector}: ${contentError.message}`);
+            }
           }
         }
       }
 
-      // Fallback: return original wrapper HTML
-      // Don't try to extract from #wm-ipp-base or .wm-ipp - these are Wayback UI elements
+      // Final fallback: return original wrapper HTML
+      console.warn('[Wayback] Could not extract original HTML, returning wrapper as fallback');
       return wrapperHtml;
     } catch (error) {
-      console.error('Error extracting original HTML from Wayback wrapper:', error);
+      console.error('[Wayback] Error extracting original HTML from Wayback wrapper:', error);
       // Safe fallback: return original HTML
       return wrapperHtml;
     }
@@ -355,11 +441,17 @@ export class WaybackClient {
         // If raw URL works, use it directly
         if (rawResponse && rawResponse.ok) {
           const html = await rawResponse.text();
+          console.log(`[Wayback] Raw URL returned HTML (${html.length} bytes)`);
           
           // Verify it's not a wrapper
           let finalHtml = html;
           if (this.isWaybackWrapperHtml(html)) {
-            finalHtml = await this.extractOriginalHtmlFromWaybackWrapper(html, rawUrl);
+            console.log(`[Wayback] Raw URL HTML is a wrapper, extracting original...`);
+            const extracted = await this.extractOriginalHtmlFromWaybackWrapper(html, rawUrl);
+            if (extracted && extracted !== html && extracted.trim().length > 100) {
+              finalHtml = extracted;
+              console.log(`[Wayback] Successfully extracted from raw wrapper (${finalHtml.length} bytes)`);
+            }
           }
 
           const result = {
@@ -417,13 +509,18 @@ export class WaybackClient {
 
         // Extract original HTML if this is a wrapper
         if (this.isWaybackWrapperHtml(html)) {
-          html = await this.extractOriginalHtmlFromWaybackWrapper(html, snapshotUrl);
+          console.log(`[Wayback] Detected Wayback wrapper (${html.length} bytes), extracting original HTML...`);
+          const extractedHtml = await this.extractOriginalHtmlFromWaybackWrapper(html, snapshotUrl);
           
-          // Verify extracted HTML is valid
-          if (!html || html.trim().length === 0) {
-            console.warn('Extracted HTML is empty, using wrapper HTML as fallback');
-            html = await wrapperResponse.text(); // Re-read original
+          // Verify extracted HTML is valid and different from wrapper
+          if (extractedHtml && extractedHtml.trim().length > 100 && extractedHtml !== html) {
+            html = extractedHtml;
+            console.log(`[Wayback] Successfully extracted original HTML (${html.length} bytes)`);
+          } else {
+            console.warn(`[Wayback] Extracted HTML invalid or same as wrapper (length: ${extractedHtml?.length || 0}), keeping wrapper`);
           }
+        } else {
+          console.log(`[Wayback] HTML does not appear to be a wrapper (${html.length} bytes)`);
         }
 
         const result = {
