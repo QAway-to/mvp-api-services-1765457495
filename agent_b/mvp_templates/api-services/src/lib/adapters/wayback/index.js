@@ -66,19 +66,32 @@ export class WaybackMachineAdapter {
   }
 
   /**
-   * Analyze domain for spam content in historical snapshots
+   * Analyze domain for spam content in historical snapshots with status updates
    * @param {string} domain - Domain to analyze
    * @param {Array<string>} stopWords - List of spam keywords
    * @param {number} maxSnapshots - Max snapshots to check (default: 10)
    * @param {Function} progressCallback - Optional callback for progress updates
+   * @param {Function} statusCallback - Optional callback for status updates: (status, data) => void
    * @returns {Promise<Object>} Analysis result
    */
-  async analyzeDomainForSpam(domain, stopWords = [], maxSnapshots = 10, progressCallback = null) {
+  async analyzeDomainForSpam(domain, stopWords = [], maxSnapshots = 10, progressCallback = null, statusCallback = null) {
     const log = (msg) => {
       if (progressCallback) progressCallback(msg);
     };
+    
+    const updateStatus = (status, data = {}) => {
+      if (statusCallback) {
+        statusCallback({
+          domain,
+          status,
+          ...data,
+        });
+      }
+    };
 
     try {
+      // Initial status: FETCHING_SNAPSHOTS
+      updateStatus('FETCHING_SNAPSHOTS', { lastMessage: 'Fetching snapshots from CDX API...' });
       log(`Analyzing domain: ${domain}`);
       
       // Extract domain name for exclusion from stop word matching
@@ -92,43 +105,63 @@ export class WaybackMachineAdapter {
       }
       
       // Get snapshots
-      const snapshots = await this.getSnapshots(domain, maxSnapshots);
-      
-      if (snapshots.length === 0) {
+      let snapshots;
+      try {
+        snapshots = await this.getSnapshots(domain, maxSnapshots);
+      } catch (error) {
+        const errorMsg = error.message || String(error);
+        log(`❌ Error fetching snapshots: ${errorMsg}`);
+        updateStatus('UNAVAILABLE', { 
+          lastMessage: `CDX API error: ${errorMsg}`,
+          error: errorMsg,
+          snapshotsFound: 0,
+        });
         return {
           domain: domain,
-          snapshotsChecked: 0,
-          spamDetected: false,
-          spamScore: 0,
-          totalStopWordsFound: 0,
-          stopWordsFound: [],
-          firstSpamDate: null,
-          status: 'no_snapshots',
+          status: 'UNAVAILABLE',
+          snapshotsFound: 0,
+          snapshotsAnalyzed: 0,
+          error: errorMsg,
+          lastMessage: `CDX API error: ${errorMsg}`,
+        };
+      }
+      
+      if (snapshots.length === 0) {
+        updateStatus('NO_SNAPSHOTS', { 
+          lastMessage: 'No snapshots found in Wayback Machine',
+          snapshotsFound: 0,
+        });
+        return {
+          domain: domain,
+          status: 'NO_SNAPSHOTS',
+          snapshotsFound: 0,
+          snapshotsAnalyzed: 0,
+          lastMessage: 'No snapshots found in Wayback Machine',
         };
       }
 
       log(`Found ${snapshots.length} snapshots, analyzing...`);
+      updateStatus('ANALYZING', { 
+        lastMessage: `Found ${snapshots.length} snapshot(s), analyzing...`,
+        snapshotsFound: snapshots.length,
+        snapshotsAnalyzed: 0,
+      });
       
       let spamSnapshots = 0;
       let totalSpamScore = 0;
-      let successfullyAnalyzed = 0; // Счётчик успешно проанализированных снапшотов
-      let failedSnapshots = 0; // Счётчик неудачных попыток
-      const allFoundStopWords = new Map(); // word -> count
+      let maxSpamScore = 0;
+      let successfullyAnalyzed = 0;
+      let failedSnapshots = 0;
+      const allFoundStopWords = new Map();
       let firstSpamDate = null;
-      const snapshotErrors = []; // Детальные ошибки для каждого снапшота
+      const snapshotErrors = [];
 
       // Analyze each snapshot
       for (let i = 0; i < snapshots.length; i++) {
         const snapshot = snapshots[i];
         try {
-          // Log original URL properly formatted
           const originalUrlDisplay = snapshot.originalUrl || 'unknown';
           log(`[${i + 1}/${snapshots.length}] Checking snapshot ${originalUrlDisplay} (${snapshot.timestamp})...`);
-          
-          // DEBUG: Log details for first snapshot
-          if (i === 0) {
-            log(`[DEBUG] First snapshot - originalUrl: ${snapshot.originalUrl}, timestamp: ${snapshot.timestamp}`);
-          }
           
           const htmlResult = await this.getSnapshotHtml(snapshot);
           
@@ -136,38 +169,23 @@ export class WaybackMachineAdapter {
             throw new Error('Empty HTML result from snapshot');
           }
           
-          // DEBUG: Log HTML preview for first snapshot
-          if (i === 0) {
-            const htmlPreview = htmlResult.html.substring(0, 200).replace(/\s+/g, ' ');
-            log(`[DEBUG] First snapshot HTML preview (${htmlResult.html.length} bytes): ${htmlPreview}...`);
-            log(`[DEBUG] First snapshot rawUrl: https://web.archive.org/web/${snapshot.timestamp}id_/${snapshot.originalUrl}`);
-            log(`[DEBUG] First snapshot wrapperUrl: https://web.archive.org/web/${snapshot.timestamp}/${snapshot.originalUrl}`);
-          }
-          
           log(`[${i + 1}/${snapshots.length}] HTML fetched: ${htmlResult.length} bytes`);
           
-          // ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: проверяем что передаётся в анализ
-          log(`[${i + 1}/${snapshots.length}] Domain to ignore: ${domainName}, Stop words: ${stopWords.slice(0, 5).join(', ')}${stopWords.length > 5 ? '...' : ''}`);
-          
-          // ПЕРЕДАЁМ domainName для исключения из поиска стоп-слов
           const analysis = await analyzeHtmlForSpam(htmlResult.html, stopWords, domainName);
           
           successfullyAnalyzed++;
           
-          // ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: что было найдено
-          log(`[${i + 1}/${snapshots.length}] Text extracted: ${analysis.textLength} chars, Meta: title=${analysis.metaTags.title ? analysis.metaTags.title.substring(0, 50) : 'none'}`);
-          log(`[${i + 1}/${snapshots.length}] Analysis complete: spam=${analysis.isSpam}, score=${analysis.spamScore}, found=${analysis.stopWords.count} stop words`);
-          
-          // Если стоп-слов не найдено, но должны были быть - выводим предупреждение
-          if (analysis.stopWords.count === 0 && stopWords.length > 0 && analysis.textLength > 100) {
-            log(`[${i + 1}/${snapshots.length}] ⚠️ WARNING: No stop words found but text length is ${analysis.textLength} chars. Possible issues: domain filtering too aggressive or text extraction failed.`);
+          // Update max spam score
+          if (analysis.spamScore > maxSpamScore) {
+            maxSpamScore = analysis.spamScore;
           }
+          
+          log(`[${i + 1}/${snapshots.length}] Analysis complete: spam=${analysis.isSpam}, score=${analysis.spamScore}, found=${analysis.stopWords.count} stop words`);
           
           if (analysis.isSpam) {
             spamSnapshots++;
             totalSpamScore += analysis.spamScore;
             
-            // Track stop words
             analysis.stopWords.found.forEach(item => {
               const current = allFoundStopWords.get(item.word) || 0;
               allFoundStopWords.set(item.word, current + item.count);
@@ -175,14 +193,20 @@ export class WaybackMachineAdapter {
             
             log(`[${i + 1}/${snapshots.length}] ⚠️ SPAM DETECTED: ${analysis.stopWords.found.map(s => s.word).join(', ')}`);
             
-            // Track first spam date
             if (!firstSpamDate) {
               firstSpamDate = snapshot.timestamp;
             }
           }
           
-          // Delay between snapshot requests to avoid rate limiting
-          // УВЕЛИЧЕНО: 3 секунды между snapshot-ами (для 10 snapshots = 30 секунд только на задержки)
+          // Update status with progress
+          updateStatus('ANALYZING', {
+            lastMessage: `Analyzed ${successfullyAnalyzed}/${snapshots.length} snapshots...`,
+            snapshotsFound: snapshots.length,
+            snapshotsAnalyzed: successfullyAnalyzed,
+            maxSpamScore: maxSpamScore,
+          });
+          
+          // Delay between snapshot requests
           if (i < snapshots.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 3000));
           }
@@ -194,17 +218,11 @@ export class WaybackMachineAdapter {
             timestamp: snapshot.timestamp,
             originalUrl: snapshot.originalUrl,
             error: errorMsg,
-            stack: error.stack || null
           });
-          // Continue with next snapshot
         }
       }
 
-      // Calculate overall spam score (percentage of SUCCESSFULLY ANALYZED snapshots with spam)
-      // ИСПРАВЛЕНО: используем successfullyAnalyzed вместо snapshots.length
-      const spamPercentage = successfullyAnalyzed > 0 
-        ? (spamSnapshots / successfullyAnalyzed) * 100 
-        : 0;
+      // Calculate overall spam score
       const avgSpamScore = spamSnapshots > 0 ? totalSpamScore / spamSnapshots : 0;
 
       // Convert stop words map to array
@@ -212,93 +230,170 @@ export class WaybackMachineAdapter {
         .map(([word, count]) => ({ word, count }))
         .sort((a, b) => b.count - a.count);
 
-      // Determine status
-      let status = 'clean';
-      if (spamPercentage >= 50) {
-        status = 'spam';
-      } else if (spamPercentage > 0) {
-        status = 'suspicious';
+      // Determine status based on maxSpamScore (0-10 scale)
+      let finalStatus;
+      if (successfullyAnalyzed === 0) {
+        finalStatus = 'UNAVAILABLE';
+      } else if (maxSpamScore >= 8) {
+        finalStatus = 'SPAM';
+      } else if (maxSpamScore >= 5) {
+        finalStatus = 'SUSPICIOUS';
+      } else {
+        finalStatus = 'CLEAN';
       }
 
-      // Calculate domain spam score (0-10) as average of spam snapshot scores
-      const domainSpamScore = spamSnapshots > 0 ? Math.round((totalSpamScore / spamSnapshots) * 10) / 10 : 0;
-
-      // Добавляем детальную информацию об ошибках
       const result = {
         domain: domain,
-        snapshotsChecked: snapshots.length,
-        successfullyAnalyzed: successfullyAnalyzed,
+        status: finalStatus,
+        snapshotsFound: snapshots.length,
+        snapshotsAnalyzed: successfullyAnalyzed,
         failedSnapshots: failedSnapshots,
         spamSnapshots: spamSnapshots,
-        spamPercentage: Math.round(spamPercentage * 100) / 100,
-        avgSpamScore: Math.round(avgSpamScore * 100) / 100,
-        domainSpamScore: domainSpamScore, // Добавлено: агрегированный score домена (0-10)
+        maxSpamScore: Math.round(maxSpamScore * 10) / 10,
+        avgSpamScore: Math.round(avgSpamScore * 10) / 10,
         spamDetected: spamSnapshots > 0,
         totalStopWordsFound: allFoundStopWords.size,
         stopWordsFound: stopWordsFound,
         firstSpamDate: firstSpamDate,
-        status: status,
+        lastMessage: finalStatus === 'UNAVAILABLE' 
+          ? `Failed to analyze any snapshots. ${failedSnapshots} errors occurred.`
+          : `Analysis complete: ${finalStatus}. Max spam score: ${maxSpamScore.toFixed(1)}/10`,
       };
       
-      // Добавляем детальные ошибки если есть
       if (snapshotErrors.length > 0) {
         result.snapshotErrors = snapshotErrors;
-        log(`⚠️ ${failedSnapshots} snapshot(s) failed to analyze out of ${snapshots.length} total`);
+        if (successfullyAnalyzed === 0) {
+          result.error = `Failed to analyze any snapshots. ${failedSnapshots} errors occurred.`;
+        }
       }
       
-      if (successfullyAnalyzed === 0) {
-        log(`❌ CRITICAL: No snapshots were successfully analyzed! All ${snapshots.length} attempts failed.`);
-        result.status = 'error';
-        result.error = `Failed to analyze any snapshots. ${failedSnapshots} errors occurred.`;
-      } else if (successfullyAnalyzed < snapshots.length) {
-        log(`⚠️ Only ${successfullyAnalyzed} out of ${snapshots.length} snapshots were successfully analyzed`);
-      }
+      // Final status update
+      updateStatus(finalStatus, result);
       
       return result;
     } catch (error) {
-      throw new Error(`Domain analysis failed: ${error.message}`);
+      const errorMsg = error.message || String(error);
+      log(`❌ Domain analysis failed: ${errorMsg}`);
+      updateStatus('UNAVAILABLE', {
+        lastMessage: `Analysis failed: ${errorMsg}`,
+        error: errorMsg,
+        snapshotsFound: 0,
+        snapshotsAnalyzed: 0,
+      });
+      return {
+        domain: domain,
+        status: 'UNAVAILABLE',
+        snapshotsFound: 0,
+        snapshotsAnalyzed: 0,
+        error: errorMsg,
+        lastMessage: `Analysis failed: ${errorMsg}`,
+      };
     }
   }
 
   /**
-   * Analyze multiple domains for spam
+   * Analyze multiple domains for spam with parallel processing
    * @param {Array<string>} domains - Array of domains to analyze
    * @param {Array<string>} stopWords - List of spam keywords
    * @param {number} maxSnapshots - Max snapshots per domain
    * @param {Function} progressCallback - Optional callback for progress updates
+   * @param {Function} statusCallback - Optional callback for domain status updates: (domainStatus) => void
+   * @param {number} maxConcurrent - Max concurrent domain analyses (default: 3)
    * @returns {Promise<Array<Object>>} Array of analysis results
    */
-  async analyzeDomainsForSpam(domains, stopWords = [], maxSnapshots = 10, progressCallback = null) {
+  async analyzeDomainsForSpam(domains, stopWords = [], maxSnapshots = 10, progressCallback = null, statusCallback = null, maxConcurrent = 3) {
     const results = [];
+    const domainStatuses = new Map(); // Track status for each domain
     
-    for (let i = 0; i < domains.length; i++) {
-      const domain = domains[i].trim();
-      if (!domain) continue;
+    // Initialize all domains as QUEUED
+    domains.forEach(domain => {
+      const trimmed = domain.trim();
+      if (!trimmed) return;
+      const initialStatus = {
+        domain: trimmed,
+        status: 'QUEUED',
+        lastMessage: 'Waiting to start...',
+        snapshotsFound: 0,
+        snapshotsAnalyzed: 0,
+      };
+      domainStatuses.set(trimmed, initialStatus);
+      if (statusCallback) {
+        statusCallback(initialStatus);
+      }
+    });
+    
+    // Process domains in parallel with concurrency limit
+    const domainList = domains.map(d => d.trim()).filter(d => d.length > 0);
+    const queue = [...domainList];
+    const active = new Set();
+    const promises = [];
+    
+    const processDomain = async (domain) => {
+      active.add(domain);
       
       const log = (msg) => {
-        if (progressCallback) progressCallback(`[${i + 1}/${domains.length}] ${domain}: ${msg}`);
+        if (progressCallback) {
+          const index = domainList.indexOf(domain) + 1;
+          progressCallback(`[${index}/${domainList.length}] ${domain}: ${msg}`);
+        }
+      };
+      
+      const statusUpdate = (statusData) => {
+        domainStatuses.set(domain, statusData);
+        if (statusCallback) {
+          statusCallback(statusData);
+        }
       };
       
       try {
-        const result = await this.analyzeDomainForSpam(domain, stopWords, maxSnapshots, log);
+        const result = await this.analyzeDomainForSpam(domain, stopWords, maxSnapshots, log, statusUpdate);
         results.push(result);
       } catch (error) {
         log(`❌ Error: ${error.message}`);
-        results.push({
+        const errorResult = {
           domain: domain,
+          status: 'UNAVAILABLE',
           error: error.message,
-          status: 'error',
-        });
+          lastMessage: `Analysis failed: ${error.message}`,
+          snapshotsFound: 0,
+          snapshotsAnalyzed: 0,
+        };
+        results.push(errorResult);
+        statusUpdate(errorResult);
+      } finally {
+        active.delete(domain);
+        
+        // Process next domain from queue
+        if (queue.length > 0) {
+          const nextDomain = queue.shift();
+          promises.push(processDomain(nextDomain));
+        }
       }
-      
-      // Delay between domains to avoid rate limiting
-      // УВЕЛИЧЕНО: 5 секунд между доменами для надёжности
-      if (i < domains.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
+    };
+    
+    // Start initial batch
+    for (let i = 0; i < Math.min(maxConcurrent, domainList.length); i++) {
+      const domain = queue.shift();
+      if (domain) {
+        promises.push(processDomain(domain));
       }
     }
     
-    return results;
+    // Wait for all to complete
+    await Promise.all(promises);
+    
+    // Sort results to match input order
+    const sortedResults = domainList.map(domain => {
+      return results.find(r => r.domain === domain) || {
+        domain: domain,
+        status: 'UNAVAILABLE',
+        error: 'Analysis not completed',
+        snapshotsFound: 0,
+        snapshotsAnalyzed: 0,
+      };
+    });
+    
+    return sortedResults;
   }
 }
 

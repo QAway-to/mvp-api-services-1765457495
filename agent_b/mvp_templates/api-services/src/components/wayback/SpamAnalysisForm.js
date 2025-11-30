@@ -1,8 +1,30 @@
 import { useState } from 'react';
 
+const DEFAULT_DOMAINS = `888casino.com
+paydayloan.com
+sp.freehat.cc
+example.com
+wikipedia.org
+poker.com
+loans.com
+online-casino.com
+betting.com
+test.com`;
+
+const DEFAULT_STOP_WORDS = `casino
+poker
+roulette
+blackjack
+betting
+loan
+payday
+bonus
+jackpot
+картман`;
+
 export default function SpamAnalysisForm({ onAnalyze, isLoading }) {
-  const [domains, setDomains] = useState('');
-  const [stopWords, setStopWords] = useState('');
+  const [domains, setDomains] = useState(DEFAULT_DOMAINS);
+  const [stopWords, setStopWords] = useState(DEFAULT_STOP_WORDS);
   const [maxSnapshots, setMaxSnapshots] = useState(10);
 
   const handleSubmit = (e) => {

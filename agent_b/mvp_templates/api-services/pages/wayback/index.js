@@ -6,12 +6,14 @@ import WaybackResults from '../../src/components/wayback/WaybackResults';
 import WaybackLogs from '../../src/components/wayback/WaybackLogs';
 import SpamAnalysisForm from '../../src/components/wayback/SpamAnalysisForm';
 import SpamAnalysisResults from '../../src/components/wayback/SpamAnalysisResults';
+import DomainStatusList from '../../src/components/wayback/DomainStatusList';
 
 export default function WaybackPage() {
   const [mode, setMode] = useState('test'); // 'test' or 'analyze'
   const [result, setResult] = useState(null);
   const [spamResults, setSpamResults] = useState(null);
   const [spamSummary, setSpamSummary] = useState(null);
+  const [domainStatuses, setDomainStatuses] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -81,6 +83,17 @@ export default function WaybackPage() {
     setResult(null);
     setSpamResults(null);
     setSpamSummary(null);
+    setDomainStatuses([]);
+
+    // Initialize domain statuses as QUEUED
+    const initialStatuses = domains.map(domain => ({
+      domain: domain.trim(),
+      status: 'QUEUED',
+      lastMessage: 'Waiting to start...',
+      snapshotsFound: 0,
+      snapshotsAnalyzed: 0,
+    }));
+    setDomainStatuses(initialStatuses);
 
     try {
       const response = await fetch('/api/wayback/analyze-spam', {
@@ -99,6 +112,19 @@ export default function WaybackPage() {
       }
 
       if (data.success) {
+        // Convert results to domain statuses format
+        const statuses = data.results.map(result => ({
+          domain: result.domain,
+          status: result.status || 'UNAVAILABLE',
+          lastMessage: result.lastMessage || 'Analysis complete',
+          snapshotsFound: result.snapshotsFound || 0,
+          snapshotsAnalyzed: result.snapshotsAnalyzed || 0,
+          maxSpamScore: result.maxSpamScore,
+          avgSpamScore: result.avgSpamScore,
+          stopWordsFound: result.stopWordsFound || [],
+          error: result.error,
+        }));
+        setDomainStatuses(statuses);
         setSpamResults(data.results);
         setSpamSummary(data.summary);
       } else {
@@ -296,13 +322,25 @@ export default function WaybackPage() {
           <WaybackResults result={result} />
         )}
 
-        {/* Spam Analysis Results */}
-        {mode === 'analyze' && spamResults && (
-          <SpamAnalysisResults 
-            results={spamResults} 
+        {/* Spam Analysis Results - Domain Status List */}
+        {mode === 'analyze' && domainStatuses.length > 0 && (
+          <DomainStatusList 
+            domains={domainStatuses}
             summary={spamSummary}
-            onExportCSV={handleExportCSV}
           />
+        )}
+
+        {/* Legacy Spam Analysis Results (for CSV export) */}
+        {mode === 'analyze' && spamResults && spamResults.length > 0 && (
+          <div style={{ marginTop: '20px' }}>
+            <button
+              onClick={handleExportCSV}
+              className="btn btn-primary"
+              style={{ width: '100%' }}
+            >
+              📥 Export to CSV
+            </button>
+          </div>
         )}
 
         <footer className="page-footer">

@@ -2,6 +2,9 @@
 import { waybackAdapter } from '../../../src/lib/adapters/wayback/index.js';
 import { combineStopWords, parseStopWords, defaultStopWords } from '../../../src/lib/adapters/wayback/stopWords.js';
 
+// In-memory storage for domain statuses (for real-time updates)
+const domainStatuses = new Map();
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -24,6 +27,9 @@ export default async function handler(req, res) {
       });
     }
 
+    // Clear previous statuses
+    domainStatuses.clear();
+
     // Parse stop words
     let finalStopWords = defaultStopWords;
     if (stopWords) {
@@ -40,20 +46,29 @@ export default async function handler(req, res) {
     addLog(`Using ${finalStopWords.length} stop words`, 'info');
     addLog(`Max snapshots per domain: ${snapshotsLimit}`, 'info');
 
+    // Status callback to update domain statuses
+    const statusCallback = (domainStatus) => {
+      domainStatuses.set(domainStatus.domain, domainStatus);
+    };
+
     try {
       const results = await waybackAdapter.analyzeDomainsForSpam(
         domains,
         finalStopWords,
         snapshotsLimit,
-        (msg) => addLog(msg, 'info')
+        (msg) => addLog(msg, 'info'),
+        statusCallback,
+        3 // maxConcurrent = 3
       );
 
+      // Calculate summary with new status names
       const summary = {
         total: results.length,
-        clean: results.filter(r => r.status === 'clean').length,
-        suspicious: results.filter(r => r.status === 'suspicious').length,
-        spam: results.filter(r => r.status === 'spam').length,
-        errors: results.filter(r => r.status === 'error').length,
+        clean: results.filter(r => r.status === 'CLEAN').length,
+        suspicious: results.filter(r => r.status === 'SUSPICIOUS').length,
+        spam: results.filter(r => r.status === 'SPAM').length,
+        unavailable: results.filter(r => r.status === 'UNAVAILABLE').length,
+        no_snapshots: results.filter(r => r.status === 'NO_SNAPSHOTS').length,
       };
 
       addLog(`✅ Analysis complete: ${summary.clean} clean, ${summary.suspicious} suspicious, ${summary.spam} spam`, 'success');
