@@ -385,7 +385,7 @@ async def parse_kwork_project(request: Request):
         return {
             "status": "error",
             "message": f"Failed to parse project: {str(e)}"
-        }
+    }
 
 # MVP Generation API
 @app.post("/api/generate-mvp")

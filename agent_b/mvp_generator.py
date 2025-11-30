@@ -143,7 +143,7 @@ class MVPGenerator:
         valid_templates = [
             "mini-etl-pipeline", "web-scraper", "brand-mention-monitor", "data-formatter",
             "email-campaign-manager", "price-stock-parser", "news-parser",
-            "analytics-dashboard", "telegram-shop-bot", "api-services"
+            "analytics-dashboard", "telegram-shop-bot", "api-services", "freelance-project-search"
         ]
         if template_id not in valid_templates:
             raise ValueError(f"Invalid template_id: {template_id}. Must be one of: {valid_templates}")
@@ -338,6 +338,14 @@ class MVPGenerator:
                 "vercel.json", 
                 "next.config.js"
             ],
+            "freelance-project-search": [
+                "package.json",
+                "pages/index.js",
+                "pages/api/projects/search.js",
+                "pages/api/projects/parse.js",
+                "vercel.json",
+                "next.config.js"
+            ],
         }
         
         # Get critical files for THIS template only - create a fresh list
@@ -347,7 +355,7 @@ class MVPGenerator:
         if template_id in ["brand-mention-monitor", "data-formatter"]:
             if (project_path / "next.config.js").exists():
                 critical_files.append("next.config.js")
-        elif template_id in ["email-campaign-manager", "price-stock-parser", "news-parser", "analytics-dashboard", "telegram-shop-bot", "api-services"]:
+        elif template_id in ["email-campaign-manager", "price-stock-parser", "news-parser", "analytics-dashboard", "telegram-shop-bot", "api-services", "freelance-project-search"]:
             if (project_path / "next.config.js").exists():
                 critical_files.append("next.config.js")
             if (project_path / "vercel.json").exists():

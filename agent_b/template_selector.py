@@ -156,6 +156,17 @@ class AITemplateSelector:
                 complexity="low",
                 estimated_completion="75%"
             ),
+
+            # Freelance Project Search
+            "freelance-project-search": TemplateInfo(
+                id="freelance-project-search",
+                name="Freelance Project Search",
+                category="parsers",
+                description="Поиск и парсинг проектов с фриланс платформ (Kwork) с фильтрацией и оценкой релевантности",
+                features=["search", "parsing", "filtering", "evaluation", "kwork integration"],
+                complexity="medium",
+                estimated_completion="70%"
+            ),
         }
 
     async def select_template(self, project_description: str) -> TemplateMatch:
