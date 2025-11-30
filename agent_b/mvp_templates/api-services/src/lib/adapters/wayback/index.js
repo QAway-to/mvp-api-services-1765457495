@@ -1,5 +1,6 @@
 // Wayback Machine adapter
 import { WaybackClient } from './waybackClient.js';
+import { analyzeHtmlForSpam } from './htmlParser.js';
 
 export class WaybackMachineAdapter {
   constructor() {
@@ -62,6 +63,154 @@ export class WaybackMachineAdapter {
     } catch (error) {
       throw new Error(`Wayback test failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Analyze domain for spam content in historical snapshots
+   * @param {string} domain - Domain to analyze
+   * @param {Array<string>} stopWords - List of spam keywords
+   * @param {number} maxSnapshots - Max snapshots to check (default: 10)
+   * @param {Function} progressCallback - Optional callback for progress updates
+   * @returns {Promise<Object>} Analysis result
+   */
+  async analyzeDomainForSpam(domain, stopWords = [], maxSnapshots = 10, progressCallback = null) {
+    const log = (msg) => {
+      if (progressCallback) progressCallback(msg);
+    };
+
+    try {
+      log(`Analyzing domain: ${domain}`);
+      
+      // Get snapshots
+      const snapshots = await this.getSnapshots(domain, maxSnapshots);
+      
+      if (snapshots.length === 0) {
+        return {
+          domain: domain,
+          snapshotsChecked: 0,
+          spamDetected: false,
+          spamScore: 0,
+          totalStopWordsFound: 0,
+          stopWordsFound: [],
+          firstSpamDate: null,
+          status: 'no_snapshots',
+        };
+      }
+
+      log(`Found ${snapshots.length} snapshots, analyzing...`);
+      
+      let spamSnapshots = 0;
+      let totalSpamScore = 0;
+      const allFoundStopWords = new Map(); // word -> count
+      let firstSpamDate = null;
+
+      // Analyze each snapshot
+      for (let i = 0; i < snapshots.length; i++) {
+        const snapshot = snapshots[i];
+        try {
+          log(`[${i + 1}/${snapshots.length}] Checking snapshot ${snapshot.timestamp}...`);
+          
+          const htmlResult = await this.getSnapshotHtml(snapshot);
+          const analysis = await analyzeHtmlForSpam(htmlResult.html, stopWords);
+          
+          if (analysis.isSpam) {
+            spamSnapshots++;
+            totalSpamScore += analysis.spamScore;
+            
+            // Track stop words
+            analysis.stopWords.found.forEach(item => {
+              const current = allFoundStopWords.get(item.word) || 0;
+              allFoundStopWords.set(item.word, current + item.count);
+            });
+            
+            // Track first spam date
+            if (!firstSpamDate) {
+              firstSpamDate = snapshot.timestamp;
+            }
+          }
+          
+          // Small delay between requests to be polite
+          if (i < snapshots.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (error) {
+          log(`⚠️ Error analyzing snapshot ${snapshot.timestamp}: ${error.message}`);
+          // Continue with next snapshot
+        }
+      }
+
+      // Calculate overall spam score (percentage of snapshots with spam)
+      const spamPercentage = (spamSnapshots / snapshots.length) * 100;
+      const avgSpamScore = spamSnapshots > 0 ? totalSpamScore / spamSnapshots : 0;
+
+      // Convert stop words map to array
+      const stopWordsFound = Array.from(allFoundStopWords.entries())
+        .map(([word, count]) => ({ word, count }))
+        .sort((a, b) => b.count - a.count);
+
+      // Determine status
+      let status = 'clean';
+      if (spamPercentage >= 50) {
+        status = 'spam';
+      } else if (spamPercentage > 0) {
+        status = 'suspicious';
+      }
+
+      return {
+        domain: domain,
+        snapshotsChecked: snapshots.length,
+        spamSnapshots: spamSnapshots,
+        spamPercentage: Math.round(spamPercentage * 100) / 100,
+        avgSpamScore: Math.round(avgSpamScore * 100) / 100,
+        spamDetected: spamSnapshots > 0,
+        totalStopWordsFound: allFoundStopWords.size,
+        stopWordsFound: stopWordsFound,
+        firstSpamDate: firstSpamDate,
+        status: status,
+      };
+    } catch (error) {
+      throw new Error(`Domain analysis failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Analyze multiple domains for spam
+   * @param {Array<string>} domains - Array of domains to analyze
+   * @param {Array<string>} stopWords - List of spam keywords
+   * @param {number} maxSnapshots - Max snapshots per domain
+   * @param {Function} progressCallback - Optional callback for progress updates
+   * @returns {Promise<Array<Object>>} Array of analysis results
+   */
+  async analyzeDomainsForSpam(domains, stopWords = [], maxSnapshots = 10, progressCallback = null) {
+    const results = [];
+    
+    for (let i = 0; i < domains.length; i++) {
+      const domain = domains[i].trim();
+      if (!domain) continue;
+      
+      const log = (msg) => {
+        if (progressCallback) progressCallback(`[${i + 1}/${domains.length}] ${domain}: ${msg}`);
+      };
+      
+      try {
+        const result = await this.analyzeDomainForSpam(domain, stopWords, maxSnapshots, log);
+        results.push(result);
+      } catch (error) {
+        log(`❌ Error: ${error.message}`);
+        results.push({
+          domain: domain,
+          error: error.message,
+          status: 'error',
+        });
+      }
+      
+      // Small delay between domains
+      if (i < domains.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    return results;
   }
 }
 
