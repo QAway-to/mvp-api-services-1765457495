@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import WaybackForm from '../../src/components/wayback/WaybackForm';
 import WaybackResults from '../../src/components/wayback/WaybackResults';
 import WaybackLogs from '../../src/components/wayback/WaybackLogs';
@@ -17,6 +17,7 @@ export default function WaybackPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [logs, setLogs] = useState([]);
+  const eventSourceRef = useRef(null);
 
   const handleTest = async (target) => {
     setIsLoading(true);
@@ -76,7 +77,23 @@ export default function WaybackPage() {
     }
   };
 
+  // Cleanup SSE connection on unmount or when starting new analysis
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, []);
+
   const handleSpamAnalysis = async ({ domains, stopWords, maxSnapshots }) => {
+    // Close any existing SSE connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
     setIsLoading(true);
     setError(null);
     setLogs([]);
@@ -84,6 +101,9 @@ export default function WaybackPage() {
     setSpamResults(null);
     setSpamSummary(null);
     setDomainStatuses([]);
+
+    // Generate session ID for real-time updates
+    const sessionId = `spam-analysis-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Initialize domain statuses as QUEUED
     const initialStatuses = domains.map(domain => ({
@@ -96,65 +116,99 @@ export default function WaybackPage() {
     setDomainStatuses(initialStatuses);
 
     try {
+      // Start analysis (returns immediately)
       const response = await fetch('/api/wayback/analyze-spam', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ domains, stopWords, maxSnapshots }),
+        body: JSON.stringify({ domains, stopWords, maxSnapshots, sessionId }),
       });
 
       const data = await response.json();
 
-      // Always set logs if available
-      if (data.logs && Array.isArray(data.logs)) {
-        setLogs(data.logs);
-      }
-
-      if (data.success) {
-        // Convert results to domain statuses format
-        const statuses = data.results.map(result => ({
-          domain: result.domain,
-          status: result.status || 'UNAVAILABLE',
-          lastMessage: result.lastMessage || 'Analysis complete',
-          snapshotsFound: result.snapshotsFound || 0,
-          snapshotsAnalyzed: result.snapshotsAnalyzed || 0,
-          maxSpamScore: result.maxSpamScore,
-          avgSpamScore: result.avgSpamScore,
-          stopWordsFound: result.stopWordsFound || [],
-          error: result.error,
-        }));
-        setDomainStatuses(statuses);
-        setSpamResults(data.results);
-        setSpamSummary(data.summary);
-      } else {
+      if (!data.success) {
         const errorMsg = data.message || data.error || 'Unknown error';
         setError(errorMsg);
+        setIsLoading(false);
+        return;
       }
+
+      // Connect to SSE endpoint for real-time updates
+      const eventSource = new EventSource(`/api/wayback/analyze-spam-status?sessionId=${sessionId}`);
+      eventSourceRef.current = eventSource;
+
+      eventSource.onmessage = (event) => {
+        try {
+          const update = JSON.parse(event.data);
+          
+          if (update.type === 'status' && update.domains) {
+            // Update domain statuses
+            setDomainStatuses(prevStatuses => {
+              // Merge with previous to preserve order
+              const statusMap = new Map(update.domains.map(d => [d.domain, d]));
+              return update.domains;
+            });
+            
+            // Check if all domains are complete
+            const allComplete = update.domains.every(d => 
+              ['CLEAN', 'SUSPICIOUS', 'SPAM', 'UNAVAILABLE', 'NO_SNAPSHOTS'].includes(d.status)
+            );
+            
+            if (allComplete) {
+              // Calculate summary
+              const summary = {
+                total: update.domains.length,
+                clean: update.domains.filter(d => d.status === 'CLEAN').length,
+                suspicious: update.domains.filter(d => d.status === 'SUSPICIOUS').length,
+                spam: update.domains.filter(d => d.status === 'SPAM').length,
+                unavailable: update.domains.filter(d => d.status === 'UNAVAILABLE').length,
+                no_snapshots: update.domains.filter(d => d.status === 'NO_SNAPSHOTS').length,
+              };
+              
+              // Convert to results format
+              const results = update.domains.map(d => ({
+                domain: d.domain,
+                status: d.status,
+                lastMessage: d.lastMessage,
+                snapshotsFound: d.snapshotsFound || 0,
+                snapshotsAnalyzed: d.snapshotsAnalyzed || 0,
+                maxSpamScore: d.maxSpamScore,
+                avgSpamScore: d.avgSpamScore,
+                stopWordsFound: d.stopWordsFound || [],
+                error: d.error,
+              }));
+              
+              setSpamResults(results);
+              setSpamSummary(summary);
+              setIsLoading(false);
+              eventSource.close();
+              eventSourceRef.current = null;
+            }
+          } else if (update.type === 'error') {
+            setError(update.message || 'Error receiving updates');
+            eventSource.close();
+            eventSourceRef.current = null;
+            setIsLoading(false);
+          }
+        } catch (err) {
+          console.error('Error parsing SSE message:', err);
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        console.error('SSE connection error:', err);
+        if (eventSource.readyState === EventSource.CLOSED) {
+          eventSource.close();
+          eventSourceRef.current = null;
+          // Don't set loading to false immediately - might be temporary connection issue
+        }
+      };
+
     } catch (err) {
       console.error('Spam analysis error:', err);
       const errorMsg = err.message || 'Network error or invalid response';
       setError(errorMsg);
-      
-      // Try to parse error response
-      try {
-        if (err.response) {
-          const errorText = await err.response.text();
-          if (errorText) {
-            try {
-              const errorJson = JSON.parse(errorText);
-              if (errorJson.logs) {
-                setLogs(errorJson.logs);
-              }
-            } catch (e) {
-              // Not JSON
-            }
-          }
-        }
-      } catch (e) {
-        // Ignore
-      }
-    } finally {
       setIsLoading(false);
     }
   };

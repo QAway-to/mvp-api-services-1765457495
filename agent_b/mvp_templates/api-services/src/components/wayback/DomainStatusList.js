@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 
 const STATUS_COLORS = {
   QUEUED: '#6b7280',
@@ -31,6 +31,22 @@ export default function DomainStatusList({ domains, summary }) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [domains]);
+
+  // Calculate summary from domains if not provided
+  const computedSummary = useMemo(() => {
+    if (summary) return summary;
+    
+    if (!domains || domains.length === 0) return null;
+    
+    return {
+      total: domains.length,
+      clean: domains.filter(d => d.status === 'CLEAN').length,
+      suspicious: domains.filter(d => d.status === 'SUSPICIOUS').length,
+      spam: domains.filter(d => d.status === 'SPAM').length,
+      unavailable: domains.filter(d => d.status === 'UNAVAILABLE').length,
+      no_snapshots: domains.filter(d => d.status === 'NO_SNAPSHOTS').length,
+    };
+  }, [domains, summary]);
 
   if (!domains || domains.length === 0) {
     return null;
@@ -67,7 +83,7 @@ export default function DomainStatusList({ domains, summary }) {
   return (
     <>
       {/* Summary */}
-      {summary && (
+      {computedSummary && (
         <div className="card" style={{ marginBottom: '20px' }}>
           <header className="card-header">
             <h2>Analysis Summary</h2>
@@ -81,22 +97,22 @@ export default function DomainStatusList({ domains, summary }) {
               fontWeight: 500,
             }}>
               <span>
-                <strong>Total:</strong> {summary.total || 0}
+                <strong>Total:</strong> {computedSummary.total || 0}
               </span>
               <span style={{ color: '#10b981' }}>
-                <strong>Clean:</strong> {summary.clean || 0}
+                <strong>Clean:</strong> {computedSummary.clean || 0}
               </span>
               <span style={{ color: '#f59e0b' }}>
-                <strong>Suspicious:</strong> {summary.suspicious || 0}
+                <strong>Suspicious:</strong> {computedSummary.suspicious || 0}
               </span>
               <span style={{ color: '#ef4444' }}>
-                <strong>Spam:</strong> {summary.spam || 0}
+                <strong>Spam:</strong> {computedSummary.spam || 0}
               </span>
               <span style={{ color: '#9ca3af' }}>
-                <strong>No Snapshots:</strong> {summary.no_snapshots || 0}
+                <strong>No Snapshots:</strong> {computedSummary.no_snapshots || 0}
               </span>
               <span style={{ color: '#ef4444' }}>
-                <strong>Unavailable:</strong> {summary.unavailable || 0}
+                <strong>Unavailable:</strong> {computedSummary.unavailable || 0}
               </span>
             </div>
           </div>

@@ -2,8 +2,10 @@
 import { waybackAdapter } from '../../../src/lib/adapters/wayback/index.js';
 import { combineStopWords, parseStopWords, defaultStopWords } from '../../../src/lib/adapters/wayback/stopWords.js';
 
-// In-memory storage for domain statuses (for real-time updates)
-const domainStatuses = new Map();
+// Global storage for domain statuses (shared across requests in same process)
+if (typeof global.domainStatusStorage === 'undefined') {
+  global.domainStatusStorage = new Map();
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -18,7 +20,7 @@ export default async function handler(req, res) {
   };
 
   try {
-    const { domains, stopWords, maxSnapshots } = req.body;
+    const { domains, stopWords, maxSnapshots, sessionId } = req.body;
 
     if (!domains || !Array.isArray(domains) || domains.length === 0) {
       return res.status(400).json({ 
@@ -27,8 +29,29 @@ export default async function handler(req, res) {
       });
     }
 
-    // Clear previous statuses
-    domainStatuses.clear();
+    if (!sessionId) {
+      return res.status(400).json({ 
+        error: 'sessionId is required for real-time updates',
+        logs: [{ timestamp: new Date().toISOString(), type: 'error', message: 'sessionId is required' }]
+      });
+    }
+
+    // Initialize status storage for this session
+    const domainStatuses = new Map();
+    global.domainStatusStorage.set(sessionId, domainStatuses);
+
+    // Initialize all domains as QUEUED
+    domains.forEach(domain => {
+      const trimmed = domain.trim();
+      if (!trimmed) return;
+      domainStatuses.set(trimmed, {
+        domain: trimmed,
+        status: 'QUEUED',
+        lastMessage: 'Waiting to start...',
+        snapshotsFound: 0,
+        snapshotsAnalyzed: 0,
+      });
+    });
 
     // Parse stop words
     let finalStopWords = defaultStopWords;
@@ -46,46 +69,35 @@ export default async function handler(req, res) {
     addLog(`Using ${finalStopWords.length} stop words`, 'info');
     addLog(`Max snapshots per domain: ${snapshotsLimit}`, 'info');
 
-    // Status callback to update domain statuses
+    // Status callback to update domain statuses in global storage
     const statusCallback = (domainStatus) => {
       domainStatuses.set(domainStatus.domain, domainStatus);
     };
 
-    try {
-      const results = await waybackAdapter.analyzeDomainsForSpam(
-        domains,
-        finalStopWords,
-        snapshotsLimit,
-        (msg) => addLog(msg, 'info'),
-        statusCallback,
-        3 // maxConcurrent = 3
-      );
-
-      // Calculate summary with new status names
-      const summary = {
-        total: results.length,
-        clean: results.filter(r => r.status === 'CLEAN').length,
-        suspicious: results.filter(r => r.status === 'SUSPICIOUS').length,
-        spam: results.filter(r => r.status === 'SPAM').length,
-        unavailable: results.filter(r => r.status === 'UNAVAILABLE').length,
-        no_snapshots: results.filter(r => r.status === 'NO_SNAPSHOTS').length,
-      };
-
-      addLog(`✅ Analysis complete: ${summary.clean} clean, ${summary.suspicious} suspicious, ${summary.spam} spam`, 'success');
-
-      return res.status(200).json({
-        success: true,
-        results: results,
-        summary: summary,
-        logs: logs,
-      });
-    } catch (error) {
+    // Start analysis asynchronously (don't wait for it)
+    waybackAdapter.analyzeDomainsForSpam(
+      domains,
+      finalStopWords,
+      snapshotsLimit,
+      (msg) => addLog(msg, 'info'),
+      statusCallback,
+      3 // maxConcurrent = 3
+    ).then(results => {
+      // Analysis complete - statuses are already updated via callback
+      addLog(`✅ Analysis complete`, 'success');
+    }).catch(error => {
       addLog(`❌ Error: ${error.message}`, 'error');
       if (error.stack) {
         addLog(`Stack: ${error.stack}`, 'error');
       }
-      throw error;
-    }
+    });
+
+    // Return immediately with sessionId
+    return res.status(200).json({
+      success: true,
+      sessionId: sessionId,
+      message: 'Analysis started. Use /api/wayback/analyze-spam-status?sessionId=' + sessionId + ' for real-time updates',
+    });
   } catch (error) {
     addLog(`❌ Fatal error: ${error.message}`, 'error');
     if (error.stack) {
