@@ -483,32 +483,34 @@ export class WaybackMachineAdapter {
       const riskFactors = [];
       
       // 1. Spam score (0-100, higher = worse)
-      const spamRisk = spamAnalysis.maxSpamScore !== undefined ? spamAnalysis.maxSpamScore * 10 : null;
-      if (spamRisk !== null) {
+      const spamRisk = (spamAnalysis && typeof spamAnalysis.maxSpamScore === 'number' && isFinite(spamAnalysis.maxSpamScore))
+        ? Math.min(100, Math.max(0, spamAnalysis.maxSpamScore * 10))
+        : null;
+      if (spamRisk !== null && spamRisk >= 0) {
         riskFactors.push({ name: 'Spam Content', value: spamRisk, weight: 0.35 });
       }
       
       // 2. Backlink quality (invert: 0 = bad, 100 = good -> 100 = bad, 0 = good)
-      const backlinkRisk = backlinkAnalysis.averageQualityScore !== undefined 
-        ? (100 - backlinkAnalysis.averageQualityScore) 
+      const backlinkRisk = (backlinkAnalysis && typeof backlinkAnalysis.averageQualityScore === 'number' && isFinite(backlinkAnalysis.averageQualityScore))
+        ? Math.min(100, Math.max(0, 100 - backlinkAnalysis.averageQualityScore))
         : null;
-      if (backlinkRisk !== null) {
+      if (backlinkRisk !== null && backlinkRisk >= 0) {
         riskFactors.push({ name: 'Backlink Quality', value: backlinkRisk, weight: 0.25 });
       }
       
       // 3. Domain metrics (invert: low metrics = high risk)
-      const metricsRisk = metrics.overallQualityScore !== null 
-        ? (100 - metrics.overallQualityScore) 
+      const metricsRisk = (metrics && typeof metrics.overallQualityScore === 'number' && isFinite(metrics.overallQualityScore))
+        ? Math.min(100, Math.max(0, 100 - metrics.overallQualityScore))
         : null;
-      if (metricsRisk !== null) {
+      if (metricsRisk !== null && metricsRisk >= 0) {
         riskFactors.push({ name: 'Domain Metrics', value: metricsRisk, weight: 0.25 });
       }
       
       // 4. Topic stability (invert: low stability = high risk)
-      const topicRisk = topicAnalysis.stabilityScore !== null 
-        ? (100 - topicAnalysis.stabilityScore) 
+      const topicRisk = (topicAnalysis && typeof topicAnalysis.stabilityScore === 'number' && isFinite(topicAnalysis.stabilityScore))
+        ? Math.min(100, Math.max(0, 100 - topicAnalysis.stabilityScore))
         : null;
-      if (topicRisk !== null) {
+      if (topicRisk !== null && topicRisk >= 0) {
         riskFactors.push({ name: 'Topic Stability', value: topicRisk, weight: 0.15 });
       }
       
@@ -541,18 +543,29 @@ export class WaybackMachineAdapter {
         overallRiskScore = spamRisk !== null ? Math.round(spamRisk + redFlagPenalty) : 0;
       }
       
-      // Cap at 100
+      // Cap at 100 and ensure it's a valid number
       overallRiskScore = Math.min(100, Math.max(0, overallRiskScore));
+      
+      // Handle NaN/Infinity cases
+      if (!isFinite(overallRiskScore) || isNaN(overallRiskScore)) {
+        // Fallback: use spam score or default to 50 (medium risk)
+        overallRiskScore = spamRisk !== null && isFinite(spamRisk) 
+          ? Math.min(100, Math.max(0, Math.round(spamRisk + redFlagPenalty)))
+          : 50;
+      }
       
       // Determine recommendation based on clear criteria
       let recommendation = 'REVIEW';
       let recommendationReason = [];
       
+      // Ensure overallRiskScore is valid before using in messages
+      const validRiskScore = isFinite(overallRiskScore) && !isNaN(overallRiskScore) ? overallRiskScore : 50;
+      
       // Critical issues - always AVOID
-      if (spamRisk !== null && spamRisk >= 80) {
+      if (spamRisk !== null && isFinite(spamRisk) && spamRisk >= 80) {
         recommendation = 'AVOID';
         recommendationReason.push('Very high spam score detected');
-      } else if (spamRisk !== null && spamRisk >= 50) {
+      } else if (spamRisk !== null && isFinite(spamRisk) && spamRisk >= 50) {
         recommendation = 'AVOID';
         recommendationReason.push('High spam content detected');
       } else if (redFlagPenalty >= 20) {
@@ -560,21 +573,21 @@ export class WaybackMachineAdapter {
         recommendationReason.push('Multiple high-severity red flags detected');
       }
       // High risk
-      else if (overallRiskScore >= 70) {
+      else if (validRiskScore >= 70) {
         recommendation = 'AVOID';
-        recommendationReason.push(`High overall risk score (${overallRiskScore})`);
-      } else if (overallRiskScore >= 55) {
+        recommendationReason.push(`High overall risk score (${Math.round(validRiskScore)})`);
+      } else if (validRiskScore >= 55) {
         recommendation = 'CAUTION';
-        recommendationReason.push(`Elevated risk score (${overallRiskScore})`);
-      } else if (overallRiskScore >= 40) {
+        recommendationReason.push(`Elevated risk score (${Math.round(validRiskScore)})`);
+      } else if (validRiskScore >= 40) {
         recommendation = 'REVIEW';
-        recommendationReason.push(`Moderate risk (${overallRiskScore}) - review carefully`);
-      } else if (overallRiskScore >= 25) {
+        recommendationReason.push(`Moderate risk (${Math.round(validRiskScore)}) - review carefully`);
+      } else if (validRiskScore >= 25) {
         recommendation = 'REVIEW';
-        recommendationReason.push(`Low-moderate risk (${overallRiskScore})`);
+        recommendationReason.push(`Low-moderate risk (${Math.round(validRiskScore)})`);
       } else {
         recommendation = 'BUY';
-        recommendationReason.push(`Low risk score (${overallRiskScore})`);
+        recommendationReason.push(`Low risk score (${Math.round(validRiskScore)})`);
       }
       
       // Additional factors for recommendation
@@ -609,12 +622,26 @@ export class WaybackMachineAdapter {
 
       log(`Complete analysis finished for ${domain}`);
       const reasonText = recommendationReason.join('; ');
+      
+      // Extract snapshot counts from spam analysis
+      const snapshotsFound = (spamAnalysis && typeof spamAnalysis.snapshotsFound === 'number') 
+        ? spamAnalysis.snapshotsFound 
+        : snapshots.length || 0;
+      const snapshotsAnalyzed = (spamAnalysis && typeof spamAnalysis.snapshotsAnalyzed === 'number') 
+        ? spamAnalysis.snapshotsAnalyzed 
+        : 0;
+      
       updateStatus('COMPLETE', {
         lastMessage: `Analysis complete. Risk: ${riskLevel}, Recommendation: ${recommendation}. ${reasonText}`,
         overallRiskScore,
         recommendation,
         recommendationReason: reasonText,
         riskFactors,
+        snapshotsFound,
+        snapshotsAnalyzed,
+        maxSpamScore: (spamAnalysis && typeof spamAnalysis.maxSpamScore === 'number') ? spamAnalysis.maxSpamScore : undefined,
+        avgSpamScore: (spamAnalysis && typeof spamAnalysis.avgSpamScore === 'number') ? spamAnalysis.avgSpamScore : undefined,
+        spamSnapshots: (spamAnalysis && typeof spamAnalysis.spamSnapshots === 'number') ? spamAnalysis.spamSnapshots : undefined,
       });
 
       return {
@@ -629,6 +656,11 @@ export class WaybackMachineAdapter {
         recommendation,
         recommendationReason: reasonText,
         riskFactors: riskFactors.map(f => ({ name: f.name, risk: f.value })),
+        snapshotsFound,
+        snapshotsAnalyzed,
+        maxSpamScore: (spamAnalysis && typeof spamAnalysis.maxSpamScore === 'number') ? spamAnalysis.maxSpamScore : undefined,
+        avgSpamScore: (spamAnalysis && typeof spamAnalysis.avgSpamScore === 'number') ? spamAnalysis.avgSpamScore : undefined,
+        spamSnapshots: (spamAnalysis && typeof spamAnalysis.spamSnapshots === 'number') ? spamAnalysis.spamSnapshots : undefined,
         analyzedAt: new Date().toISOString(),
       };
     } catch (error) {

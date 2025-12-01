@@ -67,14 +67,21 @@ export default async function handler(req, res) {
           );
           
           if (allComplete && resultsHash !== lastResultsHash) {
-            // Send complete results
+            // Send complete results with all data merged from status and results
             res.write(`data: ${JSON.stringify({ 
               type: 'complete', 
-              domains: results.map(r => ({
-                ...r,
-                currentStatus: statuses.get(r.domain)?.status || r.status,
-                lastMessage: statuses.get(r.domain)?.lastMessage || r.error || 'Analysis complete',
-              }))
+              domains: results.map(r => {
+                const statusData = statuses.get(r.domain);
+                return {
+                  ...r,
+                  currentStatus: statusData?.status || r.status,
+                  lastMessage: statusData?.lastMessage || r.recommendationReason || r.error || 'Analysis complete',
+                  snapshotsFound: r.snapshotsFound !== undefined ? r.snapshotsFound : (statusData?.snapshotsFound || 0),
+                  snapshotsAnalyzed: r.snapshotsAnalyzed !== undefined ? r.snapshotsAnalyzed : (statusData?.snapshotsAnalyzed || 0),
+                  maxSpamScore: r.maxSpamScore !== undefined ? r.maxSpamScore : (statusData?.maxSpamScore || r.spamAnalysis?.maxSpamScore),
+                  avgSpamScore: r.avgSpamScore !== undefined ? r.avgSpamScore : (statusData?.avgSpamScore || r.spamAnalysis?.avgSpamScore),
+                };
+              })
             })}\n\n`);
             
             lastResultsHash = resultsHash;
