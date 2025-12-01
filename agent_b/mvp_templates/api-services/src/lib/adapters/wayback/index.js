@@ -84,9 +84,14 @@ export class WaybackMachineAdapter {
     
     const updateStatus = (status, data = {}) => {
       if (statusCallback) {
+        // Ensure status is always a string
+        const normalizedStatus = typeof status === 'string' 
+          ? status 
+          : (status && typeof status === 'object' ? (status.status || status.label || 'QUEUED') : String(status || 'QUEUED'));
+        
         statusCallback({
           domain,
-          status,
+          status: normalizedStatus,
           ...data,
         });
       }
@@ -415,9 +420,14 @@ export class WaybackMachineAdapter {
     
     const updateStatus = (status, data = {}) => {
       if (statusCallback) {
+        // Ensure status is always a string
+        const normalizedStatus = typeof status === 'string' 
+          ? status 
+          : (status && typeof status === 'object' ? (status.status || status.label || 'QUEUED') : String(status || 'QUEUED'));
+        
         statusCallback({
           domain,
-          status,
+          status: normalizedStatus,
           ...data,
         });
       }
