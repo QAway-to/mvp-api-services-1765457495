@@ -187,21 +187,38 @@ export default function WaybackPage() {
           if (update.type === 'status' && update.domains && Array.isArray(update.domains)) {
             // Update domain statuses (real-time update)
             setDomainStatuses(prevStatuses => {
+              // Validate and normalize domains data
+              const validDomains = update.domains
+                .filter(d => d && typeof d === 'object' && d.domain && typeof d.domain === 'string')
+                .map(d => ({
+                  domain: String(d.domain),
+                  status: String(d.status || 'QUEUED'),
+                  lastMessage: d.lastMessage ? String(d.lastMessage) : '',
+                  snapshotsFound: typeof d.snapshotsFound === 'number' ? d.snapshotsFound : undefined,
+                  snapshotsAnalyzed: typeof d.snapshotsAnalyzed === 'number' ? d.snapshotsAnalyzed : undefined,
+                  spamSnapshots: typeof d.spamSnapshots === 'number' ? d.spamSnapshots : undefined,
+                  maxSpamScore: typeof d.maxSpamScore === 'number' ? d.maxSpamScore : undefined,
+                  avgSpamScore: typeof d.avgSpamScore === 'number' ? d.avgSpamScore : undefined,
+                  stopWordsFound: Array.isArray(d.stopWordsFound) ? d.stopWordsFound : undefined,
+                  error: d.error ? String(d.error) : undefined,
+                }));
+              
               // Create a map of new statuses
-              const newStatusMap = new Map(update.domains.map(d => [d.domain, d]));
+              const newStatusMap = new Map(validDomains.map(d => [d.domain, d]));
               
               // Merge with previous to preserve order and update only changed domains
               const updated = prevStatuses.map(prev => {
+                if (!prev || !prev.domain) return prev;
                 const updatedDomain = newStatusMap.get(prev.domain);
                 if (updatedDomain) {
                   return { ...prev, ...updatedDomain };
                 }
                 return prev;
-              });
+              }).filter(d => d && d.domain);
               
               // Add any new domains that weren't in previous list
-              update.domains.forEach(newDomain => {
-                if (!prevStatuses.find(d => d.domain === newDomain.domain)) {
+              validDomains.forEach(newDomain => {
+                if (!prevStatuses.find(d => d && d.domain === newDomain.domain)) {
                   updated.push(newDomain);
                 }
               });
@@ -452,9 +469,9 @@ export default function WaybackPage() {
         )}
 
         {/* Spam Analysis Results - Domain Status List */}
-        {mode === 'analyze' && domainStatuses.length > 0 && (
+        {mode === 'analyze' && domainStatuses && Array.isArray(domainStatuses) && domainStatuses.length > 0 && (
           <DomainStatusList 
-            domains={domainStatuses}
+            domains={domainStatuses.filter(d => d && typeof d === 'object' && d.domain)}
             summary={spamSummary}
           />
         )}

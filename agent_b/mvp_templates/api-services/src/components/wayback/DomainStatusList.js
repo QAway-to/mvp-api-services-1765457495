@@ -35,6 +35,16 @@ const STATUS_LABELS = {
 export default function DomainStatusList({ domains, summary }) {
   const containerRef = useRef(null);
   const wasAtBottomRef = useRef(true);
+  
+  // Validate and filter domains
+  const validDomains = (domains || [])
+    .filter(d => 
+      d && 
+      typeof d === 'object' && 
+      d.domain && 
+      typeof d.domain === 'string' &&
+      d.domain.trim().length > 0
+    );
 
   // Track if user is at bottom, and only auto-scroll if they were
   useEffect(() => {
@@ -50,25 +60,25 @@ export default function DomainStatusList({ domains, summary }) {
         container.scrollTop = container.scrollHeight;
       }
     }
-  }, [domains]);
+  }, [validDomains]);
 
   // Calculate summary from domains if not provided
   const computedSummary = useMemo(() => {
     if (summary) return summary;
     
-    if (!domains || domains.length === 0) return null;
+    if (!validDomains || validDomains.length === 0) return null;
     
     return {
-      total: domains.length,
-      clean: domains.filter(d => d.status === 'CLEAN').length,
-      suspicious: domains.filter(d => d.status === 'SUSPICIOUS').length,
-      spam: domains.filter(d => d.status === 'SPAM').length,
-      unavailable: domains.filter(d => d.status === 'UNAVAILABLE').length,
-      no_snapshots: domains.filter(d => d.status === 'NO_SNAPSHOTS').length,
+      total: validDomains.length,
+      clean: validDomains.filter(d => d.status === 'CLEAN').length,
+      suspicious: validDomains.filter(d => d.status === 'SUSPICIOUS').length,
+      spam: validDomains.filter(d => d.status === 'SPAM').length,
+      unavailable: validDomains.filter(d => d.status === 'UNAVAILABLE').length,
+      no_snapshots: validDomains.filter(d => d.status === 'NO_SNAPSHOTS').length,
     };
-  }, [domains, summary]);
+  }, [validDomains, summary]);
 
-  if (!domains || domains.length === 0) {
+  if (!validDomains || validDomains.length === 0) {
     return null;
   }
 
@@ -170,9 +180,16 @@ export default function DomainStatusList({ domains, summary }) {
             boxSizing: 'border-box',
             width: '100%',
           }}>
-            {domains.map((domain, index) => (
+            {validDomains.map((domain, index) => {
+              // Validate domain object structure
+              if (!domain || typeof domain !== 'object' || !domain.domain) {
+                console.error('Invalid domain object:', domain);
+                return null;
+              }
+              
+              return (
               <div
-                key={index}
+                key={domain.domain || index}
                 style={{
                   padding: '16px',
                   borderRadius: '8px',
@@ -189,7 +206,7 @@ export default function DomainStatusList({ domains, summary }) {
                       <strong style={{ fontSize: '1rem', color: '#f9fafb' }}>{domain.domain}</strong>
                       {getStatusBadge(domain.status)}
                     </div>
-                    {domain.lastMessage && (
+                    {domain.lastMessage && typeof domain.lastMessage === 'string' && (
                       <div style={{ fontSize: '0.85rem', color: '#9ca3af', marginTop: '4px' }}>
                         {domain.lastMessage}
                       </div>
@@ -255,7 +272,8 @@ export default function DomainStatusList({ domains, summary }) {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
