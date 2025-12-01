@@ -36,7 +36,7 @@ export default function DomainStatusList({ domains, summary }) {
   const containerRef = useRef(null);
   const wasAtBottomRef = useRef(true);
   
-  // Validate and filter domains
+  // Validate and filter domains, normalize status to string
   const validDomains = (domains || [])
     .filter(d => 
       d && 
@@ -44,7 +44,22 @@ export default function DomainStatusList({ domains, summary }) {
       d.domain && 
       typeof d.domain === 'string' &&
       d.domain.trim().length > 0
-    );
+    )
+    .map(d => {
+      // Ensure status is always a string
+      let normalizedStatus = d.status;
+      if (typeof normalizedStatus !== 'string') {
+        if (normalizedStatus && typeof normalizedStatus === 'object') {
+          normalizedStatus = normalizedStatus.status || normalizedStatus.label || 'QUEUED';
+        } else {
+          normalizedStatus = String(normalizedStatus || 'QUEUED');
+        }
+      }
+      return {
+        ...d,
+        status: normalizedStatus,
+      };
+    });
 
   // Track if user is at bottom, and only auto-scroll if they were
   useEffect(() => {
@@ -83,8 +98,20 @@ export default function DomainStatusList({ domains, summary }) {
   }
 
   const getStatusBadge = (status) => {
-    const color = STATUS_COLORS[status] || '#6b7280';
-    const label = STATUS_LABELS[status] || status;
+    // Normalize status - ensure it's always a string
+    let normalizedStatus = 'QUEUED';
+    if (typeof status === 'string') {
+      normalizedStatus = status;
+    } else if (status && typeof status === 'object') {
+      // If status is an object, try to extract string value
+      normalizedStatus = status.status || status.label || 'QUEUED';
+      console.warn('Status is an object, using normalized value:', normalizedStatus, status);
+    } else if (status !== null && status !== undefined) {
+      normalizedStatus = String(status);
+    }
+    
+    const color = STATUS_COLORS[normalizedStatus] || '#6b7280';
+    const label = STATUS_LABELS[normalizedStatus] || normalizedStatus;
     return (
       <span
         style={{

@@ -211,7 +211,18 @@ export default function WaybackPage() {
                 if (!prev || !prev.domain) return prev;
                 const updatedDomain = newStatusMap.get(prev.domain);
                 if (updatedDomain) {
-                  return { ...prev, ...updatedDomain };
+                  // Normalize status to always be a string
+                  const merged = { ...prev, ...updatedDomain };
+                  if (merged.status && typeof merged.status !== 'string') {
+                    merged.status = String(merged.status.status || merged.status.label || merged.status || 'QUEUED');
+                  } else if (!merged.status) {
+                    merged.status = 'QUEUED';
+                  }
+                  return merged;
+                }
+                // Ensure prev.status is also a string
+                if (prev.status && typeof prev.status !== 'string') {
+                  prev.status = String(prev.status.status || prev.status.label || prev.status || 'QUEUED');
                 }
                 return prev;
               }).filter(d => d && d.domain);
