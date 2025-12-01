@@ -605,11 +605,11 @@ export class WaybackMachineAdapter {
         }
       }
       
-      // Determine risk level (must match recommendation)
+      // Determine risk level (must match recommendation) - use validRiskScore
       let riskLevel = 'LOW';
-      if (overallRiskScore >= 70 || recommendation === 'AVOID') {
+      if (validRiskScore >= 70 || recommendation === 'AVOID') {
         riskLevel = 'HIGH';
-      } else if (overallRiskScore >= 40 || recommendation === 'CAUTION') {
+      } else if (validRiskScore >= 40 || recommendation === 'CAUTION') {
         riskLevel = 'MEDIUM';
       } else {
         riskLevel = 'LOW';
@@ -619,6 +619,9 @@ export class WaybackMachineAdapter {
       if (recommendation === 'AVOID' && riskLevel === 'LOW') {
         riskLevel = 'HIGH';
       }
+      
+      // Update overallRiskScore with valid value for return
+      overallRiskScore = validRiskScore;
 
       log(`Complete analysis finished for ${domain}`);
       const reasonText = recommendationReason.join('; ');
