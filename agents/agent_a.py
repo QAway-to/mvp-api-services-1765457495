@@ -41,6 +41,7 @@ class AgentA:
         self.search_hired_min = None  # Filter by minimum hired percentage
         self.search_proposals_max = None  # Filter by maximum proposals count
         self._loop = None  # event loop captured per session for thread-safe puts
+        self._stop_session = False  # Flag to stop current session
 
     def setup_driver(self):
         """Setup stealth browser"""
@@ -750,6 +751,9 @@ class AgentA:
 
     async def run_session(self, keywords=None, timeLeft=None, hiredMin=None, proposalsMax=None):
         """Run one search session with optional search parameters"""
+        # Reset stop flag
+        self._stop_session = False
+        
         # Store search parameters for this session
         self.search_keywords = keywords
         self.search_time_left = timeLeft
@@ -783,11 +787,27 @@ class AgentA:
         self.last_run_time = datetime.now().isoformat()
 
         try:
+            # Check if stop was requested before starting
+            if self._stop_session:
+                log_agent_action("Agent A", "⏹️ Session stopped before start")
+                self.status = "stopped"
+                return
+
             # Start consumer to evaluate and notify as projects appear
             consumer_task = asyncio.create_task(self._consume_and_notify_live(max_notifications=5))
 
             # Run blocking Selenium search off the event loop to avoid blocking notifications
             projects = await asyncio.to_thread(self.search_projects)
+            
+            # Check if stop was requested during search
+            if self._stop_session:
+                log_agent_action("Agent A", "⏹️ Session stopped by user")
+                self.status = "stopped"
+                # Signal consumer to stop
+                await self.live_queue.put(None)
+                await consumer_task
+                return
+            
             log_agent_action("Agent A", f"🔍 Found {len(projects)} projects")
 
             # Signal consumer that producer finished
@@ -804,7 +824,8 @@ class AgentA:
             session_duration = (datetime.now() - session_start).total_seconds()
             log_agent_action("Agent A", f"❌ [SESSION] Session error after {session_duration:.2f}s: {str(e)}")
         finally:
-            self.status = "waiting"
+            if not self._stop_session:
+                self.status = "waiting"
             self.current_session_start = None
             self.current_session_end = None
             self.live_queue = None
@@ -881,9 +902,10 @@ class AgentA:
             self.status = "stopped"
 
     async def stop(self):
-        """Stop the agent"""
-        log_agent_action("Agent A", "Stopping agent")
+        """Stop the agent and current session"""
+        log_agent_action("Agent A", "Stopping agent and current session")
         self.running = False
+        self._stop_session = True
         self.status = "stopped"
 
         if self.driver:

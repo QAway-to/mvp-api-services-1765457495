@@ -10,6 +10,8 @@ const agentAHiredMin = document.getElementById('agent-a-hired-min');
 const agentAProposalsMax = document.getElementById('agent-a-proposals-max');
 const agentAStatus = document.getElementById('agent-a-status');
 const agentAResults = document.getElementById('agent-a-results');
+const agentAStopButton = document.getElementById('agent-a-stop-button');
+const agentATimer = document.getElementById('agent-a-timer');
 
 const agentBButton = document.getElementById('agent-b-button');
 const agentBProjectSelect = document.getElementById('agent-b-project-select');
@@ -22,6 +24,10 @@ let agentAProjects = [];
 
 // SSE EventSource for logs
 let logEventSource = null;
+
+// Timer for Agent A
+let agentATimerInterval = null;
+let agentASessionStartTime = null;
 
 // Validate Cyrillic only input
 function validateCyrillicOnly(text) {
@@ -190,6 +196,12 @@ function initializeEventListeners() {
         agentAStatus.textContent = 'Running...';
         agentAResults.textContent = 'Starting search session...';
         
+        // Show stop button and start timer
+        if (agentAStopButton) {
+            agentAStopButton.style.display = 'block';
+        }
+        startAgentATimer();
+        
         try {
             const requestBody = {};
             if (keyword) requestBody.keywords = keyword;
@@ -210,6 +222,11 @@ function initializeEventListeners() {
             if (data.status === 'error' || data.status === 'busy') {
                 agentAStatus.textContent = data.message || 'Error';
                 agentAResults.textContent = `Error: ${data.message || 'Unknown error'}`;
+                // Hide stop button and stop timer on error
+                if (agentAStopButton) {
+                    agentAStopButton.style.display = 'none';
+                }
+                stopAgentATimer();
             } else {
                 agentAStatus.textContent = 'Started';
                 agentAResults.textContent = 'Search session started. Check logs for progress...';
@@ -221,6 +238,11 @@ function initializeEventListeners() {
             console.error('Error starting Agent A:', error);
             agentAStatus.textContent = 'Error';
             agentAResults.textContent = `Error: ${error.message}`;
+            // Hide stop button and stop timer on error
+            if (agentAStopButton) {
+                agentAStopButton.style.display = 'none';
+            }
+            stopAgentATimer();
         } finally {
             agentAButton.disabled = false;
             agentAButton.textContent = 'Execute';
@@ -250,6 +272,41 @@ function initializeEventListeners() {
                     
                     // User selects template manually - no auto-selection
                 }
+            }
+        });
+    }
+    
+    // Agent A: Stop button
+    if (agentAStopButton) {
+        agentAStopButton.addEventListener('click', async () => {
+            if (!confirm('Вы уверены, что хотите остановить поиск?')) {
+                return;
+            }
+            
+            agentAStopButton.disabled = true;
+            agentAStopButton.textContent = 'Остановка...';
+            
+            try {
+                const response = await fetch('/agent/stop', {
+                    method: 'POST',
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'stopped' || data.status === 'error') {
+                    agentAStatus.textContent = 'Stopped';
+                    agentAResults.textContent = 'Поиск остановлен пользователем.';
+                    
+                    // Hide stop button and stop timer
+                    agentAStopButton.style.display = 'none';
+                    stopAgentATimer();
+                }
+            } catch (error) {
+                console.error('Error stopping Agent A:', error);
+                agentAStatus.textContent = 'Error stopping';
+            } finally {
+                agentAStopButton.disabled = false;
+                agentAStopButton.textContent = 'Stop';
             }
         });
     }
@@ -402,6 +459,41 @@ function appendLog(logData) {
     }
 }
 
+// Timer functions for Agent A
+function startAgentATimer() {
+    agentASessionStartTime = Date.now();
+    if (agentATimerInterval) {
+        clearInterval(agentATimerInterval);
+    }
+    agentATimerInterval = setInterval(updateAgentATimer, 1000);
+    updateAgentATimer(); // Update immediately
+}
+
+function stopAgentATimer() {
+    if (agentATimerInterval) {
+        clearInterval(agentATimerInterval);
+        agentATimerInterval = null;
+    }
+    agentASessionStartTime = null;
+    if (agentATimer) {
+        agentATimer.textContent = '00:00:00';
+    }
+}
+
+function updateAgentATimer() {
+    if (!agentASessionStartTime || !agentATimer) {
+        return;
+    }
+    
+    const elapsed = Math.floor((Date.now() - agentASessionStartTime) / 1000);
+    const hours = Math.floor(elapsed / 3600);
+    const minutes = Math.floor((elapsed % 3600) / 60);
+    const seconds = elapsed % 60;
+    
+    const formatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    agentATimer.textContent = formatted;
+}
+
 // Poll Agent A status and results
 function pollAgentStatus() {
     setInterval(async () => {
@@ -411,6 +503,28 @@ function pollAgentStatus() {
             
             if (data.agent_a_status) {
                 agentAStatus.textContent = data.agent_a_status;
+                
+                // Update stop button visibility based on status
+                if (agentAStopButton) {
+                    if (data.agent_a_status === 'running' || data.agent_a_status === 'Started') {
+                        agentAStopButton.style.display = 'block';
+                        // Start timer if not already started
+                        if (!agentATimerInterval && data.current_session) {
+                            // Use server time if available
+                            if (data.current_session.elapsed_seconds) {
+                                agentASessionStartTime = Date.now() - (data.current_session.elapsed_seconds * 1000);
+                                if (!agentATimerInterval) {
+                                    startAgentATimer();
+                                }
+                            } else {
+                                startAgentATimer();
+                            }
+                        }
+                    } else {
+                        agentAStopButton.style.display = 'none';
+                        stopAgentATimer();
+                    }
+                }
             }
             
             if (data.projects_found !== undefined) {
@@ -451,14 +565,32 @@ function pollAgentResults() {
                 }
                 
                 agentAResults.textContent = resultsText;
-                clearInterval(intervalId);
+                
+                // Check if session is still running
+                const statusResponse = await fetch('/status');
+                const statusData = await statusResponse.json();
+                if (statusData.agent_a_status !== 'running' && statusData.agent_a_status !== 'Started') {
+                    // Session finished, hide stop button and stop timer
+                    if (agentAStopButton) {
+                        agentAStopButton.style.display = 'none';
+                    }
+                    stopAgentATimer();
+                    clearInterval(intervalId);
+                }
             }
         } catch (error) {
             console.error('Error polling results:', error);
         }
         
         // Stop polling after 5 minutes
-        setTimeout(() => clearInterval(intervalId), 300000);
+        setTimeout(() => {
+            clearInterval(intervalId);
+            // Hide stop button and stop timer when polling stops
+            if (agentAStopButton) {
+                agentAStopButton.style.display = 'none';
+            }
+            stopAgentATimer();
+        }, 300000);
     }, 3000); // Poll every 3 seconds
 }
 
@@ -467,5 +599,6 @@ window.addEventListener('beforeunload', () => {
     if (logEventSource) {
         logEventSource.close();
     }
+    stopAgentATimer();
 });
 

@@ -175,6 +175,29 @@ body {
     background: #2f855a;
 }
 
+.btn-stop {
+    background: #e53e3e;
+    color: #ffffff;
+}
+
+.btn-stop:hover:not(:disabled) {
+    background: #c53030;
+}
+
+.btn-stop:active:not(:disabled) {
+    background: #9b2c2c;
+}
+
+.button-group {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.button-group .btn {
+    flex: 1;
+}
+
 /* Radio group */
 .radio-group {
     display: flex;
@@ -197,7 +220,8 @@ body {
 /* Status and labels */
 .status-label,
 .results-label,
-.logs-label {
+.logs-label,
+.timer-label {
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
@@ -212,6 +236,18 @@ body {
     background: #f7fafc;
     border-radius: 4px;
     border: 1px solid #e1e8ed;
+}
+
+.timer-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2d3748;
+    padding: 8px 12px;
+    background: #edf2f7;
+    border-radius: 4px;
+    border: 1px solid #cbd5e0;
+    font-family: 'Courier New', monospace;
+    text-align: center;
 }
 
 /* Results and logs */
