@@ -44,10 +44,42 @@ function filterCyrillicOnly(text) {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+    // Verify elements exist
+    if (!agentAStopButton) {
+        console.error('Stop button not found!');
+    }
+    if (!agentATimer) {
+        console.error('Timer element not found!');
+    }
+    
     initializeEventListeners();
     connectToLogs();
     pollAgentStatus();
     loadAgentAProjects();
+    
+    // Check initial status and show button/timer if needed
+    setTimeout(async () => {
+        try {
+            const response = await fetch('/status');
+            const data = await response.json();
+            const statusLower = String(data.agent_a_status || '').toLowerCase();
+            const isRunning = statusLower === 'running' || statusLower === 'started' || statusLower === 'start';
+            
+            if (isRunning && agentAStopButton) {
+                agentAStopButton.style.display = 'block';
+                agentAStopButton.style.visibility = 'visible';
+            }
+            
+            if (isRunning && data.current_session && data.current_session.elapsed_seconds !== undefined) {
+                if (!agentATimerInterval) {
+                    agentASessionStartTime = Date.now() - (data.current_session.elapsed_seconds * 1000);
+                    startAgentATimer();
+                }
+            }
+        } catch (error) {
+            console.error('Error checking initial status:', error);
+        }
+    }, 500);
     
     // Add input validation for Agent A keywords (Cyrillic only)
     if (agentAInput) {
@@ -199,8 +231,13 @@ function initializeEventListeners() {
         // Show stop button and start timer
         if (agentAStopButton) {
             agentAStopButton.style.display = 'block';
+            agentAStopButton.style.visibility = 'visible';
+            agentAStopButton.disabled = false;
         }
-        startAgentATimer();
+        // Start timer immediately
+        if (!agentATimerInterval) {
+            startAgentATimer();
+        }
         
         try {
             const requestBody = {};
@@ -231,6 +268,23 @@ function initializeEventListeners() {
                 agentAStatus.textContent = 'Started';
                 agentAResults.textContent = 'Search session started. Check logs for progress...';
                 
+                // Ensure stop button is visible and timer is running
+                if (agentAStopButton) {
+                    agentAStopButton.style.display = 'block';
+                    agentAStopButton.style.visibility = 'visible';
+                    agentAStopButton.disabled = false;
+                }
+                // Timer should already be started, but ensure it's running
+                if (!agentATimerInterval) {
+                    if (!agentASessionStartTime) {
+                        agentASessionStartTime = Date.now();
+                    }
+                    startAgentATimer();
+                } else {
+                    // Ensure timer is updating
+                    updateAgentATimer();
+                }
+                
                 // Poll for results
                 pollAgentResults();
             }
@@ -244,8 +298,27 @@ function initializeEventListeners() {
             }
             stopAgentATimer();
         } finally {
-            agentAButton.disabled = false;
-            agentAButton.textContent = 'Execute';
+            // Don't re-enable Execute button if session is running
+            // It will be re-enabled when session stops
+            const statusCheck = async () => {
+                try {
+                    const statusResponse = await fetch('/status');
+                    const statusData = await statusResponse.json();
+                    const statusLower = String(statusData.agent_a_status || '').toLowerCase();
+                    if (statusLower !== 'running' && statusLower !== 'started' && statusLower !== 'start') {
+                        agentAButton.disabled = false;
+                        agentAButton.textContent = 'Execute';
+                    }
+                } catch (e) {
+                    // If status check fails, re-enable button after a delay
+                    setTimeout(() => {
+                        agentAButton.disabled = false;
+                        agentAButton.textContent = 'Execute';
+                    }, 2000);
+                }
+            };
+            // Check status after a short delay
+            setTimeout(statusCheck, 1000);
         }
     });
     
@@ -481,7 +554,12 @@ function stopAgentATimer() {
 }
 
 function updateAgentATimer() {
-    if (!agentASessionStartTime || !agentATimer) {
+    if (!agentASessionStartTime) {
+        return;
+    }
+    
+    if (!agentATimer) {
+        console.warn('Timer element not found');
         return;
     }
     
@@ -492,6 +570,11 @@ function updateAgentATimer() {
     
     const formatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     agentATimer.textContent = formatted;
+    
+    // Ensure timer is visible
+    if (agentATimer.style.display === 'none') {
+        agentATimer.style.display = '';
+    }
 }
 
 // Poll Agent A status and results
@@ -504,25 +587,50 @@ function pollAgentStatus() {
             if (data.agent_a_status) {
                 agentAStatus.textContent = data.agent_a_status;
                 
+                // Normalize status to lowercase for comparison
+                const statusLower = String(data.agent_a_status).toLowerCase();
+                const isRunning = statusLower === 'running' || statusLower === 'started' || statusLower === 'start';
+                
                 // Update stop button visibility based on status
                 if (agentAStopButton) {
-                    if (data.agent_a_status === 'running' || data.agent_a_status === 'Started') {
+                    if (isRunning) {
+                        // Force show button
                         agentAStopButton.style.display = 'block';
-                        // Start timer if not already started
-                        if (!agentATimerInterval && data.current_session) {
-                            // Use server time if available
-                            if (data.current_session.elapsed_seconds) {
-                                agentASessionStartTime = Date.now() - (data.current_session.elapsed_seconds * 1000);
-                                if (!agentATimerInterval) {
-                                    startAgentATimer();
+                        agentAStopButton.style.visibility = 'visible';
+                        agentAStopButton.disabled = false;
+                        
+                        // Start or sync timer
+                        if (data.current_session) {
+                            // Use server time if available to sync
+                            if (data.current_session.elapsed_seconds !== undefined && data.current_session.elapsed_seconds > 0) {
+                                if (!agentASessionStartTime || !agentATimerInterval) {
+                                    // Sync timer with server time
+                                    agentASessionStartTime = Date.now() - (data.current_session.elapsed_seconds * 1000);
+                                    if (agentATimerInterval) {
+                                        clearInterval(agentATimerInterval);
+                                    }
+                                    agentATimerInterval = setInterval(updateAgentATimer, 1000);
+                                    updateAgentATimer(); // Update immediately
                                 }
-                            } else {
+                            } else if (!agentATimerInterval) {
+                                // Start timer if not already started
                                 startAgentATimer();
                             }
+                        } else if (!agentATimerInterval) {
+                            // Start timer if session exists but no timer
+                            startAgentATimer();
+                        }
+                        
+                        // Ensure timer continues running
+                        if (!agentATimerInterval && agentASessionStartTime) {
+                            startAgentATimer();
                         }
                     } else {
                         agentAStopButton.style.display = 'none';
-                        stopAgentATimer();
+                        agentAStopButton.style.visibility = 'hidden';
+                        if (statusLower === 'stopped' || statusLower === 'waiting' || statusLower === 'error') {
+                            stopAgentATimer();
+                        }
                     }
                 }
             }

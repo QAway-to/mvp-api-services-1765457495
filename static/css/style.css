@@ -198,6 +198,11 @@ body {
     flex: 1;
 }
 
+.button-group .btn-stop {
+    display: block !important;
+    flex: 1;
+}
+
 /* Radio group */
 .radio-group {
     display: flex;
