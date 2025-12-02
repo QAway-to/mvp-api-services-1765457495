@@ -199,8 +199,15 @@ body {
 }
 
 .button-group .btn-stop {
-    display: block !important;
     flex: 1;
+}
+
+.button-group .btn-stop.hidden {
+    display: none !important;
+}
+
+.button-group .btn-stop:not(.hidden) {
+    display: block !important;
 }
 
 /* Radio group */

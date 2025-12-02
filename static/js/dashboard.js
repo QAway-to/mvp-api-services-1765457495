@@ -1,17 +1,17 @@
 ﻿// Dashboard JavaScript for Multi-Agent System
 
-// DOM Elements
-const agentAButton = document.getElementById('agent-a-button');
-const agentAInput = document.getElementById('agent-a-input');
-const agentAKworkUrl = document.getElementById('agent-a-kwork-url');
-const agentALoadUrl = document.getElementById('agent-a-load-url');
-const agentATimeLeft = document.getElementById('agent-a-time-left');
-const agentAHiredMin = document.getElementById('agent-a-hired-min');
-const agentAProposalsMax = document.getElementById('agent-a-proposals-max');
-const agentAStatus = document.getElementById('agent-a-status');
-const agentAResults = document.getElementById('agent-a-results');
-const agentAStopButton = document.getElementById('agent-a-stop-button');
-const agentATimer = document.getElementById('agent-a-timer');
+// DOM Elements - will be initialized after DOM loads
+let agentAButton;
+let agentAInput;
+let agentAKworkUrl;
+let agentALoadUrl;
+let agentATimeLeft;
+let agentAHiredMin;
+let agentAProposalsMax;
+let agentAStatus;
+let agentAResults;
+let agentAStopButton;
+let agentATimer;
 
 const agentBButton = document.getElementById('agent-b-button');
 const agentBProjectSelect = document.getElementById('agent-b-project-select');
@@ -44,12 +44,29 @@ function filterCyrillicOnly(text) {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    // Verify elements exist
+    // Initialize DOM elements
+    agentAButton = document.getElementById('agent-a-button');
+    agentAInput = document.getElementById('agent-a-input');
+    agentAKworkUrl = document.getElementById('agent-a-kwork-url');
+    agentALoadUrl = document.getElementById('agent-a-load-url');
+    agentATimeLeft = document.getElementById('agent-a-time-left');
+    agentAHiredMin = document.getElementById('agent-a-hired-min');
+    agentAProposalsMax = document.getElementById('agent-a-proposals-max');
+    agentAStatus = document.getElementById('agent-a-status');
+    agentAResults = document.getElementById('agent-a-results');
+    agentAStopButton = document.getElementById('agent-a-stop-button');
+    agentATimer = document.getElementById('agent-a-timer');
+    
+    // Verify critical elements exist
     if (!agentAStopButton) {
-        console.error('Stop button not found!');
+        console.error('❌ Stop button not found in DOM!');
+    } else {
+        console.log('✅ Stop button found');
     }
     if (!agentATimer) {
-        console.error('Timer element not found!');
+        console.error('❌ Timer element not found in DOM!');
+    } else {
+        console.log('✅ Timer element found');
     }
     
     initializeEventListeners();
@@ -66,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const isRunning = statusLower === 'running' || statusLower === 'started' || statusLower === 'start';
             
             if (isRunning && agentAStopButton) {
+                agentAStopButton.classList.remove('hidden');
                 agentAStopButton.style.display = 'block';
                 agentAStopButton.style.visibility = 'visible';
             }
@@ -229,14 +247,22 @@ function initializeEventListeners() {
         agentAResults.textContent = 'Starting search session...';
         
         // Show stop button and start timer
+        console.log('🚀 Starting session - showing stop button and timer');
         if (agentAStopButton) {
+            agentAStopButton.classList.remove('hidden');
             agentAStopButton.style.display = 'block';
             agentAStopButton.style.visibility = 'visible';
             agentAStopButton.disabled = false;
+            console.log('✅ Stop button shown, classes:', agentAStopButton.className);
+        } else {
+            console.error('❌ Stop button is null!');
         }
         // Start timer immediately
         if (!agentATimerInterval) {
             startAgentATimer();
+            console.log('✅ Timer started');
+        } else {
+            console.log('⚠️ Timer already running');
         }
         
         try {
@@ -261,6 +287,7 @@ function initializeEventListeners() {
                 agentAResults.textContent = `Error: ${data.message || 'Unknown error'}`;
                 // Hide stop button and stop timer on error
                 if (agentAStopButton) {
+                    agentAStopButton.classList.add('hidden');
                     agentAStopButton.style.display = 'none';
                 }
                 stopAgentATimer();
@@ -270,6 +297,7 @@ function initializeEventListeners() {
                 
                 // Ensure stop button is visible and timer is running
                 if (agentAStopButton) {
+                    agentAStopButton.classList.remove('hidden');
                     agentAStopButton.style.display = 'block';
                     agentAStopButton.style.visibility = 'visible';
                     agentAStopButton.disabled = false;
@@ -371,6 +399,7 @@ function initializeEventListeners() {
                     agentAResults.textContent = 'Поиск остановлен пользователем.';
                     
                     // Hide stop button and stop timer
+                    agentAStopButton.classList.add('hidden');
                     agentAStopButton.style.display = 'none';
                     stopAgentATimer();
                 }
@@ -534,12 +563,18 @@ function appendLog(logData) {
 
 // Timer functions for Agent A
 function startAgentATimer() {
+    if (!agentATimer) {
+        console.error('❌ Cannot start timer: agentATimer element is null');
+        return;
+    }
+    
     agentASessionStartTime = Date.now();
     if (agentATimerInterval) {
         clearInterval(agentATimerInterval);
     }
     agentATimerInterval = setInterval(updateAgentATimer, 1000);
     updateAgentATimer(); // Update immediately
+    console.log('⏱️ Timer started, interval ID:', agentATimerInterval);
 }
 
 function stopAgentATimer() {
@@ -555,12 +590,17 @@ function stopAgentATimer() {
 
 function updateAgentATimer() {
     if (!agentASessionStartTime) {
+        console.warn('⏱️ Timer update skipped: no session start time');
         return;
     }
     
     if (!agentATimer) {
-        console.warn('Timer element not found');
-        return;
+        console.error('❌ Timer update failed: agentATimer element is null');
+        // Try to re-initialize
+        agentATimer = document.getElementById('agent-a-timer');
+        if (!agentATimer) {
+            return;
+        }
     }
     
     const elapsed = Math.floor((Date.now() - agentASessionStartTime) / 1000);
@@ -569,7 +609,14 @@ function updateAgentATimer() {
     const seconds = elapsed % 60;
     
     const formatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    agentATimer.textContent = formatted;
+    
+    if (agentATimer.textContent !== formatted) {
+        agentATimer.textContent = formatted;
+        // Log every 10 seconds to avoid spam
+        if (elapsed % 10 === 0) {
+            console.log('⏱️ Timer updated:', formatted, '(', elapsed, 'seconds)');
+        }
+    }
     
     // Ensure timer is visible
     if (agentATimer.style.display === 'none') {
@@ -588,49 +635,53 @@ function pollAgentStatus() {
                 agentAStatus.textContent = data.agent_a_status;
                 
                 // Normalize status to lowercase for comparison
-                const statusLower = String(data.agent_a_status).toLowerCase();
-                const isRunning = statusLower === 'running' || statusLower === 'started' || statusLower === 'start';
+                const statusLower = String(data.agent_a_status || '').toLowerCase().trim();
+                const isRunning = statusLower === 'running' || statusLower === 'started';
+                
+                console.log('📊 Status check:', { status: data.agent_a_status, statusLower, isRunning, hasSession: !!data.current_session });
                 
                 // Update stop button visibility based on status
-                if (agentAStopButton) {
-                    if (isRunning) {
-                        // Force show button
-                        agentAStopButton.style.display = 'block';
-                        agentAStopButton.style.visibility = 'visible';
-                        agentAStopButton.disabled = false;
-                        
-                        // Start or sync timer
-                        if (data.current_session) {
-                            // Use server time if available to sync
-                            if (data.current_session.elapsed_seconds !== undefined && data.current_session.elapsed_seconds > 0) {
-                                if (!agentASessionStartTime || !agentATimerInterval) {
-                                    // Sync timer with server time
-                                    agentASessionStartTime = Date.now() - (data.current_session.elapsed_seconds * 1000);
-                                    if (agentATimerInterval) {
-                                        clearInterval(agentATimerInterval);
-                                    }
-                                    agentATimerInterval = setInterval(updateAgentATimer, 1000);
-                                    updateAgentATimer(); // Update immediately
+                if (!agentAStopButton) {
+                    console.error('❌ agentAStopButton is null in pollAgentStatus!');
+                } else if (isRunning) {
+                    // Force show button
+                    agentAStopButton.classList.remove('hidden');
+                    agentAStopButton.style.display = 'block';
+                    agentAStopButton.style.visibility = 'visible';
+                    agentAStopButton.disabled = false;
+                    console.log('✅ Stop button shown (status:', data.agent_a_status, ')');
+                    
+                    // Start or sync timer
+                    if (data.current_session) {
+                        // Use server time if available to sync
+                        if (data.current_session.elapsed_seconds !== undefined && data.current_session.elapsed_seconds >= 0) {
+                            if (!agentASessionStartTime || !agentATimerInterval) {
+                                // Sync timer with server time
+                                agentASessionStartTime = Date.now() - (data.current_session.elapsed_seconds * 1000);
+                                if (agentATimerInterval) {
+                                    clearInterval(agentATimerInterval);
                                 }
-                            } else if (!agentATimerInterval) {
-                                // Start timer if not already started
-                                startAgentATimer();
+                                agentATimerInterval = setInterval(updateAgentATimer, 1000);
+                                updateAgentATimer(); // Update immediately
+                                console.log('⏱️ Timer synced with server:', data.current_session.elapsed_seconds, 'seconds');
                             }
                         } else if (!agentATimerInterval) {
-                            // Start timer if session exists but no timer
+                            // Start timer if not already started
                             startAgentATimer();
+                            console.log('⏱️ Timer started (no server time)');
                         }
-                        
-                        // Ensure timer continues running
-                        if (!agentATimerInterval && agentASessionStartTime) {
-                            startAgentATimer();
-                        }
-                    } else {
-                        agentAStopButton.style.display = 'none';
-                        agentAStopButton.style.visibility = 'hidden';
-                        if (statusLower === 'stopped' || statusLower === 'waiting' || statusLower === 'error') {
-                            stopAgentATimer();
-                        }
+                    } else if (!agentATimerInterval) {
+                        // Start timer if session exists but no timer
+                        startAgentATimer();
+                        console.log('⏱️ Timer started (no session data)');
+                    }
+                } else {
+                    agentAStopButton.classList.add('hidden');
+                    agentAStopButton.style.display = 'none';
+                    agentAStopButton.style.visibility = 'hidden';
+                    if (statusLower === 'stopped' || statusLower === 'waiting' || statusLower === 'error') {
+                        stopAgentATimer();
+                        console.log('⏹️ Timer stopped (status:', data.agent_a_status, ')');
                     }
                 }
             }
@@ -680,6 +731,7 @@ function pollAgentResults() {
                 if (statusData.agent_a_status !== 'running' && statusData.agent_a_status !== 'Started') {
                     // Session finished, hide stop button and stop timer
                     if (agentAStopButton) {
+                        agentAStopButton.classList.add('hidden');
                         agentAStopButton.style.display = 'none';
                     }
                     stopAgentATimer();
@@ -695,6 +747,7 @@ function pollAgentResults() {
             clearInterval(intervalId);
             // Hide stop button and stop timer when polling stops
             if (agentAStopButton) {
+                agentAStopButton.classList.add('hidden');
                 agentAStopButton.style.display = 'none';
             }
             stopAgentATimer();
