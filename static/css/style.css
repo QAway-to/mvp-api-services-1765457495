@@ -210,6 +210,12 @@ body {
     display: block !important;
 }
 
+/* Universal hidden class */
+.hidden {
+    display: none !important;
+    visibility: hidden !important;
+}
+
 /* Radio group */
 .radio-group {
     display: flex;
