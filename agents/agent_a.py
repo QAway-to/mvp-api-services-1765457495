@@ -41,6 +41,11 @@ class AgentA:
         self.search_hired_min = None  # Filter by minimum hired percentage
         self.search_proposals_max = None  # Filter by maximum proposals count
         self.search_budget_min = None  # Filter by minimum budget (rubles)
+        # Strict filter flags - if True, projects not matching condition are completely ignored
+        self.search_time_left_strict = False
+        self.search_hired_min_strict = False
+        self.search_proposals_max_strict = False
+        self.search_budget_min_strict = False
         self._loop = None  # event loop captured per session for thread-safe puts
         self._stop_session = False  # Flag to stop current session
 
@@ -658,31 +663,57 @@ class AgentA:
                         
                         # Filter by time left (maximum hours - "не более чем")
                         # Projects with time_left <= search_time_left will pass
-                        if self.search_time_left is not None and time_left_hours is not None:
-                            if time_left_hours > self.search_time_left:
-                                should_add = False
+                        if self.search_time_left is not None:
+                            if time_left_hours is None:
+                                # If strict filter and value is missing, reject project
+                                if self.search_time_left_strict:
+                                    should_add = False
+                            else:
+                                if time_left_hours > self.search_time_left:
+                                    should_add = False
                         
                         # Filter by hired percentage (minimum percentage)
-                        if self.search_hired_min is not None and hired is not None:
-                            if hired < self.search_hired_min:
-                                should_add = False
+                        if self.search_hired_min is not None:
+                            if hired is None:
+                                # If strict filter and value is missing, reject project
+                                if self.search_hired_min_strict:
+                                    should_add = False
+                            else:
+                                if hired < self.search_hired_min:
+                                    should_add = False
                         
                         # Filter by proposals count (maximum proposals)
-                        if self.search_proposals_max is not None and proposals is not None:
-                            if proposals > self.search_proposals_max:
-                                should_add = False
+                        if self.search_proposals_max is not None:
+                            if proposals is None:
+                                # If strict filter and value is missing, reject project
+                                if self.search_proposals_max_strict:
+                                    should_add = False
+                            else:
+                                if proposals > self.search_proposals_max:
+                                    should_add = False
                         
                         # Filter by budget (minimum budget)
-                        if self.search_budget_min is not None and budget:
-                            try:
-                                # Extract numeric value from budget string (e.g., "10000 ₽" -> 10000)
-                                budget_numbers = re.findall(r'\d+', budget.replace(' ', '').replace(',', ''))
-                                if budget_numbers:
-                                    budget_value = int(''.join(budget_numbers))
-                                    if budget_value < self.search_budget_min:
+                        if self.search_budget_min is not None:
+                            if not budget:
+                                # If strict filter and budget is missing, reject project
+                                if self.search_budget_min_strict:
+                                    should_add = False
+                            else:
+                                try:
+                                    # Extract numeric value from budget string (e.g., "10000 ₽" -> 10000)
+                                    budget_numbers = re.findall(r'\d+', budget.replace(' ', '').replace(',', ''))
+                                    if budget_numbers:
+                                        budget_value = int(''.join(budget_numbers))
+                                        if budget_value < self.search_budget_min:
+                                            should_add = False
+                                    elif self.search_budget_min_strict:
+                                        # If strict filter and budget cannot be parsed, reject project
                                         should_add = False
-                            except (ValueError, AttributeError):
-                                pass  # Skip filter if budget parsing fails
+                                except (ValueError, AttributeError):
+                                    # If strict filter and budget parsing fails, reject project
+                                    if self.search_budget_min_strict:
+                                        should_add = False
+                                    pass  # Skip filter if budget parsing fails and not strict
                         
                         if should_add:
                             all_projects.append(project_data)
@@ -791,7 +822,8 @@ class AgentA:
         self.found_projects.extend(suitable_projects)
         log_agent_action("Agent A", f"📊 Session complete: {suitable_count} suitable projects")
 
-    async def run_session(self, keywords=None, timeLeft=None, hiredMin=None, proposalsMax=None, budgetMin=None):
+    async def run_session(self, keywords=None, timeLeft=None, hiredMin=None, proposalsMax=None, budgetMin=None,
+                          timeLeftStrict=False, hiredMinStrict=False, proposalsMaxStrict=False, budgetMinStrict=False):
         """Run one search session with optional search parameters"""
         # Reset stop flag
         self._stop_session = False
@@ -802,6 +834,11 @@ class AgentA:
         self.search_hired_min = hiredMin
         self.search_proposals_max = proposalsMax
         self.search_budget_min = budgetMin
+        # Store strict filter flags
+        self.search_time_left_strict = timeLeftStrict
+        self.search_hired_min_strict = hiredMinStrict
+        self.search_proposals_max_strict = proposalsMaxStrict
+        self.search_budget_min_strict = budgetMinStrict
         
         # Prepare live streaming pipeline
         self.live_queue = asyncio.Queue()
@@ -820,8 +857,16 @@ class AgentA:
             log_msg += f", hired >= {hiredMin}%"
         if proposalsMax is not None:
             log_msg += f", proposals <= {proposalsMax}"
+            if proposalsMaxStrict:
+                log_msg += " (strict)"
         if budgetMin is not None:
             log_msg += f", budget >= {budgetMin}₽"
+            if budgetMinStrict:
+                log_msg += " (strict)"
+        if timeLeft is not None and timeLeftStrict:
+            log_msg = log_msg.replace(f", time left <= {timeLeft}h", f", time left <= {timeLeft}h (strict)")
+        if hiredMin is not None and hiredMinStrict:
+            log_msg = log_msg.replace(f", hired >= {hiredMin}%", f", hired >= {hiredMin}% (strict)")
         log_agent_action("Agent A", log_msg + "...")
         
         if not self.driver:
@@ -881,6 +926,10 @@ class AgentA:
             self.search_hired_min = None
             self.search_proposals_max = None
             self.search_budget_min = None
+            self.search_time_left_strict = False
+            self.search_hired_min_strict = False
+            self.search_proposals_max_strict = False
+            self.search_budget_min_strict = False
 
     async def _consume_and_notify_live(self, max_notifications: int = 5):
         """

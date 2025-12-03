@@ -146,12 +146,16 @@ async def run_single_session(request: Request):
                 search_params["keywords"] = body["keywords"]
             if body.get("timeLeft") is not None:
                 search_params["timeLeft"] = int(body["timeLeft"])
+                search_params["timeLeftStrict"] = body.get("timeLeftStrict", False)
             if body.get("hiredMin") is not None:
                 search_params["hiredMin"] = int(body["hiredMin"])
+                search_params["hiredMinStrict"] = body.get("hiredMinStrict", False)
             if body.get("proposalsMax") is not None:
                 search_params["proposalsMax"] = int(body["proposalsMax"])
+                search_params["proposalsMaxStrict"] = body.get("proposalsMaxStrict", False)
             if body.get("budgetMin") is not None:
                 search_params["budgetMin"] = int(body["budgetMin"])
+                search_params["budgetMinStrict"] = body.get("budgetMinStrict", False)
         except Exception:
             pass  # Use default parameters if body parsing fails
         

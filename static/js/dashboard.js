@@ -9,6 +9,10 @@ let agentATimeLeft;
 let agentAHiredMin;
 let agentAProposalsMax;
 let agentABudget;
+let agentATimeLeftStrict;
+let agentAHiredMinStrict;
+let agentAProposalsMaxStrict;
+let agentABudgetStrict;
 let agentAStatus;
 let agentAResults;
 let agentAStopButton;
@@ -54,6 +58,10 @@ document.addEventListener('DOMContentLoaded', () => {
     agentAHiredMin = document.getElementById('agent-a-hired-min');
     agentAProposalsMax = document.getElementById('agent-a-proposals-max');
     agentABudget = document.getElementById('agent-a-budget');
+    agentATimeLeftStrict = document.getElementById('agent-a-time-left-strict');
+    agentAHiredMinStrict = document.getElementById('agent-a-hired-min-strict');
+    agentAProposalsMaxStrict = document.getElementById('agent-a-proposals-max-strict');
+    agentABudgetStrict = document.getElementById('agent-a-budget-strict');
     agentAStatus = document.getElementById('agent-a-status');
     agentAResults = document.getElementById('agent-a-results');
     agentAStopButton = document.getElementById('agent-a-stop-button');
@@ -251,6 +259,12 @@ function initializeEventListeners() {
         const proposalsMax = agentAProposalsMax && agentAProposalsMax.value ? parseInt(agentAProposalsMax.value) : null;
         const budgetMin = agentABudget && agentABudget.value ? parseInt(agentABudget.value) : null;
         
+        // Get strict filter flags
+        const timeLeftStrict = agentATimeLeftStrict && agentATimeLeftStrict.checked;
+        const hiredMinStrict = agentAHiredMinStrict && agentAHiredMinStrict.checked;
+        const proposalsMaxStrict = agentAProposalsMaxStrict && agentAProposalsMaxStrict.checked;
+        const budgetMinStrict = agentABudgetStrict && agentABudgetStrict.checked;
+        
         if (!keyword) {
             alert('Пожалуйста, введите ключевые слова');
             return;
@@ -289,10 +303,22 @@ function initializeEventListeners() {
         try {
             const requestBody = {};
             if (keyword) requestBody.keywords = keyword;
-            if (timeLeft !== null) requestBody.timeLeft = timeLeft;
-            if (hiredMin !== null) requestBody.hiredMin = hiredMin;
-            if (proposalsMax !== null) requestBody.proposalsMax = proposalsMax;
-            if (budgetMin !== null) requestBody.budgetMin = budgetMin;
+            if (timeLeft !== null) {
+                requestBody.timeLeft = timeLeft;
+                requestBody.timeLeftStrict = timeLeftStrict;
+            }
+            if (hiredMin !== null) {
+                requestBody.hiredMin = hiredMin;
+                requestBody.hiredMinStrict = hiredMinStrict;
+            }
+            if (proposalsMax !== null) {
+                requestBody.proposalsMax = proposalsMax;
+                requestBody.proposalsMaxStrict = proposalsMaxStrict;
+            }
+            if (budgetMin !== null) {
+                requestBody.budgetMin = budgetMin;
+                requestBody.budgetMinStrict = budgetMinStrict;
+            }
             
             const response = await fetch('/agent/run-session', {
                 method: 'POST',

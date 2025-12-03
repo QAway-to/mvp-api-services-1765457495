@@ -51,7 +51,6 @@ class TelegramNotifier:
 
             message += f"📋 <b>Название:</b> {project.get('title', 'N/A')}\n"
             message += f"💰 <b>Бюджет:</b> {project.get('budget', 'N/A')}\n"
-            message += f"📊 <b>Релевантность:</b> {score:.2f}/1.0\n"
             message += f"📊 <b>Предложений:</b> {project.get('proposals', 0)}\n"
             message += f"👥 <b>Нанято:</b> {project.get('hired', 0)}\n\n"
 
@@ -60,10 +59,6 @@ class TelegramNotifier:
             message += f"📝 <b>Описание:</b>\n{description}"
 
             message += "\n\n🔗 <b>Ссылка:</b> " + project.get('url', 'N/A')
-
-            message += "\n\n📈 <b>Причины оценки:</b>\n"
-            for reason in reasons[-3:]:  # Show last 3 reasons
-                message += f"• {reason}\n"
 
             # Send message
             await self.bot.send_message(

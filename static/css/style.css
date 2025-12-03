@@ -83,6 +83,41 @@ body {
     white-space: nowrap;
 }
 
+.filter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+
+.checkbox-label-inline {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 14px;
+    user-select: none;
+}
+
+.filter-checkbox {
+    margin: 0;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: #4299e1;
+}
+
+.checkbox-label-inline span {
+    font-size: 12px;
+    margin-left: 2px;
+    color: #718096;
+    transition: color 0.2s;
+}
+
+.filter-checkbox:checked + span {
+    color: #4299e1;
+}
+
 .form-input-inline {
     width: 100%;
     padding: 8px 10px;
