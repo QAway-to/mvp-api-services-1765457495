@@ -308,9 +308,6 @@ function initializeEventListeners() {
                         agentASessionStartTime = Date.now();
                     }
                     startAgentATimer();
-                } else {
-                    // Ensure timer is updating
-                    updateAgentATimer();
                 }
                 
                 // Poll for results
@@ -561,20 +558,21 @@ function appendLog(logData) {
     }
 }
 
-// Timer functions for Agent A
+// Timer functions for Agent A - просто и работает
 function startAgentATimer() {
-    if (!agentATimer) {
-        console.error('❌ Cannot start timer: agentATimer element is null');
-        return;
-    }
+    if (!agentATimer) return;
     
     agentASessionStartTime = Date.now();
-    if (agentATimerInterval) {
-        clearInterval(agentATimerInterval);
-    }
-    agentATimerInterval = setInterval(updateAgentATimer, 1000);
-    updateAgentATimer(); // Update immediately
-    console.log('⏱️ Timer started, interval ID:', agentATimerInterval);
+    if (agentATimerInterval) clearInterval(agentATimerInterval);
+    
+    agentATimerInterval = setInterval(() => {
+        if (!agentASessionStartTime || !agentATimer) return;
+        const elapsed = Math.floor((Date.now() - agentASessionStartTime) / 1000);
+        const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+        const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+        const s = String(elapsed % 60).padStart(2, '0');
+        agentATimer.textContent = `${h}:${m}:${s}`;
+    }, 1000);
 }
 
 function stopAgentATimer() {
@@ -583,45 +581,7 @@ function stopAgentATimer() {
         agentATimerInterval = null;
     }
     agentASessionStartTime = null;
-    if (agentATimer) {
-        agentATimer.textContent = '00:00:00';
-    }
-}
-
-function updateAgentATimer() {
-    if (!agentASessionStartTime) {
-        console.warn('⏱️ Timer update skipped: no session start time');
-        return;
-    }
-    
-    if (!agentATimer) {
-        console.error('❌ Timer update failed: agentATimer element is null');
-        // Try to re-initialize
-        agentATimer = document.getElementById('agent-a-timer');
-        if (!agentATimer) {
-            return;
-        }
-    }
-    
-    const elapsed = Math.floor((Date.now() - agentASessionStartTime) / 1000);
-    const hours = Math.floor(elapsed / 3600);
-    const minutes = Math.floor((elapsed % 3600) / 60);
-    const seconds = elapsed % 60;
-    
-    const formatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    
-    if (agentATimer.textContent !== formatted) {
-        agentATimer.textContent = formatted;
-        // Log every 10 seconds to avoid spam
-        if (elapsed % 10 === 0) {
-            console.log('⏱️ Timer updated:', formatted, '(', elapsed, 'seconds)');
-        }
-    }
-    
-    // Ensure timer is visible
-    if (agentATimer.style.display === 'none') {
-        agentATimer.style.display = '';
-    }
+    if (agentATimer) agentATimer.textContent = '00:00:00';
 }
 
 // Poll Agent A status and results
@@ -634,54 +594,23 @@ function pollAgentStatus() {
             if (data.agent_a_status) {
                 agentAStatus.textContent = data.agent_a_status;
                 
-                // Normalize status to lowercase for comparison
-                const statusLower = String(data.agent_a_status || '').toLowerCase().trim();
-                const isRunning = statusLower === 'running' || statusLower === 'started';
+                // Простая логика: показывать кнопку когда running, скрывать когда stopped/waiting
+                const isRunning = data.agent_a_status === 'running' || data.agent_a_status === 'Started';
                 
-                console.log('📊 Status check:', { status: data.agent_a_status, statusLower, isRunning, hasSession: !!data.current_session });
-                
-                // Update stop button visibility based on status
-                if (!agentAStopButton) {
-                    console.error('❌ agentAStopButton is null in pollAgentStatus!');
-                } else if (isRunning) {
-                    // Force show button
-                    agentAStopButton.classList.remove('hidden');
-                    agentAStopButton.style.display = 'block';
-                    agentAStopButton.style.visibility = 'visible';
-                    agentAStopButton.disabled = false;
-                    console.log('✅ Stop button shown (status:', data.agent_a_status, ')');
-                    
-                    // Start or sync timer
-                    if (data.current_session) {
-                        // Use server time if available to sync
-                        if (data.current_session.elapsed_seconds !== undefined && data.current_session.elapsed_seconds >= 0) {
-                            if (!agentASessionStartTime || !agentATimerInterval) {
-                                // Sync timer with server time
-                                agentASessionStartTime = Date.now() - (data.current_session.elapsed_seconds * 1000);
-                                if (agentATimerInterval) {
-                                    clearInterval(agentATimerInterval);
-                                }
-                                agentATimerInterval = setInterval(updateAgentATimer, 1000);
-                                updateAgentATimer(); // Update immediately
-                                console.log('⏱️ Timer synced with server:', data.current_session.elapsed_seconds, 'seconds');
-                            }
-                        } else if (!agentATimerInterval) {
-                            // Start timer if not already started
+                if (agentAStopButton) {
+                    if (isRunning) {
+                        agentAStopButton.classList.remove('hidden');
+                        agentAStopButton.disabled = false;
+                        // Запускаем таймер если не запущен
+                        if (!agentATimerInterval && data.current_session?.elapsed_seconds !== undefined) {
+                            agentASessionStartTime = Date.now() - (data.current_session.elapsed_seconds * 1000);
                             startAgentATimer();
-                            console.log('⏱️ Timer started (no server time)');
+                        } else if (!agentATimerInterval) {
+                            startAgentATimer();
                         }
-                    } else if (!agentATimerInterval) {
-                        // Start timer if session exists but no timer
-                        startAgentATimer();
-                        console.log('⏱️ Timer started (no session data)');
-                    }
-                } else {
-                    agentAStopButton.classList.add('hidden');
-                    agentAStopButton.style.display = 'none';
-                    agentAStopButton.style.visibility = 'hidden';
-                    if (statusLower === 'stopped' || statusLower === 'waiting' || statusLower === 'error') {
+                    } else {
+                        agentAStopButton.classList.add('hidden');
                         stopAgentATimer();
-                        console.log('⏹️ Timer stopped (status:', data.agent_a_status, ')');
                     }
                 }
             }

@@ -235,6 +235,11 @@ class AgentA:
         """Real search on Kwork with pagination, proposal button check, and semantic ranking"""
         log_agent_action("Agent A", "🔍 Searching projects...")
 
+        # Check if stop was requested
+        if self._stop_session:
+            log_agent_action("Agent A", "⏹️ Search stopped before starting")
+            return []
+
         # Use custom keywords if provided, otherwise use config
         if self.search_keywords:
             keywords_list = [kw.strip() for kw in self.search_keywords.split(',') if kw.strip()]
@@ -253,12 +258,25 @@ class AgentA:
         page = 1
         
         while page <= max_pages and len(all_projects) < max_relevant_projects:
+            # Check if stop was requested
+            if self._stop_session:
+                log_agent_action("Agent A", "⏹️ Search stopped by user")
+                break
+            
             search_url = f"{config.KWORK_PROJECTS_URL}?keyword={keywords_encoded}&page={page}&a=1"
             
             try:
+                if not self.driver:
+                    log_agent_action("Agent A", "⏹️ Driver closed, stopping search")
+                    break
                 self.driver.get(search_url)
             except Exception as e:
-                log_agent_action("Agent A", f"❌ Error loading page {page}: {str(e)[:50]}")
+                error_msg = str(e)[:50]
+                log_agent_action("Agent A", f"❌ Error loading page {page}: {error_msg}")
+                # If driver was closed, stop searching
+                if "invalid session id" in error_msg.lower() or "chrome not reachable" in error_msg.lower():
+                    log_agent_action("Agent A", "⏹️ Driver closed, stopping search")
+                    break
                 break
 
             # Wait for page to stabilize
@@ -332,6 +350,11 @@ class AgentA:
             
             # Process each project from current page
             for project_info in page_projects:
+                # Check if stop was requested
+                if self._stop_session:
+                    log_agent_action("Agent A", "⏹️ Search stopped by user during project processing")
+                    break
+                    
                 if len(all_projects) >= max_relevant_projects:
                     break
                     
@@ -343,6 +366,8 @@ class AgentA:
 
                     # Navigate to project page
                     try:
+                        if not self.driver:
+                            break
                         self.driver.get(url)
                         self.human_delay(2, 4)
                     except Exception as e:
@@ -665,6 +690,10 @@ class AgentA:
                     log_agent_action("Agent A", f"❌ [SELENIUM] Error processing project: {str(e)[:200]}")
                     continue
 
+            # Check if stop was requested before moving to next page
+            if self._stop_session:
+                break
+                
             # Move to next page
             page += 1
             
