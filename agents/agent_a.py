@@ -40,6 +40,7 @@ class AgentA:
         self.search_time_left = None  # Filter by minimum time left (hours)
         self.search_hired_min = None  # Filter by minimum hired percentage
         self.search_proposals_max = None  # Filter by maximum proposals count
+        self.search_budget_min = None  # Filter by minimum budget (rubles)
         self._loop = None  # event loop captured per session for thread-safe puts
         self._stop_session = False  # Flag to stop current session
 
@@ -671,6 +672,18 @@ class AgentA:
                             if proposals > self.search_proposals_max:
                                 should_add = False
                         
+                        # Filter by budget (minimum budget)
+                        if self.search_budget_min is not None and budget:
+                            try:
+                                # Extract numeric value from budget string (e.g., "10000 ₽" -> 10000)
+                                budget_numbers = re.findall(r'\d+', budget.replace(' ', '').replace(',', ''))
+                                if budget_numbers:
+                                    budget_value = int(''.join(budget_numbers))
+                                    if budget_value < self.search_budget_min:
+                                        should_add = False
+                            except (ValueError, AttributeError):
+                                pass  # Skip filter if budget parsing fails
+                        
                         if should_add:
                             all_projects.append(project_data)
                             # Push to live queue for immediate evaluation/notification (from Selenium thread)
@@ -778,7 +791,7 @@ class AgentA:
         self.found_projects.extend(suitable_projects)
         log_agent_action("Agent A", f"📊 Session complete: {suitable_count} suitable projects")
 
-    async def run_session(self, keywords=None, timeLeft=None, hiredMin=None, proposalsMax=None):
+    async def run_session(self, keywords=None, timeLeft=None, hiredMin=None, proposalsMax=None, budgetMin=None):
         """Run one search session with optional search parameters"""
         # Reset stop flag
         self._stop_session = False
@@ -788,6 +801,7 @@ class AgentA:
         self.search_time_left = timeLeft
         self.search_hired_min = hiredMin
         self.search_proposals_max = proposalsMax
+        self.search_budget_min = budgetMin
         
         # Prepare live streaming pipeline
         self.live_queue = asyncio.Queue()
@@ -806,6 +820,8 @@ class AgentA:
             log_msg += f", hired >= {hiredMin}%"
         if proposalsMax is not None:
             log_msg += f", proposals <= {proposalsMax}"
+        if budgetMin is not None:
+            log_msg += f", budget >= {budgetMin}₽"
         log_agent_action("Agent A", log_msg + "...")
         
         if not self.driver:
@@ -864,6 +880,7 @@ class AgentA:
             self.search_time_left = None
             self.search_hired_min = None
             self.search_proposals_max = None
+            self.search_budget_min = None
 
     async def _consume_and_notify_live(self, max_notifications: int = 5):
         """

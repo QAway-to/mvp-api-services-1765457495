@@ -8,6 +8,7 @@ let agentALoadUrl;
 let agentATimeLeft;
 let agentAHiredMin;
 let agentAProposalsMax;
+let agentABudget;
 let agentAStatus;
 let agentAResults;
 let agentAStopButton;
@@ -52,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     agentATimeLeft = document.getElementById('agent-a-time-left');
     agentAHiredMin = document.getElementById('agent-a-hired-min');
     agentAProposalsMax = document.getElementById('agent-a-proposals-max');
+    agentABudget = document.getElementById('agent-a-budget');
     agentAStatus = document.getElementById('agent-a-status');
     agentAResults = document.getElementById('agent-a-results');
     agentAStopButton = document.getElementById('agent-a-stop-button');
@@ -247,6 +249,7 @@ function initializeEventListeners() {
         const timeLeft = agentATimeLeft && agentATimeLeft.value ? parseInt(agentATimeLeft.value) : null;
         const hiredMin = agentAHiredMin && agentAHiredMin.value ? parseInt(agentAHiredMin.value) : null;
         const proposalsMax = agentAProposalsMax && agentAProposalsMax.value ? parseInt(agentAProposalsMax.value) : null;
+        const budgetMin = agentABudget && agentABudget.value ? parseInt(agentABudget.value) : null;
         
         if (!keyword) {
             alert('Пожалуйста, введите ключевые слова');
@@ -289,6 +292,7 @@ function initializeEventListeners() {
             if (timeLeft !== null) requestBody.timeLeft = timeLeft;
             if (hiredMin !== null) requestBody.hiredMin = hiredMin;
             if (proposalsMax !== null) requestBody.proposalsMax = proposalsMax;
+            if (budgetMin !== null) requestBody.budgetMin = budgetMin;
             
             const response = await fetch('/agent/run-session', {
                 method: 'POST',
