@@ -25,6 +25,7 @@ wheels/
 
 # Don't ignore lib/ in MVP templates (they contain required source files)
 !agent_b/mvp_templates/**/lib/
+!agent_b/mvp_templates/**/src/lib/
 
 # Node.js
 node_modules/
