@@ -1,4 +1,4 @@
-import { processNLQuery } from '../../src/lib/gemini';
+import { processNLQuery } from '../../src/lib/gemini.js';
 import {
   calculateStatistics,
   findAnomalies,
@@ -6,7 +6,7 @@ import {
   groupBy,
   aggregateGroups,
   detectColumnTypes
-} from '../../src/lib/dataProcessor';
+} from '../../src/lib/dataProcessor.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
