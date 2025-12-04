@@ -14,8 +14,16 @@ function getGenAI() {
  */
 export async function processNLQuery(query, dataSchema, sampleData) {
   try {
+    console.log('[Gemini] Начало processNLQuery');
+    console.log('[Gemini] Query:', query);
+    console.log('[Gemini] Schema length:', dataSchema?.length);
+    console.log('[Gemini] Sample data length:', sampleData?.length);
+    
     const genAI = getGenAI();
+    console.log('[Gemini] GenAI client создан');
+    
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    console.log('[Gemini] Model создан: gemini-1.5-flash');
 
     const schemaDescription = generateSchemaDescription(dataSchema, sampleData);
     
@@ -47,16 +55,35 @@ ${schemaDescription}
   "message": "Ответ пользователю"
 }`;
 
+    console.log('[Gemini] Отправка промпта в модель...');
+    console.log('[Gemini] Промпт длина:', prompt.length);
+    
     const result = await model.generateContent(prompt);
+    console.log('[Gemini] Ответ получен от модели');
+    
     const response = await result.response;
+    console.log('[Gemini] Response объект получен');
+    
     const text = response.text();
+    console.log('[Gemini] Текст ответа длина:', text.length);
+    console.log('[Gemini] Текст ответа (первые 500 символов):', text.substring(0, 500));
 
     // Parse JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      console.log('[Gemini] JSON найден в ответе');
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        console.log('[Gemini] JSON успешно распарсен:', parsed);
+        return parsed;
+      } catch (parseError) {
+        console.error('[Gemini] Ошибка парсинга JSON:', parseError);
+        console.error('[Gemini] JSON текст:', jsonMatch[0]);
+        throw new Error(`Ошибка парсинга JSON ответа: ${parseError.message}`);
+      }
     }
 
+    console.log('[Gemini] JSON не найден, возвращаем текстовый ответ');
     // Fallback if no JSON found
     return {
       type: 'text',
@@ -64,8 +91,23 @@ ${schemaDescription}
       description: 'Анализ выполнен'
     };
   } catch (error) {
-    console.error('Gemini API error:', error);
-    throw new Error(`Ошибка обработки запроса: ${error.message}`);
+    console.error('[Gemini] КРИТИЧЕСКАЯ ОШИБКА:', error);
+    console.error('[Gemini] Error name:', error.name);
+    console.error('[Gemini] Error message:', error.message);
+    console.error('[Gemini] Error stack:', error.stack);
+    
+    // More detailed error message
+    let errorMessage = `Ошибка обработки запроса: ${error.message}`;
+    
+    if (error.message.includes('API_KEY') || error.message.includes('api key')) {
+      errorMessage = `GEMINI_API_KEY не установлен или неверный. Добавьте ключ в Environment Variables на Vercel.`;
+    } else if (error.message.includes('quota') || error.message.includes('limit')) {
+      errorMessage = `Превышен лимит запросов к Gemini API. Проверьте квоту.`;
+    } else if (error.message.includes('network') || error.message.includes('fetch')) {
+      errorMessage = `Ошибка сети при обращении к Gemini API: ${error.message}`;
+    }
+    
+    throw new Error(errorMessage);
   }
 }
 

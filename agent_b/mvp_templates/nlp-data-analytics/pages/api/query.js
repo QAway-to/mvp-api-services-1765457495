@@ -49,12 +49,25 @@ export default async function handler(req, res) {
 
     // Process query through Gemini
     addLog('Отправка запроса в Gemini API...');
+    addLog(`Проверка GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'Установлен (' + process.env.GEMINI_API_KEY.substring(0, 10) + '...)' : 'НЕ УСТАНОВЛЕН!'}`);
+    
     let geminiResponse;
     try {
+      addLog('Вызов processNLQuery...');
       geminiResponse = await processNLQuery(query, schema, sampleData);
-      addLog(`✅ Получен ответ от Gemini: type=${geminiResponse.type}`);
+      addLog(`✅ Получен ответ от Gemini: type=${geminiResponse?.type || 'undefined'}`);
+      addLog(`Ответ Gemini: ${JSON.stringify(geminiResponse).substring(0, 200)}...`);
     } catch (geminiError) {
-      addLog(`ОШИБКА Gemini API: ${geminiError.message}`);
+      addLog(`❌ ОШИБКА Gemini API: ${geminiError.message}`);
+      addLog(`Тип ошибки: ${geminiError.constructor.name}`);
+      addLog(`Stack: ${geminiError.stack?.substring(0, 500)}`);
+      
+      // Check if it's an API key issue
+      if (geminiError.message.includes('API_KEY') || geminiError.message.includes('api key')) {
+        addLog('⚠️ ПРОБЛЕМА: GEMINI_API_KEY не установлен или неверный!');
+        addLog('Решение: Добавьте GEMINI_API_KEY в Environment Variables на Vercel');
+      }
+      
       throw geminiError;
     }
 
@@ -179,13 +192,38 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Query processing error:', error);
-    addLog(`КРИТИЧЕСКАЯ ОШИБКА: ${error.message}`);
-    addLog(`Stack: ${error.stack}`);
+    addLog(`❌ КРИТИЧЕСКАЯ ОШИБКА: ${error.message}`);
+    addLog(`Тип ошибки: ${error.constructor.name}`);
+    addLog(`Stack trace: ${error.stack?.substring(0, 1000)}`);
+    
+    // Detailed error information
+    const errorDetails = {
+      message: error.message,
+      name: error.name,
+      type: error.constructor.name,
+      stack: error.stack
+    };
+    
+    // Check for specific error types
+    if (error.message.includes('GEMINI_API_KEY')) {
+      errorDetails.suggestion = 'Добавьте GEMINI_API_KEY в Environment Variables на Vercel';
+      errorDetails.code = 'MISSING_API_KEY';
+    } else if (error.message.includes('fetch') || error.message.includes('network')) {
+      errorDetails.suggestion = 'Проблема с сетевым запросом к Gemini API';
+      errorDetails.code = 'NETWORK_ERROR';
+    } else if (error.message.includes('JSON') || error.message.includes('parse')) {
+      errorDetails.suggestion = 'Ошибка парсинга ответа от Gemini';
+      errorDetails.code = 'PARSE_ERROR';
+    }
+    
+    addLog(`Детали ошибки: ${JSON.stringify(errorDetails, null, 2)}`);
+    
     return res.status(500).json({
       error: 'Error processing query',
       message: error.message,
+      details: errorDetails,
       logs: logs,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      stack: error.stack
     });
   }
 }

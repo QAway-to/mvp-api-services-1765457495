@@ -136,10 +136,23 @@ export default function Home() {
       console.log('[Query] Ответ получен, статус:', response.status);
       const result = await response.json();
       console.log('[Query] Результат:', result);
+      console.log('[Query] Логи из ответа:', result.logs);
 
       if (!response.ok) {
         console.error('[Query] Ошибка ответа:', result);
-        throw new Error(result.error || result.message || 'Ошибка обработки запроса');
+        console.error('[Query] Детали ошибки:', result.details);
+        console.error('[Query] Stack trace:', result.stack);
+        
+        // Build detailed error message
+        let errorMessage = result.error || result.message || 'Ошибка обработки запроса';
+        if (result.details) {
+          errorMessage += `\n\nДетали:\n${JSON.stringify(result.details, null, 2)}`;
+          if (result.details.suggestion) {
+            errorMessage += `\n\n💡 Решение: ${result.details.suggestion}`;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
       setResults(result);
@@ -150,17 +163,30 @@ export default function Home() {
       }
     } catch (error) {
       console.error('[Query] Ошибка:', error);
+      console.error('[Query] Error stack:', error.stack);
+      
+      const errorMessage = error.message || 'Ошибка обработки запроса';
+      
       setResults({
         type: 'error',
-        message: error.message || 'Ошибка обработки запроса',
+        message: errorMessage,
         table: null,
         chart: null,
-        logs: logs
+        logs: logs,
+        errorDetails: error.stack
       });
-      setLogs(prev => [...prev, { 
-        timestamp: new Date().toISOString(), 
-        message: `❌ ОШИБКА: ${error.message}` 
-      }]);
+      
+      setLogs(prev => [
+        ...prev, 
+        { 
+          timestamp: new Date().toISOString(), 
+          message: `❌ ОШИБКА: ${errorMessage}` 
+        },
+        {
+          timestamp: new Date().toISOString(),
+          message: `Детали: ${error.stack?.substring(0, 500) || 'Нет дополнительной информации'}`
+        }
+      ]);
     } finally {
       setLoading(false);
     }
@@ -249,9 +275,33 @@ export default function Home() {
           )}
           {results && results.message && (
             <div style={{ ...section, marginTop: 24 }}>
-              <p style={{ color: results.type === 'error' ? '#ef4444' : '#94a3b8' }}>
+              <p style={{ 
+                color: results.type === 'error' ? '#ef4444' : '#94a3b8',
+                whiteSpace: 'pre-wrap',
+                fontFamily: results.type === 'error' ? 'monospace' : 'inherit',
+                fontSize: results.type === 'error' ? 12 : 14
+              }}>
                 {results.message}
               </p>
+              {results.type === 'error' && results.errorDetails && (
+                <details style={{ marginTop: 16 }}>
+                  <summary style={{ color: '#94a3b8', cursor: 'pointer' }}>
+                    Показать технические детали
+                  </summary>
+                  <pre style={{
+                    marginTop: 8,
+                    padding: 12,
+                    background: '#11162a',
+                    borderRadius: 8,
+                    color: '#ef4444',
+                    fontSize: 11,
+                    overflow: 'auto',
+                    maxHeight: 300
+                  }}>
+                    {results.errorDetails}
+                  </pre>
+                </details>
+              )}
             </div>
           )}
         </div>
