@@ -3,10 +3,20 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // Initialize Gemini client
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY;
+  console.log('[Gemini] Проверка API ключа:', apiKey ? `Установлен (${apiKey.substring(0, 10)}...)` : 'НЕ УСТАНОВЛЕН!');
+  
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not set');
+    throw new Error('GEMINI_API_KEY is not set. Добавьте ключ в Environment Variables на Vercel');
   }
-  return new GoogleGenerativeAI(apiKey);
+  
+  if (apiKey.length < 20) {
+    throw new Error('GEMINI_API_KEY выглядит неверным (слишком короткий)');
+  }
+  
+  console.log('[Gemini] Создание GoogleGenerativeAI клиента...');
+  const client = new GoogleGenerativeAI(apiKey);
+  console.log('[Gemini] Клиент создан успешно');
+  return client;
 }
 
 /**
