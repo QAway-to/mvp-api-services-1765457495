@@ -410,6 +410,17 @@ function initializeEventListeners() {
     if (agentBProjectSelect) {
         agentBProjectSelect.addEventListener('change', async (e) => {
             const selectedIndex = e.target.value;
+            
+            // Handle "default" option - allow generation without project
+            if (selectedIndex === 'default') {
+                if (agentBTextarea) {
+                    agentBTextarea.value = '';
+                    agentBTextarea.placeholder = 'Введите описание проекта или выберите шаблон';
+                    agentBTextarea.style.borderColor = '';
+                }
+                return;
+            }
+            
             if (selectedIndex && agentAProjects.length > 0) {
                 const projectIndex = selectedIndex.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3, E=4
                 if (projectIndex >= 0 && projectIndex < agentAProjects.length) {
@@ -496,14 +507,17 @@ function initializeEventListeners() {
         const description = agentBTextarea.value ? agentBTextarea.value.trim() : '';
         const buildTypeRadio = document.querySelector('input[name="build-type"]:checked');
         const buildType = buildTypeRadio ? buildTypeRadio.value : 'mock';
+        const projectSelect = agentBProjectSelect ? agentBProjectSelect.value : '';
         
         if (!template) {
             alert('Please select a template');
             return;
         }
         
-        if (!description || description.length < 10) {
-            alert('Please enter project description (minimum 10 characters)');
+        // Allow generation with "default" option even without description
+        // Description will be auto-generated from template if empty
+        if (projectSelect !== 'default' && (!description || description.length < 10)) {
+            alert('Please enter project description (minimum 10 characters) or select "По умолчанию"');
             return;
         }
         

@@ -98,6 +98,7 @@
                     <div class="form-group">
                         <label class="form-label" for="agent-b-project-select">Выберите проект из Agent A:</label>
                         <select id="agent-b-project-select" class="form-select">
+                            <option value="default" selected>По умолчанию</option>
                             <option value="">-- Выберите проект --</option>
                             <option value="A" disabled style="display: none;">Проект A</option>
                             <option value="B" disabled style="display: none;">Проект B</option>
@@ -121,11 +122,12 @@
                             <option value="web-scraper">Universal Web Scraper</option>
                             <option value="api-services">API Services Manager</option>
                             <option value="freelance-project-search">Freelance Project Search</option>
+                            <option value="nlp-data-analytics">NLP Data Analytics</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="agent-b-textarea">Описание проекта:</label>
-                        <textarea id="agent-b-textarea" class="form-textarea" placeholder="Описание проекта будет заполнено автоматически при выборе проекта из Agent A" rows="4"></textarea>
+                        <textarea id="agent-b-textarea" class="form-textarea" placeholder="Введите описание проекта или выберите 'По умолчанию' для использования описания шаблона" rows="4"></textarea>
                     </div>
             <div class="form-group">
                 <div class="radio-group">

@@ -167,6 +167,17 @@ class AITemplateSelector:
                 complexity="medium",
                 estimated_completion="70%"
             ),
+
+            # NLP Data Analytics
+            "nlp-data-analytics": TemplateInfo(
+                id="nlp-data-analytics",
+                name="NLP Data Analytics",
+                category="analytics",
+                description="Веб-приложение для анализа данных через естественный язык. Загрузка CSV/Excel, подключение SQLite, анализ через текстовые запросы",
+                features=["csv/excel upload", "sqlite", "nl queries", "visualization", "statistics", "offline"],
+                complexity="medium",
+                estimated_completion="75%"
+            ),
         }
 
     async def select_template(self, project_description: str) -> TemplateMatch:

@@ -143,7 +143,8 @@ class MVPGenerator:
         valid_templates = [
             "mini-etl-pipeline", "web-scraper", "brand-mention-monitor", "data-formatter",
             "email-campaign-manager", "price-stock-parser", "news-parser",
-            "analytics-dashboard", "telegram-shop-bot", "api-services", "freelance-project-search"
+            "analytics-dashboard", "telegram-shop-bot", "api-services", "freelance-project-search",
+            "nlp-data-analytics"
         ]
         if template_id not in valid_templates:
             raise ValueError(f"Invalid template_id: {template_id}. Must be one of: {valid_templates}")
