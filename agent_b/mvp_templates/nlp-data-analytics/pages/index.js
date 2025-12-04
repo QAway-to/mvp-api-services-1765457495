@@ -50,6 +50,7 @@ export default function Home() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState([]);
 
   // Load sample data on mount for demo (only if no data uploaded)
   useEffect(() => {
@@ -105,7 +106,13 @@ export default function Home() {
     }
     
     setLoading(true);
+    setLogs([{ timestamp: new Date().toISOString(), message: 'Начало обработки запроса...' }]);
+    
     try {
+      console.log('[Query] Отправка запроса:', q);
+      console.log('[Query] Данные:', currentData?.length, 'строк');
+      console.log('[Query] Колонки:', currentColumns);
+      
       const response = await fetch('/api/query', {
         method: 'POST',
         headers: {
@@ -118,21 +125,34 @@ export default function Home() {
         })
       });
 
+      console.log('[Query] Ответ получен, статус:', response.status);
       const result = await response.json();
+      console.log('[Query] Результат:', result);
 
       if (!response.ok) {
-        throw new Error(result.error || 'Ошибка обработки запроса');
+        console.error('[Query] Ошибка ответа:', result);
+        throw new Error(result.error || result.message || 'Ошибка обработки запроса');
       }
 
       setResults(result);
+      
+      // Show logs if available
+      if (result.logs && result.logs.length > 0) {
+        setLogs(result.logs);
+      }
     } catch (error) {
-      console.error('Error processing query:', error);
+      console.error('[Query] Ошибка:', error);
       setResults({
         type: 'error',
         message: error.message || 'Ошибка обработки запроса',
         table: null,
-        chart: null
+        chart: null,
+        logs: logs
       });
+      setLogs(prev => [...prev, { 
+        timestamp: new Date().toISOString(), 
+        message: `❌ ОШИБКА: ${error.message}` 
+      }]);
     } finally {
       setLoading(false);
     }
@@ -177,23 +197,53 @@ export default function Home() {
         </section>
       </div>
 
-      {results && (
+      {(logs.length > 0 || results) && (
         <div style={results}>
-          {results.chart && (
+          {logs.length > 0 && (
+            <div style={{ ...section, marginBottom: 24 }}>
+              <h2 style={{ marginTop: 0, marginBottom: 16 }}>📝 Логи обработки</h2>
+              <div style={{
+                background: '#11162a',
+                borderRadius: 8,
+                padding: 16,
+                maxHeight: 300,
+                overflowY: 'auto',
+                fontFamily: 'monospace',
+                fontSize: 12
+              }}>
+                {logs.map((log, idx) => (
+                  <div key={idx} style={{ 
+                    marginBottom: 8, 
+                    color: log.message.includes('ОШИБКА') || log.message.includes('❌') ? '#ef4444' : '#94a3b8',
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    <span style={{ color: '#6366f1' }}>
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </span>
+                    {' '}
+                    {log.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {results && results.chart && (
             <div style={{ ...section, marginBottom: 24 }}>
               <h2 style={{ marginTop: 0, marginBottom: 16 }}>📊 Визуализация</h2>
               <ChartPanel data={results.chart} />
             </div>
           )}
-          {results.table && (
+          {results && results.table && (
             <div style={section}>
               <h2 style={{ marginTop: 0, marginBottom: 16 }}>📋 Результаты</h2>
               <DataTable data={results.table} />
             </div>
           )}
-          {results.message && (
+          {results && results.message && (
             <div style={{ ...section, marginTop: 24 }}>
-              <p style={{ color: '#94a3b8' }}>{results.message}</p>
+              <p style={{ color: results.type === 'error' ? '#ef4444' : '#94a3b8' }}>
+                {results.message}
+              </p>
             </div>
           )}
         </div>

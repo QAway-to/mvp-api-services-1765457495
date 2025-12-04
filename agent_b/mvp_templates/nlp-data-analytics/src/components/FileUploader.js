@@ -30,7 +30,9 @@ export default function FileUploader({ onDataLoaded }) {
       
       reader.onload = async (e) => {
         try {
+          console.log('[FileUploader] Файл прочитан, отправка на сервер...');
           const base64Data = e.target.result;
+          console.log('[FileUploader] Размер base64 данных:', base64Data.length);
           
           const response = await fetch('/api/upload', {
             method: 'POST',
@@ -44,16 +46,20 @@ export default function FileUploader({ onDataLoaded }) {
             })
           });
 
+          console.log('[FileUploader] Ответ получен, статус:', response.status);
           const result = await response.json();
+          console.log('[FileUploader] Результат:', result);
 
           if (!response.ok) {
-            throw new Error(result.error || 'Ошибка загрузки файла');
+            console.error('[FileUploader] Ошибка ответа:', result);
+            throw new Error(result.error || result.message || 'Ошибка загрузки файла');
           }
 
           // Store full data in sessionStorage for later use
           if (result.data) {
             sessionStorage.setItem('uploadedData', JSON.stringify(result.data));
             sessionStorage.setItem('uploadedColumns', JSON.stringify(result.columnNames));
+            console.log('[FileUploader] Данные сохранены в sessionStorage');
           }
 
           onDataLoaded({
@@ -61,10 +67,12 @@ export default function FileUploader({ onDataLoaded }) {
             columns: result.columns,
             columnNames: result.columnNames,
             sample: result.sample,
-            data: result.data
+            data: result.data,
+            logs: result.logs || []
           });
+          console.log('[FileUploader] ✅ Файл успешно загружен');
         } catch (error) {
-          console.error('Upload error:', error);
+          console.error('[FileUploader] Ошибка:', error);
           setError(error.message || 'Ошибка загрузки файла');
           setUploading(false);
         }

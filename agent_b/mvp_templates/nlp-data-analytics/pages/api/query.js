@@ -13,27 +13,50 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const logs = [];
+  const addLog = (message) => {
+    logs.push({ timestamp: new Date().toISOString(), message });
+    console.log(`[QUERY] ${message}`);
+  };
+
   try {
+    addLog('Начало обработки запроса');
+    
     const { query, data, columns } = req.body;
 
+    addLog(`Получен запрос: "${query?.substring(0, 50)}..."`);
+    addLog(`Данные: ${data?.length || 0} строк, колонок: ${columns?.length || 0}`);
+
     if (!query || !query.trim()) {
-      return res.status(400).json({ error: 'Query is required' });
+      addLog('ОШИБКА: Запрос пуст');
+      return res.status(400).json({ error: 'Query is required', logs });
     }
 
     if (!data || !Array.isArray(data) || data.length === 0) {
-      return res.status(400).json({ error: 'Data is required' });
+      addLog('ОШИБКА: Нет данных');
+      return res.status(400).json({ error: 'Data is required', logs });
     }
 
     // Detect column types
+    addLog('Определение типов колонок...');
     const columnTypes = detectColumnTypes(data, columns);
     const numericColumns = columns.filter(col => columnTypes[col] === 'number');
+    addLog(`Найдено числовых колонок: ${numericColumns.length}`);
 
     // Get schema from sample data
     const sampleData = data.slice(0, 10);
     const schema = columns;
 
     // Process query through Gemini
-    const geminiResponse = await processNLQuery(query, schema, sampleData);
+    addLog('Отправка запроса в Gemini API...');
+    let geminiResponse;
+    try {
+      geminiResponse = await processNLQuery(query, schema, sampleData);
+      addLog(`✅ Получен ответ от Gemini: type=${geminiResponse.type}`);
+    } catch (geminiError) {
+      addLog(`ОШИБКА Gemini API: ${geminiError.message}`);
+      throw geminiError;
+    }
 
     let result = {
       type: geminiResponse.type || 'text',
@@ -45,7 +68,10 @@ export default async function handler(req, res) {
     };
 
     // Process based on Gemini response type
+    addLog(`Обработка типа ответа: ${geminiResponse.type}`);
+    
     if (geminiResponse.type === 'statistics') {
+      addLog('Вычисление статистики...');
       // Calculate statistics for numeric columns
       const stats = {};
       numericColumns.forEach(col => {
@@ -54,6 +80,7 @@ export default async function handler(req, res) {
           stats[col] = stat;
         }
       });
+      addLog(`Вычислена статистика для ${Object.keys(stats).length} колонок`);
 
       result.statistics = stats;
       result.table = Object.entries(stats).map(([col, stat]) => ({
@@ -145,12 +172,20 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json(result);
+    addLog('✅ Запрос успешно обработан');
+    return res.status(200).json({
+      ...result,
+      logs: logs
+    });
   } catch (error) {
     console.error('Query processing error:', error);
+    addLog(`КРИТИЧЕСКАЯ ОШИБКА: ${error.message}`);
+    addLog(`Stack: ${error.stack}`);
     return res.status(500).json({
       error: 'Error processing query',
-      message: error.message
+      message: error.message,
+      logs: logs,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
