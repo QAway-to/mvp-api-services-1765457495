@@ -22,8 +22,9 @@ export async function processNLQuery(query, dataSchema, sampleData) {
     const genAI = getGenAI();
     console.log('[Gemini] GenAI client создан');
     
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    console.log('[Gemini] Model создан: gemini-1.5-flash');
+    // Use gemini-2.5-flash (stable model, same as Python SDK)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    console.log('[Gemini] Model создан: gemini-2.5-flash');
 
     const schemaDescription = generateSchemaDescription(dataSchema, sampleData);
     
@@ -117,7 +118,7 @@ ${schemaDescription}
 export async function generateDataSummary(data, columns) {
   try {
     const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const sampleRows = data.slice(0, 10).map(row => 
       Object.values(row).join(', ')
