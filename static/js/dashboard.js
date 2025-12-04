@@ -5,6 +5,7 @@ let agentAButton;
 let agentAInput;
 let agentAKworkUrl;
 let agentALoadUrl;
+let agentANegativeFilter;
 let agentATimeLeft;
 let agentAHiredMin;
 let agentAProposalsMax;
@@ -54,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     agentAInput = document.getElementById('agent-a-input');
     agentAKworkUrl = document.getElementById('agent-a-kwork-url');
     agentALoadUrl = document.getElementById('agent-a-load-url');
+    agentANegativeFilter = document.getElementById('agent-a-negative-filter');
     agentATimeLeft = document.getElementById('agent-a-time-left');
     agentAHiredMin = document.getElementById('agent-a-hired-min');
     agentAProposalsMax = document.getElementById('agent-a-proposals-max');
@@ -246,7 +248,7 @@ function initializeEventListeners() {
     
     // Agent A: Execute button
     if (agentAButton) {
-        agentAButton.addEventListener('click', async () => {
+    agentAButton.addEventListener('click', async () => {
         if (!agentAInput || !agentAStatus || !agentAResults) {
             console.error('❌ Required elements not found!');
             alert('Ошибка инициализации интерфейса. Перезагрузите страницу.');
@@ -254,6 +256,7 @@ function initializeEventListeners() {
         }
         
         const keyword = agentAInput.value ? agentAInput.value.trim() : '';
+        const negativeFilter = agentANegativeFilter && agentANegativeFilter.value ? agentANegativeFilter.value.trim() : '';
         const timeLeft = agentATimeLeft && agentATimeLeft.value ? parseInt(agentATimeLeft.value) : null;
         const hiredMin = agentAHiredMin && agentAHiredMin.value ? parseInt(agentAHiredMin.value) : null;
         const proposalsMax = agentAProposalsMax && agentAProposalsMax.value ? parseInt(agentAProposalsMax.value) : null;
@@ -303,6 +306,7 @@ function initializeEventListeners() {
         try {
             const requestBody = {};
             if (keyword) requestBody.keywords = keyword;
+            if (negativeFilter) requestBody.negativeFilter = negativeFilter;
             if (timeLeft !== null) {
                 requestBody.timeLeft = timeLeft;
                 requestBody.timeLeftStrict = timeLeftStrict;
@@ -380,16 +384,16 @@ function initializeEventListeners() {
                     const statusLower = String(statusData.agent_a_status || '').toLowerCase();
                     if (statusLower !== 'running' && statusLower !== 'started' && statusLower !== 'start') {
                         if (agentAButton) {
-                            agentAButton.disabled = false;
-                            agentAButton.textContent = 'Execute';
+                        agentAButton.disabled = false;
+                        agentAButton.textContent = 'Execute';
                         }
                     }
                 } catch (e) {
                     // If status check fails, re-enable button after a delay
                     setTimeout(() => {
                         if (agentAButton) {
-                            agentAButton.disabled = false;
-                            agentAButton.textContent = 'Execute';
+                        agentAButton.disabled = false;
+                        agentAButton.textContent = 'Execute';
                         }
                     }, 2000);
                 }
@@ -397,7 +401,7 @@ function initializeEventListeners() {
             // Check status after a short delay
             setTimeout(statusCheck, 1000);
         }
-        });
+    });
     } else {
         console.error('❌ Agent A button not found!');
     }
@@ -481,7 +485,7 @@ function initializeEventListeners() {
     
     // Agent B: Generate button
     if (agentBButton) {
-        agentBButton.addEventListener('click', async () => {
+    agentBButton.addEventListener('click', async () => {
         if (!agentBDropdown || !agentBTextarea || !agentBLogs) {
             console.error('❌ Required Agent B elements not found!');
             alert('Ошибка инициализации интерфейса Agent B. Перезагрузите страницу.');
@@ -536,11 +540,11 @@ function initializeEventListeners() {
                 if (agentBLogs) {
                     const currentContent = agentBLogs.textContent || '';
                     agentBLogs.textContent = currentContent + `\n✅ ${data.message || 'MVP generated successfully'}`;
-                    if (data.deployUrl) {
-                        agentBLogs.textContent += `\n🔗 Deploy URL: ${data.deployUrl}`;
+                if (data.deployUrl) {
+                    agentBLogs.textContent += `\n🔗 Deploy URL: ${data.deployUrl}`;
                     }
                     if (data.template) {
-                        agentBLogs.textContent += `\n📦 Template: ${data.template}`;
+                    agentBLogs.textContent += `\n📦 Template: ${data.template}`;
                     }
                     agentBLogs.scrollTop = agentBLogs.scrollHeight;
                 }
@@ -554,11 +558,11 @@ function initializeEventListeners() {
             }
         } finally {
             if (agentBButton) {
-                agentBButton.disabled = false;
-                agentBButton.textContent = 'Generate';
+            agentBButton.disabled = false;
+            agentBButton.textContent = 'Generate';
             }
         }
-        });
+    });
     } else {
         console.error('❌ Agent B button not found!');
     }
@@ -780,23 +784,23 @@ function pollAgentResults() {
                 // Update results display
                 if (agentAResults) {
                     let resultsText = `Found ${data.total || data.projects.length} project(s), ${data.suitable || 0} suitable:\n\n`;
-                    
+                
                     agentAProjects.forEach((project, index) => {
-                        resultsText += `${index + 1}. ${project.title || 'Untitled'}\n`;
-                        if (project.url) {
-                            resultsText += `   URL: ${project.url}\n`;
-                        }
-                        if (project.evaluation && project.evaluation.suitable) {
-                            resultsText += `   ✓ Suitable\n`;
-                        }
-                        resultsText += '\n';
-                    });
-                    
-                    if (data.projects.length > 5) {
-                        resultsText += `... and ${data.projects.length - 5} more`;
+                    resultsText += `${index + 1}. ${project.title || 'Untitled'}\n`;
+                    if (project.url) {
+                        resultsText += `   URL: ${project.url}\n`;
                     }
-                    
-                    agentAResults.textContent = resultsText;
+                    if (project.evaluation && project.evaluation.suitable) {
+                        resultsText += `   ✓ Suitable\n`;
+                    }
+                    resultsText += '\n';
+                });
+                
+                if (data.projects.length > 5) {
+                    resultsText += `... and ${data.projects.length - 5} more`;
+                }
+                
+                agentAResults.textContent = resultsText;
                     agentAResults.scrollTop = agentAResults.scrollHeight;
                 }
                 
@@ -823,18 +827,18 @@ function pollAgentResults() {
                 
                 // Check if session is still running
                 try {
-                    const statusResponse = await fetch('/status');
+                const statusResponse = await fetch('/status');
                     if (statusResponse.ok) {
-                        const statusData = await statusResponse.json();
+                const statusData = await statusResponse.json();
                         const statusLower = String(statusData.agent_a_status || '').toLowerCase();
                         if (statusLower !== 'running' && statusLower !== 'started' && statusLower !== 'start') {
-                            // Session finished, hide stop button and stop timer
-                            if (agentAStopButton) {
-                                agentAStopButton.classList.add('hidden');
-                                agentAStopButton.style.display = 'none';
-                            }
-                            stopAgentATimer();
-                            clearInterval(intervalId);
+                    // Session finished, hide stop button and stop timer
+                    if (agentAStopButton) {
+                        agentAStopButton.classList.add('hidden');
+                        agentAStopButton.style.display = 'none';
+                    }
+                    stopAgentATimer();
+                    clearInterval(intervalId);
                             
                             // Re-enable Execute button
                             if (agentAButton) {

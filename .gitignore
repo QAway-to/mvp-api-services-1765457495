@@ -53,3 +53,9 @@ generated/
 
 # Cache
 .cache/
+
+# Database files
+data/
+*.db
+*.sqlite
+*.sqlite3

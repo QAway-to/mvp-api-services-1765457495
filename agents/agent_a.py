@@ -18,6 +18,7 @@ from urllib.parse import quote_plus
 
 from config import config
 from utils.logger import logger, log_agent_action
+from utils.project_deduplicator import ProjectDeduplicator
 from evaluation.evaluator import ProjectEvaluator
 from telegram_bot import TelegramNotifier
 
@@ -33,13 +34,11 @@ class AgentA:
         self.current_session_start = None
         self.current_session_end = None
         self.session_steps: List[Dict[str, Any]] = []
-        # Track processed projects in current session to avoid duplicates
-        self.session_processed_urls: set = set()
-        self.session_processed_ids: set = set()
         # Live streaming of projects during Selenium run
         self.live_queue = None  # type: ignore
         # Search parameters for current session
         self.search_keywords = None  # Override keywords if provided
+        self.search_negative_filter = None  # Negative filter: ignore projects with these words in title
         self.search_time_left = None  # Filter by minimum time left (hours)
         self.search_hired_min = None  # Filter by minimum hired percentage
         self.search_proposals_max = None  # Filter by maximum proposals count
@@ -49,6 +48,8 @@ class AgentA:
         self.search_hired_min_strict = False
         self.search_proposals_max_strict = False
         self.search_budget_min_strict = False
+        # Deduplicator for seen projects
+        self.deduplicator = None
         self._loop = None  # event loop captured per session for thread-safe puts
         self._stop_session = False  # Flag to stop current session
 
@@ -147,6 +148,30 @@ class AgentA:
         # we assume that most results are relevant unless they contain irrelevant words.
         # This allows more projects to pass through for detailed evaluation.
         return True
+    
+    def _matches_negative_filter(self, title: str) -> bool:
+        """
+        Check if title matches negative filter (should be ignored)
+        
+        Args:
+            title: Project title to check
+            
+        Returns:
+            True if title matches negative filter (should be ignored), False otherwise
+        """
+        if not self.search_negative_filter or not title:
+            return False
+        
+        # Parse negative filter: split by comma and strip whitespace
+        negative_words = [word.strip().lower() for word in self.search_negative_filter.split(',') if word.strip()]
+        
+        if not negative_words:
+            return False
+        
+        title_lower = title.lower()
+        
+        # Check if any negative word is in title
+        return any(word in title_lower for word in negative_words)
 
     def simulate_reading(self, duration: int = None):
         """Simulate human reading"""
@@ -319,6 +344,12 @@ class AgentA:
                 try:
                     title = link_element.text.strip()
                     url = link_element.get_attribute("href")
+                    
+                    # NEGATIVE FILTER - check if title matches negative filter
+                    if self._matches_negative_filter(title):
+                        filtered_count += 1
+                        log_agent_action("Agent A", f"🚫 Ignored (negative filter): {title[:50]}...")
+                        continue
                     
                     # SOFT FILTERING - only skip obviously irrelevant projects
                     if not self._is_title_preliminary_relevant(title):
@@ -718,31 +749,16 @@ class AgentA:
                                         should_add = False
                                     pass  # Skip filter if budget parsing fails and not strict
                         
-                        # Check for duplicates (by URL or project ID)
                         if should_add:
-                            project_url = project_data.get('url', '')
-                            project_id = project_data.get('id', '')
+                            # Check deduplication - skip if project was already seen
+                            if self.deduplicator and self.deduplicator.is_seen(project_id, url):
+                                log_agent_action("Agent A", f"🔄 Duplicate skipped: {title[:50]}...")
+                                continue
                             
-                            # Check if we've already processed this project in this session
-                            if project_url in self.session_processed_urls or project_id in self.session_processed_ids:
-                                should_add = False
-                                log_agent_action("Agent A", f"⏭️ Skipping duplicate project: {title[:50]}...")
-                        
-                        # Negative filter - check if title contains any negative keywords
-                        if should_add and self.search_negative_titles:
-                            title_lower = title.lower()
-                            for negative_title in self.search_negative_titles:
-                                if negative_title.lower().strip() in title_lower:
-                                    should_add = False
-                                    log_agent_action("Agent A", f"🚫 Ignored by negative filter: {title[:50]}... (matched: {negative_title})")
-                                    break
-                        
-                        if should_add:
-                            # Mark as processed
-                            if project_url:
-                                self.session_processed_urls.add(project_url)
-                            if project_id:
-                                self.session_processed_ids.add(project_id)
+                            # Mark project as seen
+                            if self.deduplicator:
+                                self.deduplicator.mark_seen(project_id, url, title)
+                            
                             all_projects.append(project_data)
                             # Push to live queue for immediate evaluation/notification (from Selenium thread)
                             try:
@@ -849,19 +865,18 @@ class AgentA:
         self.found_projects.extend(suitable_projects)
         log_agent_action("Agent A", f"📊 Session complete: {suitable_count} suitable projects")
 
-    async def run_session(self, keywords=None, timeLeft=None, hiredMin=None, proposalsMax=None, budgetMin=None,
-                          timeLeftStrict=False, hiredMinStrict=False, proposalsMaxStrict=False, budgetMinStrict=False,
-                          negativeTitles=None):
+    async def run_session(self, keywords=None, negativeFilter=None, timeLeft=None, hiredMin=None, proposalsMax=None, budgetMin=None,
+                          timeLeftStrict=False, hiredMinStrict=False, proposalsMaxStrict=False, budgetMinStrict=False):
         """Run one search session with optional search parameters"""
         # Reset stop flag
         self._stop_session = False
         
-        # Reset duplicate tracking for new session
-        self.session_processed_urls = set()
-        self.session_processed_ids = set()
+        # Initialize deduplicator for this session
+        self.deduplicator = ProjectDeduplicator()
         
         # Store search parameters for this session
         self.search_keywords = keywords
+        self.search_negative_filter = negativeFilter
         self.search_time_left = timeLeft
         self.search_hired_min = hiredMin
         self.search_proposals_max = proposalsMax
@@ -871,12 +886,6 @@ class AgentA:
         self.search_hired_min_strict = hiredMinStrict
         self.search_proposals_max_strict = proposalsMaxStrict
         self.search_budget_min_strict = budgetMinStrict
-        # Store negative filter titles
-        if negativeTitles:
-            # Split by comma or newline and clean up
-            self.search_negative_titles = [t.strip() for t in negativeTitles.replace('\n', ',').split(',') if t.strip()]
-        else:
-            self.search_negative_titles = []
         
         # Prepare live streaming pipeline
         self.live_queue = asyncio.Queue()
@@ -889,6 +898,11 @@ class AgentA:
         log_msg = "🚀 Starting search session"
         if keywords:
             log_msg += f" with keywords: {keywords}"
+        if negativeFilter:
+            log_msg += f", negative filter: {negativeFilter}"
+        if self.deduplicator:
+            stats = self.deduplicator.get_stats()
+            log_agent_action("Agent A", f"📊 Deduplicator: {stats['total_seen']} projects seen previously")
         if timeLeft is not None:
             log_msg += f", time left <= {timeLeft}h"
         if hiredMin is not None:
@@ -968,9 +982,6 @@ class AgentA:
             self.search_hired_min_strict = False
             self.search_proposals_max_strict = False
             self.search_budget_min_strict = False
-            self.search_negative_titles = []
-            self.session_processed_urls = set()
-            self.session_processed_ids = set()
 
     async def _consume_and_notify_live(self, max_notifications: int = 5):
         """

@@ -24,10 +24,14 @@
                     <div class="form-group">
                         <input type="text" id="agent-a-input" class="form-input" placeholder="Ключевые слова (только кириллица, запятые, пробелы)" pattern="[а-яА-ЯёЁ\s,.-]*" title="Разрешены только русские буквы, пробелы, запятые и дефисы">
                     </div>
+                    <div class="form-group">
+                        <label class="form-label" for="agent-a-negative-filter">Негативная фильтрация (игнорировать проекты с названиями):</label>
+                        <input type="text" id="agent-a-negative-filter" class="form-input" placeholder="Слова через запятую (например: лифт, дизайн, ремонт)" title="Проекты, содержащие эти слова в названии, будут игнорироваться">
+                    </div>
                     <div class="form-group form-group-row">
                         <div class="form-field-inline">
                             <div class="filter-header">
-                                <label class="form-label-inline" for="agent-a-time-left">Осталось ≤</label>
+                            <label class="form-label-inline" for="agent-a-time-left">Осталось ≤</label>
                                 <label class="checkbox-label-inline" title="Жёсткая фильтрация: игнорировать проекты, не соответствующие условию">
                                     <input type="checkbox" id="agent-a-time-left-strict" class="filter-checkbox">
                                     <span>⚡</span>
@@ -37,7 +41,7 @@
                         </div>
                         <div class="form-field-inline">
                             <div class="filter-header">
-                                <label class="form-label-inline" for="agent-a-hired-min">Нанято</label>
+                            <label class="form-label-inline" for="agent-a-hired-min">Нанято</label>
                                 <label class="checkbox-label-inline" title="Жёсткая фильтрация: игнорировать проекты, не соответствующие условию">
                                     <input type="checkbox" id="agent-a-hired-min-strict" class="filter-checkbox">
                                     <span>⚡</span>
@@ -47,7 +51,7 @@
                         </div>
                         <div class="form-field-inline">
                             <div class="filter-header">
-                                <label class="form-label-inline" for="agent-a-proposals-max">Предложений</label>
+                            <label class="form-label-inline" for="agent-a-proposals-max">Предложений</label>
                                 <label class="checkbox-label-inline" title="Жёсткая фильтрация: игнорировать проекты, не соответствующие условию">
                                     <input type="checkbox" id="agent-a-proposals-max-strict" class="filter-checkbox">
                                     <span>⚡</span>

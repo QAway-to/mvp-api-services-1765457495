@@ -144,6 +144,8 @@ async def run_single_session(request: Request):
             body = await request.json()
             if body.get("keywords"):
                 search_params["keywords"] = body["keywords"]
+            if body.get("negativeFilter"):
+                search_params["negativeFilter"] = body["negativeFilter"]
             if body.get("timeLeft") is not None:
                 search_params["timeLeft"] = int(body["timeLeft"])
                 search_params["timeLeftStrict"] = body.get("timeLeftStrict", False)
@@ -156,8 +158,6 @@ async def run_single_session(request: Request):
             if body.get("budgetMin") is not None:
                 search_params["budgetMin"] = int(body["budgetMin"])
                 search_params["budgetMinStrict"] = body.get("budgetMinStrict", False)
-            if body.get("negativeTitles"):
-                search_params["negativeTitles"] = body["negativeTitles"]
         except Exception:
             pass  # Use default parameters if body parsing fails
         
