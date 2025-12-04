@@ -32,10 +32,17 @@ export async function processNLQuery(query, dataSchema, sampleData) {
     const genAI = getGenAI();
     console.log('[Gemini] GenAI client создан');
     
-    // Use gemini-1.5-flash (stable and widely supported in JavaScript SDK)
-    // Note: gemini-2.5-flash may not be available in @google/generative-ai npm package yet
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    console.log('[Gemini] Model создан: gemini-1.5-flash');
+    // Try gemini-1.5-flash first (most stable in JavaScript SDK)
+    // If that fails, fallback to gemini-pro
+    let model;
+    try {
+      model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      console.log('[Gemini] Model создан: gemini-1.5-flash');
+    } catch (modelError) {
+      console.warn('[Gemini] gemini-1.5-flash не доступна, пробуем gemini-pro:', modelError.message);
+      model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+      console.log('[Gemini] Model создан: gemini-pro (fallback)');
+    }
 
     const schemaDescription = generateSchemaDescription(dataSchema, sampleData);
     
