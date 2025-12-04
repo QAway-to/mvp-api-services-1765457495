@@ -76,6 +76,13 @@ export default function Home() {
     }
   }, []);
 
+  const handleDataLoaded = (loadedData) => {
+    setData(loadedData);
+    if (loadedData.logs && loadedData.logs.length > 0) {
+      setLogs(loadedData.logs);
+    }
+  };
+
   const handleQuerySubmit = async (q) => {
     if (!q.trim()) return;
     
@@ -102,6 +109,7 @@ export default function Home() {
         table: null,
         chart: null
       });
+      setLogs([{ timestamp: new Date().toISOString(), message: '❌ ОШИБКА: Нет данных для анализа' }]);
       return;
     }
     
@@ -170,7 +178,7 @@ export default function Home() {
       <div style={grid}>
         <section style={section}>
           <h2 style={{ marginTop: 0, marginBottom: 16 }}>📁 Загрузка данных</h2>
-          <FileUploader onDataLoaded={setData} />
+          <FileUploader onDataLoaded={handleDataLoaded} />
           {data && (
             <div style={info}>
               ✅ Загружено: {data.rows} строк, {data.columns} колонок
