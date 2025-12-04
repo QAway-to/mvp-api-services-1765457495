@@ -51,74 +51,85 @@ export default function Home() {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Load sample data on mount for demo
+  // Load sample data on mount for demo (only if no data uploaded)
   useEffect(() => {
-    setData({
-      rows: sampleData.length,
-      columns: Object.keys(sampleData[0] || {}).length,
-      sample: sampleData.slice(0, 5)
-    });
+    const savedData = sessionStorage.getItem('uploadedData');
+    if (!savedData && !data) {
+      setData({
+        rows: sampleData.length,
+        columns: Object.keys(sampleData[0] || {}).length,
+        sample: sampleData.slice(0, 5),
+        columnNames: Object.keys(sampleData[0] || {}),
+        data: sampleData
+      });
+    } else if (savedData) {
+      const parsedData = JSON.parse(savedData);
+      const columns = JSON.parse(sessionStorage.getItem('uploadedColumns') || '[]');
+      setData({
+        rows: parsedData.length,
+        columns: columns.length,
+        sample: parsedData.slice(0, 5),
+        columnNames: columns,
+        data: parsedData
+      });
+    }
   }, []);
 
   const handleQuerySubmit = async (q) => {
     if (!q.trim()) return;
     
+    // Get data from state or sessionStorage
+    let currentData = data?.data;
+    let currentColumns = data?.columnNames;
+
+    if (!currentData) {
+      const savedData = sessionStorage.getItem('uploadedData');
+      if (savedData) {
+        currentData = JSON.parse(savedData);
+        currentColumns = JSON.parse(sessionStorage.getItem('uploadedColumns') || '[]');
+      } else {
+        // Use sample data
+        currentData = sampleData;
+        currentColumns = Object.keys(sampleData[0] || {});
+      }
+    }
+
+    if (!currentData || currentData.length === 0) {
+      setResults({
+        type: 'error',
+        message: 'Сначала загрузите данные',
+        table: null,
+        chart: null
+      });
+      return;
+    }
+    
     setLoading(true);
     try {
-      // Simulate API call with mock response
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock response based on query
-      const queryLower = q.toLowerCase();
-      let mockResult = null;
-      
-      if (queryLower.includes('средн') || queryLower.includes('average')) {
-        mockResult = {
-          type: 'statistics',
-          message: 'Средние значения по числовым колонкам',
-          table: [
-            { column: 'sales', average: 1250.5, min: 500, max: 2000 },
-            { column: 'revenue', average: 15230.8, min: 8000, max: 25000 }
-          ],
-          chart: {
-            type: 'bar',
-            data: [
-              { name: 'Sales', value: 1250.5 },
-              { name: 'Revenue', value: 15230.8 }
-            ]
-          }
-        };
-      } else if (queryLower.includes('график') || queryLower.includes('chart') || queryLower.includes('тренд')) {
-        mockResult = {
-          type: 'chart',
-          message: 'График тренда продаж',
-          chart: {
-            type: 'line',
-            data: [
-              { date: '2024-01', value: 1000 },
-              { date: '2024-02', value: 1200 },
-              { date: '2024-03', value: 1500 },
-              { date: '2024-04', value: 1400 },
-              { date: '2024-05', value: 1600 }
-            ]
-          },
-          table: null
-        };
-      } else {
-        mockResult = {
-          type: 'text',
-          message: `Обработан запрос: "${q}"`,
-          table: sampleData.slice(0, 10),
-          chart: null
-        };
+      const response = await fetch('/api/query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: q,
+          data: currentData,
+          columns: currentColumns
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Ошибка обработки запроса');
       }
-      
-      setResults(mockResult);
+
+      setResults(result);
     } catch (error) {
       console.error('Error processing query:', error);
       setResults({
         type: 'error',
-        message: 'Ошибка обработки запроса',
+        message: error.message || 'Ошибка обработки запроса',
         table: null,
         chart: null
       });
@@ -145,9 +156,11 @@ export default function Home() {
               ✅ Загружено: {data.rows} строк, {data.columns} колонок
             </div>
           )}
-          <div style={{ marginTop: 16, padding: 12, background: '#11162a', borderRadius: 8, fontSize: 12, color: '#94a3b8' }}>
-            💡 <strong>Демо режим:</strong> Используются примерные данные для демонстрации
-          </div>
+          {!data && (
+            <div style={{ marginTop: 16, padding: 12, background: '#11162a', borderRadius: 8, fontSize: 12, color: '#94a3b8' }}>
+              💡 <strong>Демо режим:</strong> Используются примерные данные для демонстрации. Загрузите свой файл для реального анализа.
+            </div>
+          )}
         </section>
 
         <section style={section}>

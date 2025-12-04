@@ -11,7 +11,7 @@ export default function ChatInterface({ query, onQueryChange, onQuerySubmit, loa
       <textarea
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
-        placeholder="Например: покажи средние продажи по месяцам"
+        placeholder="Что умеешь?"
         disabled={loading}
         style={{
           width: '100%',
