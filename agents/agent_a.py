@@ -33,6 +33,9 @@ class AgentA:
         self.current_session_start = None
         self.current_session_end = None
         self.session_steps: List[Dict[str, Any]] = []
+        # Track processed projects in current session to avoid duplicates
+        self.session_processed_urls: set = set()
+        self.session_processed_ids: set = set()
         # Live streaming of projects during Selenium run
         self.live_queue = None  # type: ignore
         # Search parameters for current session
@@ -715,7 +718,31 @@ class AgentA:
                                         should_add = False
                                     pass  # Skip filter if budget parsing fails and not strict
                         
+                        # Check for duplicates (by URL or project ID)
                         if should_add:
+                            project_url = project_data.get('url', '')
+                            project_id = project_data.get('id', '')
+                            
+                            # Check if we've already processed this project in this session
+                            if project_url in self.session_processed_urls or project_id in self.session_processed_ids:
+                                should_add = False
+                                log_agent_action("Agent A", f"⏭️ Skipping duplicate project: {title[:50]}...")
+                        
+                        # Negative filter - check if title contains any negative keywords
+                        if should_add and self.search_negative_titles:
+                            title_lower = title.lower()
+                            for negative_title in self.search_negative_titles:
+                                if negative_title.lower().strip() in title_lower:
+                                    should_add = False
+                                    log_agent_action("Agent A", f"🚫 Ignored by negative filter: {title[:50]}... (matched: {negative_title})")
+                                    break
+                        
+                        if should_add:
+                            # Mark as processed
+                            if project_url:
+                                self.session_processed_urls.add(project_url)
+                            if project_id:
+                                self.session_processed_ids.add(project_id)
                             all_projects.append(project_data)
                             # Push to live queue for immediate evaluation/notification (from Selenium thread)
                             try:
@@ -823,10 +850,15 @@ class AgentA:
         log_agent_action("Agent A", f"📊 Session complete: {suitable_count} suitable projects")
 
     async def run_session(self, keywords=None, timeLeft=None, hiredMin=None, proposalsMax=None, budgetMin=None,
-                          timeLeftStrict=False, hiredMinStrict=False, proposalsMaxStrict=False, budgetMinStrict=False):
+                          timeLeftStrict=False, hiredMinStrict=False, proposalsMaxStrict=False, budgetMinStrict=False,
+                          negativeTitles=None):
         """Run one search session with optional search parameters"""
         # Reset stop flag
         self._stop_session = False
+        
+        # Reset duplicate tracking for new session
+        self.session_processed_urls = set()
+        self.session_processed_ids = set()
         
         # Store search parameters for this session
         self.search_keywords = keywords
@@ -839,6 +871,12 @@ class AgentA:
         self.search_hired_min_strict = hiredMinStrict
         self.search_proposals_max_strict = proposalsMaxStrict
         self.search_budget_min_strict = budgetMinStrict
+        # Store negative filter titles
+        if negativeTitles:
+            # Split by comma or newline and clean up
+            self.search_negative_titles = [t.strip() for t in negativeTitles.replace('\n', ',').split(',') if t.strip()]
+        else:
+            self.search_negative_titles = []
         
         # Prepare live streaming pipeline
         self.live_queue = asyncio.Queue()
@@ -930,6 +968,9 @@ class AgentA:
             self.search_hired_min_strict = False
             self.search_proposals_max_strict = False
             self.search_budget_min_strict = False
+            self.search_negative_titles = []
+            self.session_processed_urls = set()
+            self.session_processed_ids = set()
 
     async def _consume_and_notify_live(self, max_notifications: int = 5):
         """

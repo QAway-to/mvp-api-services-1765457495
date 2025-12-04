@@ -156,6 +156,8 @@ async def run_single_session(request: Request):
             if body.get("budgetMin") is not None:
                 search_params["budgetMin"] = int(body["budgetMin"])
                 search_params["budgetMinStrict"] = body.get("budgetMinStrict", False)
+            if body.get("negativeTitles"):
+                search_params["negativeTitles"] = body["negativeTitles"]
         except Exception:
             pass  # Use default parameters if body parsing fails
         
