@@ -68,9 +68,11 @@ export default function FileUploader({ onDataLoaded }) {
             columnNames: result.columnNames,
             sample: result.sample,
             data: result.data,
+            missingValues: result.missingValues,
             logs: result.logs || []
           });
           console.log('[FileUploader] ✅ Файл успешно загружен');
+          setUploading(false); // Сбрасываем состояние загрузки
         } catch (error) {
           console.error('[FileUploader] Ошибка:', error);
           setError(error.message || 'Ошибка загрузки файла');

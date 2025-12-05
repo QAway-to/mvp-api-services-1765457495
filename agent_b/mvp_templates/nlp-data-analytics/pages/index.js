@@ -88,6 +88,128 @@ const results = {
   marginTop: 32
 };
 
+// Функция для форматирования ответа LLM
+function formatLLMResponse(text) {
+  if (!text) return '';
+  
+  // Разбиваем на параграфы
+  const paragraphs = text.split('\n\n');
+  
+  return paragraphs.map((para, idx) => {
+    const trimmed = para.trim();
+    if (!trimmed) return null;
+    
+    // Заголовки (начинаются с ** или цифры с точкой)
+    if (trimmed.match(/^\*\*.*\*\*$/) || trimmed.match(/^\d+\.\s+\*\*/)) {
+      return (
+        <h3 key={idx} style={{ 
+          color: '#f8fafc', 
+          fontSize: 18, 
+          fontWeight: 600, 
+          marginTop: idx > 0 ? 20 : 0,
+          marginBottom: 12,
+          borderLeft: '3px solid #6366f1',
+          paddingLeft: 12
+        }}>
+          {trimmed.replace(/\*\*/g, '')}
+        </h3>
+      );
+    }
+    
+    // Списки (начинаются с -, *, или цифры)
+    if (trimmed.match(/^[-*•]\s/) || trimmed.match(/^\d+\.\s/)) {
+      const items = trimmed.split('\n').filter(line => line.trim());
+      return (
+        <ul key={idx} style={{ 
+          marginTop: idx > 0 ? 16 : 0, 
+          marginBottom: 16,
+          paddingLeft: 24,
+          listStyle: 'none'
+        }}>
+          {items.map((item, itemIdx) => {
+            const cleanItem = item.replace(/^[-*•]\s/, '').replace(/^\d+\.\s/, '').trim();
+            return (
+              <li key={itemIdx} style={{ 
+                marginBottom: 8,
+                position: 'relative',
+                paddingLeft: 20
+              }}>
+                <span style={{ 
+                  position: 'absolute',
+                  left: 0,
+                  color: '#6366f1'
+                }}>•</span>
+                <span>{cleanItem}</span>
+              </li>
+            );
+          })}
+        </ul>
+      );
+    }
+    
+    // Выделение жирным текстом
+    const parts = trimmed.split(/(\*\*.*?\*\*)/g);
+    const formatted = parts.map((part, partIdx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return (
+          <strong key={partIdx} style={{ color: '#f8fafc', fontWeight: 600 }}>
+            {part.replace(/\*\*/g, '')}
+          </strong>
+        );
+      }
+      return part;
+    });
+    
+    // Код (в обратных кавычках)
+    const codeParts = [];
+    let currentIndex = 0;
+    formatted.forEach((part, partIdx) => {
+      if (typeof part === 'string') {
+        const codeMatches = part.match(/`([^`]+)`/g);
+        if (codeMatches) {
+          let lastIndex = 0;
+          codeMatches.forEach(match => {
+            const matchIndex = part.indexOf(match, lastIndex);
+            if (matchIndex > lastIndex) {
+              codeParts.push(part.substring(lastIndex, matchIndex));
+            }
+            codeParts.push(
+              <code key={`code-${partIdx}-${currentIndex++}`} style={{
+                background: 'rgba(99, 102, 241, 0.2)',
+                padding: '2px 6px',
+                borderRadius: 4,
+                fontFamily: 'monospace',
+                fontSize: 13,
+                color: '#a78bfa'
+              }}>
+                {match.replace(/`/g, '')}
+              </code>
+            );
+            lastIndex = matchIndex + match.length;
+          });
+          if (lastIndex < part.length) {
+            codeParts.push(part.substring(lastIndex));
+          }
+        } else {
+          codeParts.push(part);
+        }
+      } else {
+        codeParts.push(part);
+      }
+    });
+    
+    return (
+      <p key={idx} style={{ 
+        marginTop: idx > 0 ? 16 : 0, 
+        marginBottom: 0,
+        color: 'inherit'
+      }}>
+        {codeParts.length > 0 ? codeParts : formatted}
+      </p>
+    );
+  }).filter(Boolean);
+}
+
 export default function Home() {
   const [data, setData] = useState(null);
   const [query, setQuery] = useState('');
@@ -377,17 +499,18 @@ export default function Home() {
         <section style={section}>
           <h2 style={{ marginTop: 0, marginBottom: 16 }}>💬 Ответ от LLM</h2>
           <div style={{
-            color: results.type === 'error' ? '#ef4444' : '#94a3b8',
+            color: results.type === 'error' ? '#ef4444' : '#e2e8f0',
             whiteSpace: 'pre-wrap',
             fontFamily: results.type === 'error' ? 'monospace' : 'inherit',
-            fontSize: results.type === 'error' ? 12 : 14,
-            lineHeight: 1.6,
+            fontSize: results.type === 'error' ? 12 : 15,
+            lineHeight: 1.8,
             wordBreak: 'break-word',
-            padding: results.type === 'error' ? 16 : 0,
-            background: results.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
-            borderRadius: results.type === 'error' ? 8 : 0
+            padding: results.type === 'error' ? 16 : 20,
+            background: results.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(99, 102, 241, 0.05)',
+            borderRadius: 12,
+            border: results.type === 'error' ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(99, 102, 241, 0.2)'
           }}>
-            {results.message}
+            {formatLLMResponse(results.message)}
           </div>
           {results.type === 'error' && results.errorDetails && (
             <details style={{ marginTop: 16 }}>
