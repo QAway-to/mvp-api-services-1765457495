@@ -1067,24 +1067,35 @@ class MVPGenerator:
         if not Config.VERCEL_TOKEN:
             return
 
-        if template_id != "mini-etl-pipeline":
-            return
-
         project_id = project_info.get("id") or project_info.get("projectId") or project_name
         if not project_id:
             log_agent_action("Agent B", f"⚠️ Unable to determine Vercel project id for {project_name}, skipping env configuration")
             return
 
-        spacex_url = os.getenv("SPACEX_API_URL", "https://api.spacexdata.com/v5/launches")
-        if not spacex_url:
-            log_agent_action("Agent B", "ℹ️ SPACEX_API_URL not set in environment; using default")
-            spacex_url = "https://api.spacexdata.com/v5/launches"
+        # Configure environment variables for nlp-data-analytics template
+        if template_id == "nlp-data-analytics":
+            gemini_key = Config.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
+            if gemini_key:
+                try:
+                    self._set_vercel_env_var(project_id, "GEMINI_API_KEY", gemini_key)
+                    log_agent_action("Agent B", f"🔐 Vercel env configured for {project_name} (GEMINI_API_KEY)")
+                except Exception as error:
+                    log_agent_action("Agent B", f"❌ Failed to configure GEMINI_API_KEY: {error}")
+            else:
+                log_agent_action("Agent B", "⚠️ GEMINI_API_KEY not set in Config or environment - skipping")
 
-        try:
-            self._set_vercel_env_var(project_id, "SPACEX_API_URL", spacex_url)
-            log_agent_action("Agent B", f"🔐 Vercel env configured for {project_name} (SPACEX_API_URL)")
-        except Exception as error:
-            log_agent_action("Agent B", f"❌ Failed to configure Vercel env vars: {error}")
+        # Configure environment variables for mini-etl-pipeline template
+        if template_id == "mini-etl-pipeline":
+            spacex_url = os.getenv("SPACEX_API_URL", "https://api.spacexdata.com/v5/launches")
+            if not spacex_url:
+                log_agent_action("Agent B", "ℹ️ SPACEX_API_URL not set in environment; using default")
+                spacex_url = "https://api.spacexdata.com/v5/launches"
+
+            try:
+                self._set_vercel_env_var(project_id, "SPACEX_API_URL", spacex_url)
+                log_agent_action("Agent B", f"🔐 Vercel env configured for {project_name} (SPACEX_API_URL)")
+            except Exception as error:
+                log_agent_action("Agent B", f"❌ Failed to configure Vercel env vars: {error}")
 
     def _set_vercel_env_var(self, project_id: str, key: str, value: str) -> None:
         """Create or update a Vercel environment variable (encrypted)."""

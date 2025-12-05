@@ -1,7 +1,8 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { google } from '@ai-sdk/google';
+import { generateText } from 'ai';
 
-// Initialize Gemini client
-function getGenAI() {
+// Initialize Gemini client - проверка API ключа
+function validateApiKey() {
   const apiKey = process.env.GEMINI_API_KEY;
   console.log('[Gemini] Проверка API ключа:', apiKey ? `Установлен (${apiKey.substring(0, 10)}...)` : 'НЕ УСТАНОВЛЕН!');
   
@@ -13,10 +14,7 @@ function getGenAI() {
     throw new Error('GEMINI_API_KEY выглядит неверным (слишком короткий)');
   }
   
-  console.log('[Gemini] Создание GoogleGenerativeAI клиента...');
-  const client = new GoogleGenerativeAI(apiKey);
-  console.log('[Gemini] Клиент создан успешно');
-  return client;
+  return apiKey;
 }
 
 /**
@@ -29,13 +27,13 @@ export async function processNLQuery(query, dataSchema, sampleData) {
     console.log('[Gemini] Schema length:', dataSchema?.length);
     console.log('[Gemini] Sample data length:', sampleData?.length);
     
-    const genAI = getGenAI();
-    console.log('[Gemini] GenAI client создан');
+    // Validate API key
+    validateApiKey();
+    console.log('[Gemini] API ключ валиден');
     
-    // Use gemini-pro - stable model available in v1beta API
-    // gemini-1.5-flash is not available in v1beta, use gemini-pro instead
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    console.log('[Gemini] Model создан: gemini-pro (available in v1beta API)');
+    // Use gemini-2.5-flash - latest stable model supported by @ai-sdk/google
+    const model = google('models/gemini-2.5-flash');
+    console.log('[Gemini] Model создан: gemini-2.5-flash (via @ai-sdk/google)');
 
     const schemaDescription = generateSchemaDescription(dataSchema, sampleData);
     
@@ -70,13 +68,12 @@ ${schemaDescription}
     console.log('[Gemini] Отправка промпта в модель...');
     console.log('[Gemini] Промпт длина:', prompt.length);
     
-    const result = await model.generateContent(prompt);
+    const { text } = await generateText({
+      model: model,
+      prompt: prompt,
+    });
+    
     console.log('[Gemini] Ответ получен от модели');
-    
-    const response = await result.response;
-    console.log('[Gemini] Response объект получен');
-    
-    const text = response.text();
     console.log('[Gemini] Текст ответа длина:', text.length);
     console.log('[Gemini] Текст ответа (первые 500 символов):', text.substring(0, 500));
 
@@ -111,12 +108,14 @@ ${schemaDescription}
     // More detailed error message
     let errorMessage = `Ошибка обработки запроса: ${error.message}`;
     
-    if (error.message.includes('API_KEY') || error.message.includes('api key')) {
+    if (error.message.includes('API_KEY') || error.message.includes('api key') || error.message.includes('GEMINI_API_KEY')) {
       errorMessage = `GEMINI_API_KEY не установлен или неверный. Добавьте ключ в Environment Variables на Vercel.`;
     } else if (error.message.includes('quota') || error.message.includes('limit')) {
       errorMessage = `Превышен лимит запросов к Gemini API. Проверьте квоту.`;
     } else if (error.message.includes('network') || error.message.includes('fetch')) {
       errorMessage = `Ошибка сети при обращении к Gemini API: ${error.message}`;
+    } else if (error.message.includes('404') || error.message.includes('not found')) {
+      errorMessage = `Модель не найдена. Проверьте название модели. Используется: gemini-2.5-flash`;
     }
     
     throw new Error(errorMessage);
@@ -128,8 +127,9 @@ ${schemaDescription}
  */
 export async function generateDataSummary(data, columns) {
   try {
-    const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    validateApiKey();
+    
+    const model = google('models/gemini-2.5-flash');
 
     const sampleRows = data.slice(0, 10).map(row => 
       Object.values(row).join(', ')
@@ -145,9 +145,12 @@ ${sampleRows}
 
 Дай краткое саммари на русском языке (2-3 предложения) о том, что представляют собой эти данные, какие основные паттерны видишь, есть ли аномалии.`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
+    const { text } = await generateText({
+      model: model,
+      prompt: prompt,
+    });
+    
+    return text;
   } catch (error) {
     console.error('Gemini summary error:', error);
     return 'Не удалось сгенерировать саммари данных';
@@ -171,4 +174,3 @@ function generateSchemaDescription(schema, sampleData) {
   description += `\nВсего строк: ${sampleData.length}`;
   return description;
 }
-
