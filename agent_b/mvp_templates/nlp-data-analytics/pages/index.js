@@ -19,7 +19,14 @@ const header = {
 
 const grid = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+  gridTemplateColumns: '1fr 1fr 1fr',
+  gap: 24,
+  marginBottom: 32
+};
+
+const resultsGrid = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
   gap: 24,
   marginBottom: 32
 };
@@ -229,63 +236,44 @@ export default function Home() {
             Примеры: "покажи средние продажи", "создай график тренда", "найди аномалии"
           </div>
         </section>
-      </div>
 
-      {(logs.length > 0 || results) && (
-        <div style={results}>
-          {logs.length > 0 && (
-            <div style={{ ...section, marginBottom: 24 }}>
-              <h2 style={{ marginTop: 0, marginBottom: 16 }}>📝 Логи обработки</h2>
-              <div style={{
-                background: '#11162a',
-                borderRadius: 8,
-                padding: 16,
-                maxHeight: 300,
-                overflowY: 'auto',
-                fontFamily: 'monospace',
-                fontSize: 12
-              }}>
-                {logs.map((log, idx) => (
-                  <div key={idx} style={{ 
-                    marginBottom: 8, 
-                    color: log.message.includes('ОШИБКА') || log.message.includes('❌') ? '#ef4444' : '#94a3b8',
-                    whiteSpace: 'pre-wrap'
-                  }}>
-                    <span style={{ color: '#6366f1' }}>
-                      {new Date(log.timestamp).toLocaleTimeString()}
-                    </span>
-                    {' '}
-                    {log.message}
-                  </div>
-                ))}
-              </div>
+        {/* Блок с результатами от LLM - справа */}
+        <section style={section}>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>📊 Результаты анализа</h2>
+          {loading && (
+            <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>
+              <div style={{ fontSize: 14 }}>⏳ Обработка запроса...</div>
             </div>
           )}
-          {results && results.chart && (
-            <div style={{ ...section, marginBottom: 24 }}>
-              <h2 style={{ marginTop: 0, marginBottom: 16 }}>📊 Визуализация</h2>
+          {!loading && results && results.chart && (
+            <div style={{ marginBottom: 24 }}>
+              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16 }}>📈 Визуализация</h3>
               <ChartPanel data={results.chart} />
             </div>
           )}
-          {results && results.table && (
-            <div style={section}>
-              <h2 style={{ marginTop: 0, marginBottom: 16 }}>📋 Результаты</h2>
-              <DataTable data={results.table} />
+          {!loading && results && results.table && (
+            <div style={{ marginBottom: 24 }}>
+              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16 }}>📋 Данные</h3>
+              <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+                <DataTable data={results.table} />
+              </div>
             </div>
           )}
-          {results && results.message && (
-            <div style={{ ...section, marginTop: 24 }}>
+          {!loading && results && results.message && (
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16 }}>💬 Ответ</h3>
               <p style={{ 
                 color: results.type === 'error' ? '#ef4444' : '#94a3b8',
                 whiteSpace: 'pre-wrap',
                 fontFamily: results.type === 'error' ? 'monospace' : 'inherit',
-                fontSize: results.type === 'error' ? 12 : 14
+                fontSize: results.type === 'error' ? 12 : 14,
+                lineHeight: 1.6
               }}>
                 {results.message}
               </p>
               {results.type === 'error' && results.errorDetails && (
                 <details style={{ marginTop: 16 }}>
-                  <summary style={{ color: '#94a3b8', cursor: 'pointer' }}>
+                  <summary style={{ color: '#94a3b8', cursor: 'pointer', fontSize: 12 }}>
                     Показать технические детали
                   </summary>
                   <pre style={{
@@ -296,7 +284,7 @@ export default function Home() {
                     color: '#ef4444',
                     fontSize: 11,
                     overflow: 'auto',
-                    maxHeight: 300
+                    maxHeight: 200
                   }}>
                     {results.errorDetails}
                   </pre>
@@ -304,6 +292,41 @@ export default function Home() {
               )}
             </div>
           )}
+          {!loading && !results && (
+            <div style={{ padding: 24, textAlign: 'center', color: '#64748b', fontSize: 14 }}>
+              💡 Результаты анализа появятся здесь после отправки запроса
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* Логи обработки - внизу на всю ширину */}
+      {logs.length > 0 && (
+        <div style={{ ...section, marginTop: 24 }}>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>📝 Логи обработки</h2>
+          <div style={{
+            background: '#11162a',
+            borderRadius: 8,
+            padding: 16,
+            maxHeight: 300,
+            overflowY: 'auto',
+            fontFamily: 'monospace',
+            fontSize: 12
+          }}>
+            {logs.map((log, idx) => (
+              <div key={idx} style={{ 
+                marginBottom: 8, 
+                color: log.message.includes('ОШИБКА') || log.message.includes('❌') ? '#ef4444' : '#94a3b8',
+                whiteSpace: 'pre-wrap'
+              }}>
+                <span style={{ color: '#6366f1' }}>
+                  {new Date(log.timestamp).toLocaleTimeString()}
+                </span>
+                {' '}
+                {log.message}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </main>
