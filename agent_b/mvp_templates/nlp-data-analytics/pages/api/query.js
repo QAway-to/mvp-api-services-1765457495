@@ -7,7 +7,6 @@ import {
   aggregateGroups,
   detectColumnTypes
 } from '../../src/lib/dataProcessor.js';
-import { detectDateColumns, groupByPeriod, parseDate } from '../../src/lib/dateUtils.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -43,11 +42,6 @@ export default async function handler(req, res) {
     const columnTypes = detectColumnTypes(data, columns);
     const numericColumns = columns.filter(col => columnTypes[col] === 'number');
     addLog(`Найдено числовых колонок: ${numericColumns.length}`);
-
-    // Detect date columns
-    addLog('Определение колонок с датами...');
-    const dateColumns = detectDateColumns(data, columns);
-    addLog(`Найдено колонок с датами: ${dateColumns.length}`);
 
     // Get schema from sample data
     const sampleData = data.slice(0, 10);
