@@ -197,7 +197,38 @@ export default async function handler(req, res) {
     }
 
     // If no specific visualization but we have numeric data, create default chart
-    if (!result.chart && numericColumns.length > 0) {
+    if (!result.chart && numericColumns.length > 0 && results.table) {
+      // Используем данные из таблицы для создания графика
+      const tableData = result.table;
+      if (tableData && tableData.length > 0) {
+        // Берем первую числовую колонку из таблицы
+        const numericCol = numericColumns.find(col => 
+          tableData[0].hasOwnProperty(col)
+        ) || Object.keys(tableData[0]).find(key => 
+          !isNaN(parseFloat(tableData[0][key]))
+        );
+        
+        if (numericCol) {
+          // Группируем данные для графика
+          const chartData = tableData.slice(0, 20).map((row, idx) => {
+            const xValue = row[numericCol] !== undefined ? row[numericCol] : idx;
+            const yValue = parseFloat(row[numericCol]) || 0;
+            return {
+              [numericCol]: xValue,
+              value: yValue
+            };
+          });
+          
+          result.chart = {
+            type: 'bar',
+            data: chartData,
+            xKey: numericCol,
+            yKey: 'value'
+          };
+        }
+      }
+    } else if (!result.chart && numericColumns.length > 0) {
+      // Fallback: создаем график из статистики
       const firstNumeric = numericColumns[0];
       const stats = calculateStatistics(data, firstNumeric);
       if (stats) {

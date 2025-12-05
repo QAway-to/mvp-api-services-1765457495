@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -18,18 +19,105 @@ import {
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#06b6d4'];
 
-export default function ChartPanel({ data }) {
+const CHART_TYPES = [
+  { id: 'bar', label: '📊 Столбчатая', icon: '📊' },
+  { id: 'line', label: '📈 Линейная', icon: '📈' },
+  { id: 'pie', label: '🥧 Круговая', icon: '🥧' },
+  { id: 'scatter', label: '🔵 Точечная', icon: '🔵' }
+];
+
+export default function ChartPanel({ data, onChartTypeChange }) {
+  const [activeChartType, setActiveChartType] = useState(data?.type || 'bar');
+
   if (!data || !data.data || data.data.length === 0) {
     return <p style={{ color: '#94a3b8' }}>Нет данных для графика</p>;
   }
 
-  const chartType = data.type || 'bar';
+  const handleChartTypeChange = (type) => {
+    setActiveChartType(type);
+    if (onChartTypeChange) {
+      onChartTypeChange(type);
+    }
+  };
+
+  const chartType = activeChartType;
+
+  // Определяем доступные типы графиков на основе данных
+  const availableTypes = CHART_TYPES.filter(type => {
+    if (type.id === 'scatter') {
+      // Scatter требует числовые данные для обеих осей
+      return data.xKey && data.yKey && data.data.every(d => 
+        !isNaN(parseFloat(d[data.xKey])) && !isNaN(parseFloat(d[data.yKey]))
+      );
+    }
+    if (type.id === 'pie') {
+      // Pie требует категориальные данные
+      return data.data.length > 0 && data.yKey;
+    }
+    return true; // bar и line доступны всегда
+  });
+
+  // Если выбранный тип недоступен, выбираем первый доступный
+  const finalChartType = availableTypes.some(t => t.id === chartType) 
+    ? chartType 
+    : (availableTypes[0]?.id || 'bar');
+
+  // Табы для переключения типов графиков
+  const renderTabs = () => (
+    <div style={{
+      display: 'flex',
+      gap: 8,
+      marginBottom: 16,
+      borderBottom: '1px solid #334155',
+      paddingBottom: 8
+    }}>
+      {availableTypes.map(type => (
+        <button
+          key={type.id}
+          onClick={() => handleChartTypeChange(type.id)}
+          style={{
+            padding: '8px 16px',
+            background: finalChartType === type.id 
+              ? 'rgba(99, 102, 241, 0.2)' 
+              : 'transparent',
+            border: finalChartType === type.id 
+              ? '1px solid #6366f1' 
+              : '1px solid transparent',
+            borderRadius: 8,
+            color: finalChartType === type.id ? '#f8fafc' : '#94a3b8',
+            fontSize: 13,
+            fontWeight: finalChartType === type.id ? 600 : 400,
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
+          }}
+          onMouseEnter={(e) => {
+            if (finalChartType !== type.id) {
+              e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (finalChartType !== type.id) {
+              e.currentTarget.style.background = 'transparent';
+            }
+          }}
+        >
+          <span>{type.icon}</span>
+          <span>{type.label.replace(/^[^\s]+\s/, '')}</span>
+        </button>
+      ))}
+    </div>
+  );
 
   // Pie chart
-  if (chartType === 'pie') {
+  if (finalChartType === 'pie') {
     return (
-      <div style={{ width: '100%', height: 300 }}>
-        <ResponsiveContainer>
+      <div style={{ width: '100%' }}>
+        {renderTabs()}
+        <div style={{ width: '100%', height: 300 }}>
+          <ResponsiveContainer>
           <PieChart>
             <Pie
               data={data.data}
@@ -61,10 +149,12 @@ export default function ChartPanel({ data }) {
   }
 
   // Scatter chart
-  if (chartType === 'scatter') {
+  if (finalChartType === 'scatter') {
     return (
-      <div style={{ width: '100%', height: 300 }}>
-        <ResponsiveContainer>
+      <div style={{ width: '100%' }}>
+        {renderTabs()}
+        <div style={{ width: '100%', height: 300 }}>
+          <ResponsiveContainer>
           <ScatterChart data={data.data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
             <XAxis 
@@ -100,12 +190,14 @@ export default function ChartPanel({ data }) {
   }
 
   // Line and Bar charts
-  const ChartComponent = chartType === 'line' ? LineChart : BarChart;
-  const DataComponent = chartType === 'line' ? Line : Bar;
+  const ChartComponent = finalChartType === 'line' ? LineChart : BarChart;
+  const DataComponent = finalChartType === 'line' ? Line : Bar;
 
   return (
-    <div style={{ width: '100%', height: 300 }}>
-      <ResponsiveContainer>
+    <div style={{ width: '100%' }}>
+      {renderTabs()}
+      <div style={{ width: '100%', height: 300 }}>
+        <ResponsiveContainer>
         <ChartComponent data={data.data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
           <XAxis 
