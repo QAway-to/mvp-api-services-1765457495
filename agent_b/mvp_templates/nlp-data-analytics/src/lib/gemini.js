@@ -32,10 +32,10 @@ export async function processNLQuery(query, dataSchema, sampleData) {
     const genAI = getGenAI();
     console.log('[Gemini] GenAI client создан');
     
-    // Use gemini-1.5-flash - stable model supported by @google/generative-ai npm package
-    // This is the recommended model for JavaScript SDK (not gemini-2.5-flash which is Python-only)
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    console.log('[Gemini] Model создан: gemini-1.5-flash (stable for JavaScript SDK)');
+    // Use gemini-pro - stable model available in v1beta API
+    // gemini-1.5-flash is not available in v1beta, use gemini-pro instead
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    console.log('[Gemini] Model создан: gemini-pro (available in v1beta API)');
 
     const schemaDescription = generateSchemaDescription(dataSchema, sampleData);
     
@@ -129,7 +129,7 @@ ${schemaDescription}
 export async function generateDataSummary(data, columns) {
   try {
     const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
     const sampleRows = data.slice(0, 10).map(row => 
       Object.values(row).join(', ')
