@@ -4,6 +4,7 @@ import ChatInterface from '../src/components/ChatInterface';
 import DataTable from '../src/components/DataTable';
 import ChartPanel from '../src/components/ChartPanel';
 import sampleData from '../src/mock-data/sample';
+import { exportToCSV, exportToExcel, exportToJSON, exportChartToPNG, exportToPDF } from '../src/lib/exportUtils.js';
 
 // Стили для скроллбара (современный вид)
 const scrollbarStyles = `
@@ -217,6 +218,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
+  const [queryHistory, setQueryHistory] = useState([]);
 
   // Определение мобильного устройства
   useEffect(() => {
@@ -227,6 +229,40 @@ export default function Home() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Загрузка истории запросов из localStorage
+  useEffect(() => {
+    const savedHistory = localStorage.getItem('queryHistory');
+    if (savedHistory) {
+      try {
+        setQueryHistory(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error('Error loading query history:', e);
+      }
+    }
+  }, []);
+
+  // Сохранение истории запросов
+  const saveToHistory = (query, result) => {
+    const historyItem = {
+      id: Date.now(),
+      query,
+      timestamp: new Date().toISOString(),
+      resultType: result?.type || 'text',
+      hasChart: !!result?.chart,
+      hasTable: !!result?.table
+    };
+    
+    const newHistory = [historyItem, ...queryHistory.slice(0, 19)]; // Последние 20 запросов
+    setQueryHistory(newHistory);
+    localStorage.setItem('queryHistory', JSON.stringify(newHistory));
+  };
+
+  // Повтор запроса из истории
+  const repeatQuery = (historyItem) => {
+    setQuery(historyItem.query);
+    handleQuerySubmit(historyItem.query);
+  };
 
   // Load sample data on mount for demo (only if no data uploaded)
   useEffect(() => {
@@ -332,6 +368,9 @@ export default function Home() {
       }
 
       setResults(result);
+      
+      // Сохраняем в историю
+      saveToHistory(q, result);
       
       // Show logs if available
       if (result.logs && result.logs.length > 0) {
@@ -478,14 +517,107 @@ export default function Home() {
           
           {!loading && results.chart && (
             <div style={{ marginBottom: 24 }}>
-              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16, color: '#f8fafc' }}>📈 Визуализация</h3>
-              <ChartPanel data={results.chart} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: 16, color: '#f8fafc' }}>📈 Визуализация</h3>
+                <button
+                  onClick={() => exportChartToPNG('chart-container', `chart-${Date.now()}.png`)}
+                  style={{
+                    padding: '6px 12px',
+                    background: 'rgba(99, 102, 241, 0.2)',
+                    border: '1px solid #6366f1',
+                    borderRadius: 6,
+                    color: '#f8fafc',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.3)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)'}
+                >
+                  📥 PNG
+                </button>
+              </div>
+              <div id="chart-container">
+                <ChartPanel data={results.chart} />
+              </div>
             </div>
           )}
           
           {!loading && results.table && (
             <div>
-              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16, color: '#f8fafc' }}>📋 Данные</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: 16, color: '#f8fafc' }}>📋 Данные</h3>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => exportToCSV(results.table, `data-${Date.now()}.csv`)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(16, 185, 129, 0.2)',
+                      border: '1px solid #10b981',
+                      borderRadius: 6,
+                      color: '#f8fafc',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.3)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)'}
+                  >
+                    📥 CSV
+                  </button>
+                  <button
+                    onClick={() => exportToExcel(results.table, `data-${Date.now()}.xlsx`)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      border: '1px solid #3b82f6',
+                      borderRadius: 6,
+                      color: '#f8fafc',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'}
+                  >
+                    📥 Excel
+                  </button>
+                  <button
+                    onClick={() => exportToJSON(results.table, `data-${Date.now()}.json`)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(139, 92, 246, 0.2)',
+                      border: '1px solid #8b5cf6',
+                      borderRadius: 6,
+                      color: '#f8fafc',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.3)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)'}
+                  >
+                    📥 JSON
+                  </button>
+                  <button
+                    onClick={() => exportToPDF(results.table, 'chart-container', `analysis-${Date.now()}.pdf`)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(239, 68, 68, 0.2)',
+                      border: '1px solid #ef4444',
+                      borderRadius: 6,
+                      color: '#f8fafc',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
+                  >
+                    📥 PDF
+                  </button>
+                </div>
+              </div>
               <div style={{ overflowX: 'auto' }}>
                 <DataTable data={results.table} />
               </div>
