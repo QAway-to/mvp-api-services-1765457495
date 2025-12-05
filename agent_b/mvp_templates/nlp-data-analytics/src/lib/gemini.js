@@ -2,16 +2,26 @@ import { google } from '@ai-sdk/google';
 import { generateText } from 'ai';
 
 // Initialize Gemini client - проверка API ключа
+// @ai-sdk/google использует GOOGLE_GENERATIVE_AI_API_KEY, но мы поддерживаем GEMINI_API_KEY для совместимости
 function validateApiKey() {
-  const apiKey = process.env.GEMINI_API_KEY;
+  // Проверяем обе переменные для совместимости
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   console.log('[Gemini] Проверка API ключа:', apiKey ? `Установлен (${apiKey.substring(0, 10)}...)` : 'НЕ УСТАНОВЛЕН!');
+  console.log('[Gemini] GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? 'установлен' : 'не установлен');
+  console.log('[Gemini] GOOGLE_GENERATIVE_AI_API_KEY:', process.env.GOOGLE_GENERATIVE_AI_API_KEY ? 'установлен' : 'не установлен');
   
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not set. Добавьте ключ в Environment Variables на Vercel');
+    throw new Error('GEMINI_API_KEY или GOOGLE_GENERATIVE_AI_API_KEY не установлен. Добавьте ключ в Environment Variables на Vercel');
   }
   
   if (apiKey.length < 20) {
-    throw new Error('GEMINI_API_KEY выглядит неверным (слишком короткий)');
+    throw new Error('API ключ выглядит неверным (слишком короткий)');
+  }
+  
+  // Устанавливаем GOOGLE_GENERATIVE_AI_API_KEY если используется GEMINI_API_KEY
+  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GEMINI_API_KEY;
+    console.log('[Gemini] Установлен GOOGLE_GENERATIVE_AI_API_KEY из GEMINI_API_KEY');
   }
   
   return apiKey;
