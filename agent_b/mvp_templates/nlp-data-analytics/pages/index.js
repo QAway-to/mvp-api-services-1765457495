@@ -45,14 +45,14 @@ const header = {
   flexShrink: 0
 };
 
-// Основной контейнер с тремя колонками - фиксированная высота
-const getMainGridStyle = (isMobile = false) => ({
+// Верхний ряд: 3 колонки фиксированной высоты
+const topRowStyle = (isMobile = false) => ({
   display: 'grid',
   gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
   gap: 24,
-  flex: '1 1 auto',
-  minHeight: 0, // Важно для работы overflow
-  height: isMobile ? 'auto' : 'calc(100vh - 180px)' // Высота окна минус хедер и отступы
+  marginBottom: 24,
+  minHeight: 0,
+  height: isMobile ? 'auto' : '400px' // Фиксированная высота для верхнего ряда
 });
 
 const section = {
@@ -256,8 +256,8 @@ export default function Home() {
         </p>
       </header>
 
-      {/* Основной трёхколоночный layout с фиксированной высотой */}
-      <div style={getMainGridStyle(isMobile)}>
+      {/* Верхний ряд: 3 колонки фиксированной высоты */}
+      <div style={topRowStyle(isMobile)}>
         {/* Левая колонка: Загрузка данных */}
         <section style={section}>
           <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0 }}>📁 Загрузка данных</h2>
@@ -292,113 +292,103 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Правая колонка: Результаты анализа (включая ответ LLM) */}
+        {/* Правая колонка: Логи обработки */}
         <section style={section}>
-          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0 }}>📊 Результаты анализа</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0 }}>📝 Логи обработки</h2>
           <div style={sectionContent}>
-            {loading && (
-              <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>
-                <div style={{ fontSize: 14 }}>⏳ Обработка запроса...</div>
+            {logs.length > 0 ? (
+              <div style={{
+                fontFamily: 'monospace',
+                fontSize: 12
+              }}>
+                {logs.map((log, idx) => (
+                  <div key={idx} style={{ 
+                    marginBottom: 8, 
+                    color: log.message.includes('ОШИБКА') || log.message.includes('❌') ? '#ef4444' : '#94a3b8',
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    <span style={{ color: '#6366f1' }}>
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </span>
+                    {' '}
+                    {log.message}
+                  </div>
+                ))}
               </div>
-            )}
-            
-            {!loading && results && results.chart && (
-              <div style={{ marginBottom: 24 }}>
-                <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16, color: '#f8fafc' }}>📈 Визуализация</h3>
-                <ChartPanel data={results.chart} />
-              </div>
-            )}
-            
-            {!loading && results && results.table && (
-              <div style={{ marginBottom: 24 }}>
-                <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16, color: '#f8fafc' }}>📋 Данные</h3>
-                <div style={{ overflowX: 'auto' }}>
-                  <DataTable data={results.table} />
-                </div>
-              </div>
-            )}
-            
-            {/* Блок "Ответ от LLM" внутри правой колонки */}
-            {!loading && results && results.message && (
-              <div style={{ marginTop: results.chart || results.table ? 24 : 0 }}>
-                <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16, color: '#f8fafc' }}>💬 Ответ от LLM</h3>
-                <div style={{
-                  color: results.type === 'error' ? '#ef4444' : '#94a3b8',
-                  whiteSpace: 'pre-wrap',
-                  fontFamily: results.type === 'error' ? 'monospace' : 'inherit',
-                  fontSize: results.type === 'error' ? 12 : 14,
-                  lineHeight: 1.6,
-                  wordBreak: 'break-word',
-                  padding: results.type === 'error' ? 12 : 0,
-                  background: results.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
-                  borderRadius: results.type === 'error' ? 8 : 0
-                }}>
-                  {results.message}
-                </div>
-                {results.type === 'error' && results.errorDetails && (
-                  <details style={{ marginTop: 16 }}>
-                    <summary style={{ color: '#94a3b8', cursor: 'pointer', fontSize: 12 }}>
-                      Показать технические детали
-                    </summary>
-                    <pre style={{
-                      marginTop: 8,
-                      padding: 12,
-                      background: '#11162a',
-                      borderRadius: 8,
-                      color: '#ef4444',
-                      fontSize: 11,
-                      overflow: 'auto',
-                      maxHeight: 200
-                    }}>
-                      {results.errorDetails}
-                    </pre>
-                  </details>
-                )}
-              </div>
-            )}
-            
-            {!loading && !results && (
+            ) : (
               <div style={{ padding: 24, textAlign: 'center', color: '#64748b', fontSize: 14 }}>
-                💡 Результаты анализа появятся здесь после отправки запроса
+                💡 Логи обработки появятся здесь после отправки запроса
               </div>
             )}
           </div>
         </section>
       </div>
 
-      {/* Логи обработки - внизу, вне основного layout'а, не влияют на высоту колонок */}
-      {logs.length > 0 && (
-        <div style={{ 
-          ...section, 
-          marginTop: 24, 
-          flexShrink: 0,
-          maxHeight: '200px'
-        }}>
-          <h2 style={{ marginTop: 0, marginBottom: 16 }}>📝 Логи обработки</h2>
-          <div style={{
-            background: '#11162a',
-            borderRadius: 8,
-            padding: 16,
-            maxHeight: 150,
-            overflowY: 'auto',
-            fontFamily: 'monospace',
-            fontSize: 12
-          }}>
-            {logs.map((log, idx) => (
-              <div key={idx} style={{ 
-                marginBottom: 8, 
-                color: log.message.includes('ОШИБКА') || log.message.includes('❌') ? '#ef4444' : '#94a3b8',
-                whiteSpace: 'pre-wrap'
-              }}>
-                <span style={{ color: '#6366f1' }}>
-                  {new Date(log.timestamp).toLocaleTimeString()}
-                </span>
-                {' '}
-                {log.message}
+      {/* Нижний ряд: Результаты анализа (на всю ширину) */}
+      {(results && (results.chart || results.table)) && (
+        <section style={{ ...section, marginBottom: 24 }}>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>📊 Результаты анализа</h2>
+          {loading && (
+            <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>
+              <div style={{ fontSize: 14 }}>⏳ Обработка запроса...</div>
+            </div>
+          )}
+          
+          {!loading && results.chart && (
+            <div style={{ marginBottom: 24 }}>
+              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16, color: '#f8fafc' }}>📈 Визуализация</h3>
+              <ChartPanel data={results.chart} />
+            </div>
+          )}
+          
+          {!loading && results.table && (
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16, color: '#f8fafc' }}>📋 Данные</h3>
+              <div style={{ overflowX: 'auto' }}>
+                <DataTable data={results.table} />
               </div>
-            ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Нижний ряд: Ответ от LLM (на всю ширину) */}
+      {results && results.message && (
+        <section style={section}>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>💬 Ответ от LLM</h2>
+          <div style={{
+            color: results.type === 'error' ? '#ef4444' : '#94a3b8',
+            whiteSpace: 'pre-wrap',
+            fontFamily: results.type === 'error' ? 'monospace' : 'inherit',
+            fontSize: results.type === 'error' ? 12 : 14,
+            lineHeight: 1.6,
+            wordBreak: 'break-word',
+            padding: results.type === 'error' ? 16 : 0,
+            background: results.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+            borderRadius: results.type === 'error' ? 8 : 0
+          }}>
+            {results.message}
           </div>
-        </div>
+          {results.type === 'error' && results.errorDetails && (
+            <details style={{ marginTop: 16 }}>
+              <summary style={{ color: '#94a3b8', cursor: 'pointer', fontSize: 12 }}>
+                Показать технические детали
+              </summary>
+              <pre style={{
+                marginTop: 8,
+                padding: 12,
+                background: '#11162a',
+                borderRadius: 8,
+                color: '#ef4444',
+                fontSize: 11,
+                overflow: 'auto',
+                maxHeight: 200
+              }}>
+                {results.errorDetails}
+              </pre>
+            </details>
+          )}
+        </section>
       )}
     </main>
   );
