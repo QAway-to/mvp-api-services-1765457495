@@ -21,14 +21,7 @@ const grid = {
   display: 'grid',
   gridTemplateColumns: '1fr 1fr 1fr',
   gap: 24,
-  marginBottom: 32
-};
-
-const resultsGrid = {
-  display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
-  gap: 24,
-  marginBottom: 32
+  marginBottom: 24
 };
 
 const section = {
@@ -208,6 +201,7 @@ export default function Home() {
         </p>
       </header>
 
+      {/* Верхний ряд: Загрузка данных, Задайте вопрос, Результаты анализа */}
       <div style={grid}>
         <section style={section}>
           <h2 style={{ marginTop: 0, marginBottom: 16 }}>📁 Загрузка данных</h2>
@@ -237,7 +231,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Блок с результатами от LLM - справа */}
         <section style={section}>
           <h2 style={{ marginTop: 0, marginBottom: 16 }}>📊 Результаты анализа</h2>
           {loading && (
@@ -259,39 +252,6 @@ export default function Home() {
               </div>
             </div>
           )}
-          {!loading && results && results.message && (
-            <div>
-              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16 }}>💬 Ответ</h3>
-              <p style={{ 
-                color: results.type === 'error' ? '#ef4444' : '#94a3b8',
-                whiteSpace: 'pre-wrap',
-                fontFamily: results.type === 'error' ? 'monospace' : 'inherit',
-                fontSize: results.type === 'error' ? 12 : 14,
-                lineHeight: 1.6
-              }}>
-                {results.message}
-              </p>
-              {results.type === 'error' && results.errorDetails && (
-                <details style={{ marginTop: 16 }}>
-                  <summary style={{ color: '#94a3b8', cursor: 'pointer', fontSize: 12 }}>
-                    Показать технические детали
-                  </summary>
-                  <pre style={{
-                    marginTop: 8,
-                    padding: 12,
-                    background: '#11162a',
-                    borderRadius: 8,
-                    color: '#ef4444',
-                    fontSize: 11,
-                    overflow: 'auto',
-                    maxHeight: 200
-                  }}>
-                    {results.errorDetails}
-                  </pre>
-                </details>
-              )}
-            </div>
-          )}
           {!loading && !results && (
             <div style={{ padding: 24, textAlign: 'center', color: '#64748b', fontSize: 14 }}>
               💡 Результаты анализа появятся здесь после отправки запроса
@@ -299,6 +259,57 @@ export default function Home() {
           )}
         </section>
       </div>
+
+      {/* Средний ряд: Пустое место слева, Ответ LLM справа */}
+      {(results && results.message) && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '2fr 1fr',
+          gap: 24,
+          marginBottom: 24
+        }}>
+          {/* Пустой блок слева для выравнивания */}
+          <div></div>
+          
+          {/* Блок с ответом от LLM - справа, может растягиваться вниз */}
+          <section style={{
+            ...section,
+            alignSelf: 'start',
+            minHeight: 'auto'
+          }}>
+            <h2 style={{ marginTop: 0, marginBottom: 16 }}>💬 Ответ от LLM</h2>
+            <div style={{
+              color: results.type === 'error' ? '#ef4444' : '#94a3b8',
+              whiteSpace: 'pre-wrap',
+              fontFamily: results.type === 'error' ? 'monospace' : 'inherit',
+              fontSize: results.type === 'error' ? 12 : 14,
+              lineHeight: 1.6,
+              wordBreak: 'break-word'
+            }}>
+              {results.message}
+            </div>
+            {results.type === 'error' && results.errorDetails && (
+              <details style={{ marginTop: 16 }}>
+                <summary style={{ color: '#94a3b8', cursor: 'pointer', fontSize: 12 }}>
+                  Показать технические детали
+                </summary>
+                <pre style={{
+                  marginTop: 8,
+                  padding: 12,
+                  background: '#11162a',
+                  borderRadius: 8,
+                  color: '#ef4444',
+                  fontSize: 11,
+                  overflow: 'auto',
+                  maxHeight: 200
+                }}>
+                  {results.errorDetails}
+                </pre>
+              </details>
+            )}
+          </section>
+        </div>
+      )}
 
       {/* Логи обработки - внизу на всю ширину */}
       {logs.length > 0 && (
