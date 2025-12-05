@@ -7,6 +7,7 @@ import {
   aggregateGroups,
   detectColumnTypes
 } from '../../src/lib/dataProcessor.js';
+import { detectDateColumns, groupByPeriod } from '../../src/lib/dateUtils.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -42,6 +43,11 @@ export default async function handler(req, res) {
     const columnTypes = detectColumnTypes(data, columns);
     const numericColumns = columns.filter(col => columnTypes[col] === 'number');
     addLog(`Найдено числовых колонок: ${numericColumns.length}`);
+
+    // Detect date columns
+    addLog('Определение колонок с датами...');
+    const dateColumns = detectDateColumns(data, columns);
+    addLog(`Найдено колонок с датами: ${dateColumns.length}`);
 
     // Get schema from sample data
     const sampleData = data.slice(0, 10);
@@ -124,7 +130,47 @@ export default async function handler(req, res) {
       let xAxis = viz.xAxis || columns[0];
       const yAxis = viz.yAxis || numericColumns[0];
 
-      if (chartType === 'pie') {
+      // Если xAxis - это дата, группируем по периоду
+      if (dateColumns.includes(xAxis)) {
+        const queryLower = query.toLowerCase();
+        let period = 'day';
+        if (queryLower.includes('год') || queryLower.includes('year')) {
+          period = 'year';
+        } else if (queryLower.includes('месяц') || queryLower.includes('month')) {
+          period = 'month';
+        } else if (queryLower.includes('недел') || queryLower.includes('week')) {
+          period = 'week';
+        }
+        
+        const grouped = groupByPeriod(data, xAxis, period);
+        const aggregated = Object.entries(grouped).map(([key, rows]) => {
+          const yValues = rows.map(r => parseFloat(r[yAxis])).filter(v => !isNaN(v));
+          const avg = yValues.length > 0 ? yValues.reduce((a, b) => a + b, 0) / yValues.length : 0;
+          return {
+            [xAxis]: key,
+            [yAxis]: Math.round(avg * 100) / 100
+          };
+        }).sort((a, b) => a[xAxis].localeCompare(b[xAxis]));
+        
+        if (chartType === 'pie') {
+          result.chart = {
+            type: 'pie',
+            data: aggregated.map(item => ({
+              name: item[xAxis],
+              value: item[yAxis]
+            })),
+            xKey: xAxis,
+            yKey: 'value'
+          };
+        } else {
+          result.chart = {
+            type: chartType,
+            data: aggregated,
+            xKey: xAxis,
+            yKey: yAxis
+          };
+        }
+      } else if (chartType === 'pie') {
         // Pie chart: group by xAxis and aggregate yAxis
         const groups = groupBy(data, xAxis);
         const aggregated = aggregateGroups(groups, yAxis, 'sum');
@@ -197,7 +243,7 @@ export default async function handler(req, res) {
     }
 
     // If no specific visualization but we have numeric data, create default chart
-    if (!result.chart && numericColumns.length > 0 && results.table) {
+    if (!result.chart && numericColumns.length > 0 && result.table) {
       // Используем данные из таблицы для создания графика
       const tableData = result.table;
       if (tableData && tableData.length > 0) {

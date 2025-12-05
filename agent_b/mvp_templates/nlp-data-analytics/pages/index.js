@@ -4,6 +4,7 @@ import ChatInterface from '../src/components/ChatInterface';
 import DataTable from '../src/components/DataTable';
 import ChartPanel from '../src/components/ChartPanel';
 import sampleData from '../src/mock-data/sample';
+import { exportToCSV, exportToExcel, exportToJSON, exportChartToPNG, exportToPDF } from '../src/lib/exportUtils.js';
 
 // Стили для скроллбара (современный вид)
 const scrollbarStyles = `
@@ -41,7 +42,7 @@ const container = {
 };
 
 const header = {
-  marginBottom: 32,
+  marginBottom: 24,
   flexShrink: 0
 };
 
@@ -49,18 +50,18 @@ const header = {
 const topRowStyle = (isMobile = false) => ({
   display: 'grid',
   gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-  gap: 24,
-  marginBottom: 24,
+  gap: 20,
+  marginBottom: 20,
   minHeight: 0,
-  height: isMobile ? 'auto' : '400px' // Фиксированная высота для верхнего ряда
+  height: isMobile ? 'auto' : '380px' // Фиксированная высота для верхнего ряда
 });
 
 const section = {
   background: '#1e1f33',
-  borderRadius: 16,
-  padding: 24,
-  border: '1px solid rgba(59,130,246,0.2)',
-  boxShadow: '0 20px 35px rgba(15, 23, 42, 0.35)',
+  borderRadius: 12,
+  padding: 20,
+  border: '1px solid rgba(59,130,246,0.15)',
+  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.25)',
   display: 'flex',
   flexDirection: 'column',
   minHeight: 0, // Важно для работы overflow
@@ -72,16 +73,18 @@ const sectionContent = {
   flex: '1 1 auto',
   overflowY: 'auto',
   overflowX: 'hidden',
-  minHeight: 0
+  minHeight: 0,
+  paddingRight: 4 // Отступ для скроллбара
 };
 
 const info = {
-  marginTop: 16,
-  padding: 12,
+  marginTop: 12,
+  padding: 10,
   background: 'rgba(16, 185, 129, 0.1)',
   borderRadius: 8,
   color: '#10b981',
-  fontSize: 14
+  fontSize: 13,
+  border: '1px solid rgba(16, 185, 129, 0.2)'
 };
 
 const results = {
@@ -325,6 +328,8 @@ export default function Home() {
     }
     
     setLoading(true);
+    // Очищаем предыдущие результаты перед новым запросом
+    setResults(null);
     setLogs([{ timestamp: new Date().toISOString(), message: 'Начало обработки запроса...' }]);
     
     try {
@@ -386,7 +391,6 @@ export default function Home() {
         message: errorMessage,
         table: null,
         chart: null,
-        logs: logs,
         errorDetails: error.stack
       });
       
@@ -410,8 +414,8 @@ export default function Home() {
     <main style={container}>
       <style dangerouslySetInnerHTML={{ __html: scrollbarStyles }} />
       <header style={header}>
-        <h1 style={{ fontSize: 36, margin: 0 }}>📊 NLP Data Analytics</h1>
-        <p style={{ color: '#94a3b8', marginTop: 8 }}>
+        <h1 style={{ fontSize: 28, margin: 0, fontWeight: 700, color: '#f8fafc' }}>📊 NLP Data Analytics</h1>
+        <p style={{ color: '#94a3b8', marginTop: 8, fontSize: 14 }}>
           Анализ данных через естественный язык. Загрузите CSV/Excel или подключите БД.
         </p>
       </header>
@@ -420,7 +424,7 @@ export default function Home() {
       <div style={topRowStyle(isMobile)}>
         {/* Левая колонка: Загрузка данных */}
         <section style={section}>
-          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0 }}>📁 Загрузка данных</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📁 Загрузка данных</h2>
           <div style={sectionContent}>
             <FileUploader onDataLoaded={handleDataLoaded} />
             {data && (
@@ -449,7 +453,7 @@ export default function Home() {
               </>
             )}
             {!data && (
-              <div style={{ marginTop: 16, padding: 12, background: '#11162a', borderRadius: 8, fontSize: 12, color: '#94a3b8' }}>
+              <div style={{ marginTop: 12, padding: 10, background: '#11162a', borderRadius: 8, fontSize: 12, color: '#94a3b8', border: '1px solid #334155' }}>
                 💡 <strong>Демо режим:</strong> Используются примерные данные для демонстрации. Загрузите свой файл для реального анализа.
               </div>
             )}
@@ -458,7 +462,7 @@ export default function Home() {
 
         {/* Средняя колонка: Задайте вопрос */}
         <section style={section}>
-          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0 }}>💬 Задайте вопрос</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>💬 Задайте вопрос</h2>
           <div style={sectionContent}>
             <ChatInterface 
               query={query}
@@ -466,22 +470,64 @@ export default function Home() {
               onQuerySubmit={handleQuerySubmit}
               loading={loading}
             />
-            <div style={{ marginTop: 16, fontSize: 12, color: '#94a3b8' }}>
+            <div style={{ marginTop: 12, fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
               Примеры: "покажи средние продажи", "создай график тренда", "найди аномалии"
             </div>
+            
+            {/* История запросов */}
+            {queryHistory.length > 0 && (
+              <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #334155' }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#94a3b8', marginBottom: 12 }}>📜 История запросов</h3>
+                <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                  {queryHistory.slice(0, 5).map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => repeatQuery(item)}
+                      style={{
+                        padding: '8px 12px',
+                        marginBottom: 8,
+                        background: 'rgba(99, 102, 241, 0.1)',
+                        border: '1px solid rgba(99, 102, 241, 0.2)',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        fontSize: 12
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)';
+                        e.currentTarget.style.borderColor = '#6366f1';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
+                        e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.2)';
+                      }}
+                    >
+                      <div style={{ color: '#f8fafc', marginBottom: 4, wordBreak: 'break-word' }}>
+                        {item.query.length > 50 ? `${item.query.substring(0, 50)}...` : item.query}
+                      </div>
+                      <div style={{ color: '#64748b', fontSize: 11 }}>
+                        {new Date(item.timestamp).toLocaleString('ru-RU')}
+                        {item.hasChart && ' 📊'}
+                        {item.hasTable && ' 📋'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
         {/* Правая колонка: Логи обработки */}
         <section style={section}>
-          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0 }}>📝 Логи обработки</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📝 Логи обработки</h2>
           <div style={sectionContent}>
             {logs.length > 0 ? (
               <div style={{
                 fontFamily: 'monospace',
                 fontSize: 12
               }}>
-                {logs.map((log, idx) => (
+                {logs.slice(-50).map((log, idx) => (
                   <div key={idx} style={{ 
                     marginBottom: 8, 
                     color: log.message.includes('ОШИБКА') || log.message.includes('❌') ? '#ef4444' : '#94a3b8',
@@ -496,7 +542,7 @@ export default function Home() {
                 ))}
               </div>
             ) : (
-              <div style={{ padding: 24, textAlign: 'center', color: '#64748b', fontSize: 14 }}>
+              <div style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 13 }}>
                 💡 Логи обработки появятся здесь после отправки запроса
               </div>
             )}
@@ -506,24 +552,117 @@ export default function Home() {
 
       {/* Нижний ряд: Результаты анализа (на всю ширину) */}
       {(results && (results.chart || results.table)) && (
-        <section style={{ ...section, marginBottom: 24 }}>
-          <h2 style={{ marginTop: 0, marginBottom: 16 }}>📊 Результаты анализа</h2>
+        <section style={{ ...section, marginBottom: 20 }}>
+          <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📊 Результаты анализа</h2>
           {loading && (
-            <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>
+            <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8' }}>
               <div style={{ fontSize: 14 }}>⏳ Обработка запроса...</div>
             </div>
           )}
           
           {!loading && results.chart && (
-            <div style={{ marginBottom: 24 }}>
-              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16, color: '#f8fafc' }}>📈 Визуализация</h3>
-              <ChartPanel data={results.chart} />
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: 15, fontWeight: 500, color: '#e2e8f0' }}>📈 Визуализация</h3>
+                <button
+                  onClick={() => exportChartToPNG('chart-container', `chart-${Date.now()}.png`)}
+                  style={{
+                    padding: '6px 12px',
+                    background: 'rgba(99, 102, 241, 0.2)',
+                    border: '1px solid #6366f1',
+                    borderRadius: 6,
+                    color: '#f8fafc',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.3)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)'}
+                >
+                  📥 PNG
+                </button>
+              </div>
+              <div id="chart-container">
+                <ChartPanel data={results.chart} />
+              </div>
             </div>
           )}
           
           {!loading && results.table && (
             <div>
-              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16, color: '#f8fafc' }}>📋 Данные</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: 15, fontWeight: 500, color: '#e2e8f0' }}>📋 Данные</h3>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => exportToCSV(results.table, `data-${Date.now()}.csv`)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(16, 185, 129, 0.2)',
+                      border: '1px solid #10b981',
+                      borderRadius: 6,
+                      color: '#f8fafc',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.3)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)'}
+                  >
+                    📥 CSV
+                  </button>
+                  <button
+                    onClick={() => exportToExcel(results.table, `data-${Date.now()}.xlsx`)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      border: '1px solid #3b82f6',
+                      borderRadius: 6,
+                      color: '#f8fafc',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'}
+                  >
+                    📥 Excel
+                  </button>
+                  <button
+                    onClick={() => exportToJSON(results.table, `data-${Date.now()}.json`)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(139, 92, 246, 0.2)',
+                      border: '1px solid #8b5cf6',
+                      borderRadius: 6,
+                      color: '#f8fafc',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.3)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)'}
+                  >
+                    📥 JSON
+                  </button>
+                  <button
+                    onClick={() => exportToPDF(results.table, 'chart-container', `analysis-${Date.now()}.pdf`)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(239, 68, 68, 0.2)',
+                      border: '1px solid #ef4444',
+                      borderRadius: 6,
+                      color: '#f8fafc',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
+                  >
+                    📥 PDF
+                  </button>
+                </div>
+              </div>
               <div style={{ overflowX: 'auto' }}>
                 <DataTable data={results.table} />
               </div>
@@ -535,7 +674,7 @@ export default function Home() {
       {/* Нижний ряд: Ответ от LLM (на всю ширину) */}
       {results && results.message && (
         <section style={section}>
-          <h2 style={{ marginTop: 0, marginBottom: 16 }}>💬 Ответ от LLM</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>💬 Ответ от LLM</h2>
           <div style={{
             color: results.type === 'error' ? '#ef4444' : '#e2e8f0',
             whiteSpace: 'pre-wrap',
