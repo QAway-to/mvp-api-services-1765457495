@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import { countMissingValues } from '../../src/lib/dataProcessor.js';
 
 // Use bodyParser with size limit
 export const config = {
@@ -103,6 +104,11 @@ export default async function handler(req, res) {
 
     addLog(`✅ Успешно обработано: ${data.length} строк, ${columns.length} колонок`);
 
+    // Calculate missing values
+    addLog('Подсчет пропущенных значений...');
+    const missingValues = countMissingValues(data, columns);
+    addLog(`Пропущенные значения подсчитаны для ${Object.keys(missingValues).length} колонок`);
+
     // Return parsed data
     return res.status(200).json({
       success: true,
@@ -111,6 +117,7 @@ export default async function handler(req, res) {
       columnNames: columns,
       sample: data.slice(0, 10), // First 10 rows as sample
       data: data, // Full data (for small files)
+      missingValues: missingValues, // Missing values info
       logs: logs
     });
   } catch (error) {

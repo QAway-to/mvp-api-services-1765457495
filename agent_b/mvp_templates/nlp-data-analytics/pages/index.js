@@ -264,9 +264,29 @@ export default function Home() {
           <div style={sectionContent}>
             <FileUploader onDataLoaded={handleDataLoaded} />
             {data && (
-              <div style={info}>
-                ✅ Загружено: {data.rows} строк, {data.columns} колонок
-              </div>
+              <>
+                <div style={info}>
+                  ✅ Загружено: {data.rows} строк, {data.columns} колонок
+                </div>
+                {data.missingValues && Object.keys(data.missingValues).length > 0 && (
+                  <div style={{ marginTop: 12, padding: 12, background: 'rgba(251, 191, 36, 0.1)', borderRadius: 8, fontSize: 12 }}>
+                    <div style={{ color: '#fbbf24', fontWeight: 600, marginBottom: 8 }}>⚠️ Пропущенные значения:</div>
+                    {Object.entries(data.missingValues)
+                      .filter(([_, info]) => info.count > 0)
+                      .slice(0, 5)
+                      .map(([col, info]) => (
+                        <div key={col} style={{ color: '#fbbf24', marginBottom: 4, fontSize: 11 }}>
+                          {col}: {info.count} ({info.percentage}%)
+                        </div>
+                      ))}
+                    {Object.values(data.missingValues).filter(info => info.count > 0).length > 5 && (
+                      <div style={{ color: '#fbbf24', fontSize: 11, marginTop: 4 }}>
+                        ... и ещё {Object.values(data.missingValues).filter(info => info.count > 0).length - 5} колонок
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
             {!data && (
               <div style={{ marginTop: 16, padding: 12, background: '#11162a', borderRadius: 8, fontSize: 12, color: '#94a3b8' }}>

@@ -124,7 +124,32 @@ export default async function handler(req, res) {
       const xAxis = viz.xAxis || columns[0];
       const yAxis = viz.yAxis || numericColumns[0];
 
-      if (chartType === 'line' || chartType === 'bar') {
+      if (chartType === 'pie') {
+        // Pie chart: group by xAxis and aggregate yAxis
+        const groups = groupBy(data, xAxis);
+        const aggregated = aggregateGroups(groups, yAxis, 'sum');
+        
+        result.chart = {
+          type: 'pie',
+          data: aggregated.map(item => ({
+            name: item.group,
+            value: item.value
+          })),
+          xKey: xAxis,
+          yKey: 'value'
+        };
+      } else if (chartType === 'scatter') {
+        // Scatter plot: direct mapping of x and y values
+        result.chart = {
+          type: 'scatter',
+          data: data.slice(0, 100).map(row => ({
+            x: parseFloat(row[xAxis]) || 0,
+            y: parseFloat(row[yAxis]) || 0
+          })).filter(item => !isNaN(item.x) && !isNaN(item.y)),
+          xKey: 'x',
+          yKey: 'y'
+        };
+      } else if (chartType === 'line' || chartType === 'bar') {
         // Group by xAxis and aggregate yAxis
         const groups = groupBy(data, xAxis);
         const aggregated = aggregateGroups(groups, yAxis, 'mean');
