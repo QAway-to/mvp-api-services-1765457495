@@ -122,49 +122,9 @@ export default async function handler(req, res) {
       const viz = geminiResponse.visualization || {};
       const chartType = viz.chartType || 'line';
       let xAxis = viz.xAxis || columns[0];
-      let yAxis = viz.yAxis || numericColumns[0];
+      const yAxis = viz.yAxis || numericColumns[0];
 
-      // Если xAxis - это дата, группируем по периоду
-      if (dateColumns.includes(xAxis)) {
-        const queryLower = query.toLowerCase();
-        let period = 'day';
-        if (queryLower.includes('год') || queryLower.includes('year')) {
-          period = 'year';
-        } else if (queryLower.includes('месяц') || queryLower.includes('month')) {
-          period = 'month';
-        } else if (queryLower.includes('недел') || queryLower.includes('week')) {
-          period = 'week';
-        }
-        
-        const grouped = groupByPeriod(data, xAxis, period);
-        const aggregated = Object.entries(grouped).map(([key, rows]) => {
-          const yValues = rows.map(r => parseFloat(r[yAxis])).filter(v => !isNaN(v));
-          const avg = yValues.length > 0 ? yValues.reduce((a, b) => a + b, 0) / yValues.length : 0;
-          return {
-            [xAxis]: key,
-            [yAxis]: Math.round(avg * 100) / 100
-          };
-        }).sort((a, b) => a[xAxis].localeCompare(b[xAxis]));
-        
-        if (chartType === 'pie') {
-          result.chart = {
-            type: 'pie',
-            data: aggregated.map(item => ({
-              name: item[xAxis],
-              value: item[yAxis]
-            })),
-            xKey: xAxis,
-            yKey: 'value'
-          };
-        } else {
-          result.chart = {
-            type: chartType,
-            data: aggregated,
-            xKey: xAxis,
-            yKey: yAxis
-          };
-        }
-      } else if (chartType === 'pie') {
+      if (chartType === 'pie') {
         // Pie chart: group by xAxis and aggregate yAxis
         const groups = groupBy(data, xAxis);
         const aggregated = aggregateGroups(groups, yAxis, 'sum');
