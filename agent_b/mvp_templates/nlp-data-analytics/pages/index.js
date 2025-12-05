@@ -330,7 +330,8 @@ export default function Home() {
     setLoading(true);
     // Очищаем предыдущие результаты перед новым запросом
     setResults(null);
-    setLogs([{ timestamp: new Date().toISOString(), message: 'Начало обработки запроса...' }]);
+    // Очищаем старые логи, оставляем только последние 10 для контекста
+    setLogs(prev => [...prev.slice(-10), { timestamp: new Date().toISOString(), message: 'Начало обработки запроса...' }]);
     
     try {
       console.log('[Query] Отправка запроса:', q);
