@@ -1077,10 +1077,13 @@ class MVPGenerator:
             gemini_key = Config.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
             if gemini_key:
                 try:
+                    # Set both GEMINI_API_KEY and GOOGLE_GENERATIVE_AI_API_KEY for compatibility
+                    # @ai-sdk/google uses GOOGLE_GENERATIVE_AI_API_KEY, but we support both
                     self._set_vercel_env_var(project_id, "GEMINI_API_KEY", gemini_key)
-                    log_agent_action("Agent B", f"🔐 Vercel env configured for {project_name} (GEMINI_API_KEY)")
+                    self._set_vercel_env_var(project_id, "GOOGLE_GENERATIVE_AI_API_KEY", gemini_key)
+                    log_agent_action("Agent B", f"🔐 Vercel env configured for {project_name} (GEMINI_API_KEY and GOOGLE_GENERATIVE_AI_API_KEY)")
                 except Exception as error:
-                    log_agent_action("Agent B", f"❌ Failed to configure GEMINI_API_KEY: {error}")
+                    log_agent_action("Agent B", f"❌ Failed to configure Gemini API keys: {error}")
             else:
                 log_agent_action("Agent B", "⚠️ GEMINI_API_KEY not set in Config or environment - skipping")
 
