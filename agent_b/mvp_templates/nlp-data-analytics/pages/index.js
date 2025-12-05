@@ -32,8 +32,8 @@ const scrollbarStyles = `
 `;
 
 const container = {
-  fontFamily: 'Inter, sans-serif',
-  padding: '24px 32px',
+  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  padding: '20px 24px',
   background: '#0f172a',
   color: '#f8fafc',
   minHeight: '100vh',
