@@ -144,6 +144,7 @@ export default function ChartPanel({ data, onChartTypeChange }) {
             <Legend />
           </PieChart>
         </ResponsiveContainer>
+        </div>
       </div>
     );
   }
@@ -185,6 +186,7 @@ export default function ChartPanel({ data, onChartTypeChange }) {
             />
           </ScatterChart>
         </ResponsiveContainer>
+        </div>
       </div>
     );
   }
@@ -227,6 +229,7 @@ export default function ChartPanel({ data, onChartTypeChange }) {
           />
         </ChartComponent>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }
