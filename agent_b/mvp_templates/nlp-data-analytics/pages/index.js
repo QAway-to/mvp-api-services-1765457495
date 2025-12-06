@@ -545,14 +545,13 @@ export default function Home() {
         gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
         gap: 20,
         marginBottom: 20,
-        minHeight: 0,
-        height: isMobile ? 'auto' : '320px' // Уменьшена высота для более компактного вида
+        alignItems: 'start' // Выравнивание по верху
       }}>
         {/* Левая колонка: Фильтрация данных */}
         {data && data.columnNames && (
-          <section style={section}>
+          <section style={{ ...section, height: 'auto', minHeight: 'auto' }}>
             <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>🔍 Фильтрация данных</h2>
-            <div style={sectionContent}>
+            <div>
               <DataFilter
                 columns={data.columnNames}
                 columnTypes={columnTypes}
@@ -564,9 +563,9 @@ export default function Home() {
         )}
 
         {/* Правая колонка: История запросов */}
-        <section style={section}>
+        <section style={{ ...section, height: 'auto', minHeight: 'auto', maxHeight: '400px' }}>
           <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📜 История запросов</h2>
-          <div style={sectionContent}>
+          <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
             {queryHistory.length > 0 ? (
               <div>
                 {queryHistory.map((item) => (
