@@ -31,7 +31,6 @@ export default function DataPreview({ shopifyData, bitrixData, eventId, onSendEv
                 {isSending ? 'Отправка...' : '📤 Отправить это событие'}
               </button>
             )}
-            <div style={{ display: 'flex', gap: '8px' }}>
             {shopifyData && (
               <button
                 onClick={() => setActiveTab('shopify')}
