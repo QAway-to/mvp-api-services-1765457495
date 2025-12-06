@@ -11,6 +11,13 @@ import { advancedFilterData, detectColumnTypes } from '../src/lib/dataProcessor.
 
 // Стили для скроллбара (современный вид)
 const scrollbarStyles = `
+  /* Убираем все выделения заголовков */
+  h1, h2, h3, h4, h5, h6 {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
   /* Webkit (Chrome, Safari, Edge) */
   *::-webkit-scrollbar {
     width: 8px;
