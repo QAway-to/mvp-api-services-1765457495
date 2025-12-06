@@ -8,17 +8,24 @@
 api-services/
 ├── pages/
 │   ├── index.js              # Главная страница с выбором API
+│   ├── shopify/
+│   │   └── index.js          # Страница Shopify Webhook
 │   ├── wayback/
 │   │   └── index.js          # Страница Wayback Machine
 │   └── api/
+│       ├── send-to-bitrix.js # API endpoint для отправки в Bitrix
+│       ├── webhook/
+│       │   └── shopify.js    # Webhook endpoint для Shopify
 │       └── wayback/
 │           └── index.js      # API endpoint для Wayback Machine
 ├── src/
 │   ├── lib/
 │   │   └── adapters/
+│   │       ├── shopify/      # Адаптер Shopify
 │   │       └── wayback/      # Адаптер Wayback Machine
 │   ├── components/
 │   │   ├── ApiCard.js        # Карточка для выбора API
+│   │   ├── shopify/          # Компоненты для Shopify
 │   │   └── wayback/          # Компоненты для Wayback Machine
 │   └── styles/
 │       └── global.css        # Глобальные стили
@@ -36,9 +43,23 @@ npm run dev
 
 ## Реализованные API
 
+### 🛍️ Shopify Webhook
+
+Интеграция с Shopify для приема и обработки webhook событий. Позволяет:
+- Получать webhook события от Shopify в реальном времени
+- Просматривать детали заказов (товары, цены, покупатели)
+- Выбирать и отправлять выбранные события в Bitrix24
+
+**Использование:**
+1. Откройте главную страницу
+2. Выберите "Shopify Webhook"
+3. Настройте webhook URL в Shopify на: `https://your-domain.vercel.app/api/webhook/shopify`
+4. Выберите нужные события чекбоксами
+5. Нажмите "Отправить в Bitrix" для отправки выбранных событий
+
 ### 📚 Wayback Machine
 
-Первый реализованный API - Wayback Machine. Позволяет:
+Интеграция с Wayback Machine для анализа исторических данных сайтов. Позволяет:
 - Поиск архивных снимков сайтов через CDX API
 - Получение HTML конкретного снимка
 - Тестирование интеграции
@@ -107,6 +128,12 @@ npm run dev
 ## Deploy
 
 Шаблон готов к деплою на Vercel. Файл `vercel.json` уже настроен.
+
+**Настройка webhook в Shopify:**
+1. В админке Shopify перейдите в Settings > Notifications > Webhooks
+2. Создайте новый webhook для события "Order creation"
+3. URL: `https://your-vercel-app.vercel.app/api/webhook/shopify`
+4. Format: JSON
 
 ## License
 
