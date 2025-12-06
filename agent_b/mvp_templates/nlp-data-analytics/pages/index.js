@@ -56,13 +56,13 @@ const topRowStyle = (isMobile = false) => ({
   gap: 20,
   marginBottom: 20,
   minHeight: 0,
-  height: isMobile ? 'auto' : '380px' // Фиксированная высота для верхнего ряда
+  height: isMobile ? 'auto' : '350px' // Уменьшена высота для более компактного вида
 });
 
 const section = {
   background: '#1e1f33',
   borderRadius: 12,
-  padding: 20,
+  padding: 16,
   border: '1px solid rgba(59,130,246,0.15)',
   boxShadow: '0 4px 12px rgba(15, 23, 42, 0.25)',
   display: 'flex',
@@ -493,7 +493,7 @@ export default function Home() {
 
         {/* Средняя колонка: Задайте вопрос */}
         <section style={section}>
-          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>💬 Задайте вопрос</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>💬 Задайте вопрос</h2>
           <div style={sectionContent}>
             <ChatInterface 
               query={query}
@@ -509,7 +509,7 @@ export default function Home() {
 
         {/* Правая колонка: Логи обработки */}
         <section style={section}>
-          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📝 Логи обработки</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📝 Логи обработки</h2>
           <div style={sectionContent}>
             {logs.length > 0 ? (
               <div style={{
@@ -546,12 +546,12 @@ export default function Home() {
         gap: 20,
         marginBottom: 20,
         minHeight: 0,
-        height: isMobile ? 'auto' : '400px' // Фиксированная высота
+        height: isMobile ? 'auto' : '320px' // Уменьшена высота для более компактного вида
       }}>
         {/* Левая колонка: Фильтрация данных */}
         {data && data.columnNames && (
           <section style={section}>
-            <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>🔍 Фильтрация данных</h2>
+            <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>🔍 Фильтрация данных</h2>
             <div style={sectionContent}>
               <DataFilter
                 columns={data.columnNames}
@@ -565,7 +565,7 @@ export default function Home() {
 
         {/* Правая колонка: История запросов */}
         <section style={section}>
-          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📜 История запросов</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📜 История запросов</h2>
           <div style={sectionContent}>
             {queryHistory.length > 0 ? (
               <div>
@@ -574,11 +574,11 @@ export default function Home() {
                     key={item.id}
                     onClick={() => repeatQuery(item)}
                     style={{
-                      padding: '10px 12px',
-                      marginBottom: 10,
+                      padding: '8px 10px',
+                      marginBottom: 8,
                       background: 'rgba(99, 102, 241, 0.1)',
                       border: '1px solid rgba(99, 102, 241, 0.2)',
-                      borderRadius: 8,
+                      borderRadius: 6,
                       cursor: 'pointer',
                       transition: 'all 0.2s',
                       fontSize: 12
@@ -592,10 +592,10 @@ export default function Home() {
                       e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.2)';
                     }}
                   >
-                    <div style={{ color: '#f8fafc', marginBottom: 6, wordBreak: 'break-word', fontWeight: 500 }}>
+                    <div style={{ color: '#f8fafc', marginBottom: 4, wordBreak: 'break-word', fontWeight: 500, fontSize: 12 }}>
                       {item.query}
                     </div>
-                    <div style={{ color: '#64748b', fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ color: '#64748b', fontSize: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span>{new Date(item.timestamp).toLocaleString('ru-RU')}</span>
                       {item.hasChart && <span>📊</span>}
                       {item.hasTable && <span>📋</span>}
@@ -604,7 +604,7 @@ export default function Home() {
                 ))}
               </div>
             ) : (
-              <div style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 13 }}>
+              <div style={{ padding: 16, textAlign: 'center', color: '#64748b', fontSize: 12 }}>
                 💡 История запросов появится здесь после отправки запросов
               </div>
             )}

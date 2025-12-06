@@ -62,8 +62,7 @@ export default function DataFilter({ columns, columnTypes, onFilter, onClear }) 
     <div style={{
       padding: 0
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#f8fafc' }}>🔍 Фильтрация данных</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={addFilter}
@@ -127,11 +126,11 @@ export default function DataFilter({ columns, columnTypes, onFilter, onClear }) 
       </div>
 
       {filters.length === 0 ? (
-        <div style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 13 }}>
+        <div style={{ padding: 16, textAlign: 'center', color: '#64748b', fontSize: 12 }}>
           Нажмите "Добавить фильтр" для начала фильтрации данных
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filters.map((filter, idx) => {
             const operators = getOperatorsForColumn(filter.column);
             const needsValue = !['isEmpty', 'isNull'].includes(filter.operator);
@@ -141,12 +140,12 @@ export default function DataFilter({ columns, columnTypes, onFilter, onClear }) 
               <div
                 key={filter.id}
                 style={{
-                  padding: 12,
+                  padding: 10,
                   background: '#11162a',
-                  borderRadius: 8,
+                  borderRadius: 6,
                   border: '1px solid #334155',
                   display: 'flex',
-                  gap: 8,
+                  gap: 6,
                   alignItems: 'center',
                   flexWrap: 'wrap'
                 }}
