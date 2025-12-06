@@ -207,39 +207,63 @@ export class ShopifyAdapter {
       }
     };
 
-    // Calculate totals
-    const totalPrice = parseNumber(shopifyOrder.total_price);
-    const totalTax = parseNumber(shopifyOrder.total_tax);
-    const totalDiscount = shopifyOrder.discount_codes && shopifyOrder.discount_codes.length > 0
-      ? shopifyOrder.discount_codes.reduce((sum, code) => sum + parseNumber(code.amount) || 0, 0)
-      : null;
-    const shippingPrice = parseNumber(shopifyOrder.total_shipping_price_set?.shop_money?.amount || shopifyOrder.shipping_price);
+    // Calculate totals - use real data from Shopify
+    const totalPrice = parseNumber(shopifyOrder.total_price || shopifyOrder.total_price_set?.shop_money?.amount);
+    const totalTax = parseNumber(shopifyOrder.total_tax || shopifyOrder.total_tax_set?.shop_money?.amount);
+    
+    // Calculate total discount from discount codes or discount_amount
+    let totalDiscount = null;
+    if (shopifyOrder.discount_codes && Array.isArray(shopifyOrder.discount_codes) && shopifyOrder.discount_codes.length > 0) {
+      totalDiscount = shopifyOrder.discount_codes.reduce((sum, code) => {
+        const amount = parseNumber(code.amount);
+        return sum + (amount || 0);
+      }, 0);
+      if (totalDiscount === 0) totalDiscount = null;
+    } else if (shopifyOrder.total_discounts) {
+      totalDiscount = parseNumber(shopifyOrder.total_discounts);
+    }
+    
+    const shippingPrice = parseNumber(
+      shopifyOrder.total_shipping_price_set?.shop_money?.amount || 
+      shopifyOrder.shipping_price || 
+      shopifyOrder.total_shipping_price_set?.amount
+    );
 
-    // Format line items
+    // Format line items - use real data from Shopify
     const lineItems = shopifyOrder.line_items && Array.isArray(shopifyOrder.line_items)
       ? shopifyOrder.line_items.map(item => ({
           id: item.id || null,
-          title: item.title || null,
+          title: item.title || item.name || null,
           quantity: item.quantity || null,
-          price: parseNumber(item.price),
+          price: parseNumber(item.price || item.price_set?.shop_money?.amount),
           sku: item.sku || null,
-          variant_id: item.variant_id || null,
+          variant_id: item.variant_id || item.variant_id || null,
           product_id: item.product_id || null
         }))
       : null;
 
-    // Customer name
+    // Customer name - use real data
     const customerName = shopifyOrder.customer
       ? `${getValue(shopifyOrder.customer.first_name) || ''} ${getValue(shopifyOrder.customer.last_name) || ''}`.trim() || null
-      : null;
+      : (shopifyOrder.billing_address 
+          ? `${getValue(shopifyOrder.billing_address.first_name) || ''} ${getValue(shopifyOrder.billing_address.last_name) || ''}`.trim() || null
+          : null);
 
-    // Customer email
-    const customerEmail = shopifyOrder.customer?.email || shopifyOrder.email || null;
+    // Customer email - use real data
+    const customerEmail = shopifyOrder.customer?.email || 
+                         shopifyOrder.email || 
+                         shopifyOrder.billing_address?.email || 
+                         null;
 
-    // Build Bitrix24 deal structure
+    // Order title - use real order number or name
+    const orderTitle = shopifyOrder.order_number 
+      ? `#${shopifyOrder.order_number}`
+      : (shopifyOrder.name || `Order #${shopifyOrder.id || 'Unknown'}`);
+
+    // Build Bitrix24 deal structure with real data
     const bitrixDeal = {
       fields: {
-        TITLE: getValue(shopifyOrder.name) || `Order #${shopifyOrder.id || 'Unknown'}`,
+        TITLE: orderTitle,
         TYPE_ID: null, // Not available in Shopify order
         STAGE_ID: null, // Not available in Shopify order
         CATEGORY_ID: null, // Not available in Shopify order

@@ -31,6 +31,24 @@ export default function ShopifyPage() {
         const fetchedEvents = data.events || [];
         setEvents(fetchedEvents);
         setLastRefresh(new Date());
+        
+        // Update preview if the previewed event still exists
+        if (previewEvent && previewData) {
+          const updatedEvent = fetchedEvents.find(e => e.id === previewEvent.id);
+          if (updatedEvent) {
+            try {
+              const bitrixData = shopifyAdapter.transformToBitrix(updatedEvent);
+              setPreviewEvent(updatedEvent);
+              setPreviewData({
+                shopifyData: updatedEvent,
+                bitrixData: bitrixData
+              });
+            } catch (error) {
+              console.error('Error updating preview:', error);
+            }
+          }
+        }
+        
         // Auto-select all events only on initial load if none are selected
         if (isInitialLoad && selectedEvents.length === 0 && fetchedEvents.length > 0) {
           setSelectedEvents(fetchedEvents);

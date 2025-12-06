@@ -70,24 +70,31 @@ export default function DataPreview({ shopifyData, bitrixData, eventId, onSendEv
       <div style={{ padding: '20px' }}>
         {activeTab === 'shopify' && shopifyData && (
           <div>
-            <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ color: '#f1f5f9', fontSize: '1rem', margin: 0 }}>Received Shopify Order Data</h3>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(JSON.stringify(shopifyData, null, 2));
-                }}
-                style={{
-                  padding: '4px 8px',
-                  background: '#334155',
-                  border: '1px solid #475569',
-                  borderRadius: '4px',
-                  color: '#f1f5f9',
-                  cursor: 'pointer',
-                  fontSize: '0.85rem'
-                }}
-              >
-                Copy JSON
-              </button>
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h3 style={{ color: '#f1f5f9', fontSize: '1rem', margin: 0 }}>Received Shopify Order Data</h3>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(JSON.stringify(shopifyData, null, 2));
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    background: '#334155',
+                    border: '1px solid #475569',
+                    borderRadius: '4px',
+                    color: '#f1f5f9',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  Copy JSON
+                </button>
+              </div>
+              {shopifyData.received_at && (
+                <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '8px' }}>
+                  Received at: {new Date(shopifyData.received_at).toLocaleString()}
+                </div>
+              )}
             </div>
             <pre style={{
               padding: '16px',
