@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 
 export default function WebhookInfo({ onBitrixUrlChange }) {
   const [webhookUrl, setWebhookUrl] = useState('');
-  const [bitrixWebhookUrl, setBitrixWebhookUrl] = useState('https://bfcshoes.bitrix24.eu/rest/52/fan7d3m1ylod3mgq/crm.deal.add.json');
+  const [bitrixWebhookUrl, setBitrixWebhookUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [bitrixCopied, setBitrixCopied] = useState(false);
 
@@ -33,6 +33,16 @@ export default function WebhookInfo({ onBitrixUrlChange }) {
     setTimeout(() => setBitrixCopied(false), 2000);
   };
 
+  // Mask URL for security (show only domain)
+  const maskUrl = (url) => {
+    try {
+      const urlObj = new URL(url);
+      return `${urlObj.origin}/***`;
+    } catch {
+      return '***';
+    }
+  };
+
   return (
     <div className="card">
       <header className="card-header">
@@ -41,7 +51,7 @@ export default function WebhookInfo({ onBitrixUrlChange }) {
       <div style={{ padding: '20px' }}>
         <div style={{ marginBottom: '16px' }}>
           <p style={{ color: '#94a3b8', marginBottom: '8px', fontSize: '0.9rem' }}>
-            Use this URL in your Shopify admin to receive webhook events:
+            Shopify webhook endpoint is configured and ready to receive events.
           </p>
           <div style={{
             display: 'flex',
@@ -54,17 +64,17 @@ export default function WebhookInfo({ onBitrixUrlChange }) {
           }}>
             <code style={{
               flex: 1,
-              color: '#f1f5f9',
+              color: '#94a3b8',
               fontSize: '0.9rem',
-              wordBreak: 'break-all',
               fontFamily: 'monospace'
             }}>
-              {webhookUrl}
+              {maskUrl(webhookUrl)}
             </code>
             <button
               onClick={handleCopy}
               className="btn"
               style={{ whiteSpace: 'nowrap' }}
+              title="Copy webhook URL"
             >
               {copied ? '✓ Copied' : 'Copy'}
             </button>
@@ -73,7 +83,7 @@ export default function WebhookInfo({ onBitrixUrlChange }) {
 
         <div style={{ marginBottom: '16px' }}>
           <p style={{ color: '#94a3b8', marginBottom: '8px', fontSize: '0.9rem' }}>
-            Bitrix24 Webhook URL for sending events:
+            Bitrix24 webhook is configured for sending events.
           </p>
           <div style={{
             display: 'flex',
@@ -85,7 +95,7 @@ export default function WebhookInfo({ onBitrixUrlChange }) {
             border: '1px solid #334155'
           }}>
             <input
-              type="text"
+              type="password"
               value={bitrixWebhookUrl}
               onChange={(e) => setBitrixWebhookUrl(e.target.value)}
               style={{
@@ -104,6 +114,7 @@ export default function WebhookInfo({ onBitrixUrlChange }) {
               onClick={handleBitrixCopy}
               className="btn"
               style={{ whiteSpace: 'nowrap' }}
+              title="Copy webhook URL"
             >
               {bitrixCopied ? '✓ Copied' : 'Copy'}
             </button>
@@ -118,7 +129,7 @@ export default function WebhookInfo({ onBitrixUrlChange }) {
             <li style={{ marginBottom: '8px' }}>Scroll to "Webhooks" section</li>
             <li style={{ marginBottom: '8px' }}>Click "Create webhook"</li>
             <li style={{ marginBottom: '8px' }}>Select event type (e.g., "Order creation")</li>
-            <li style={{ marginBottom: '8px' }}>Paste the webhook URL above</li>
+            <li style={{ marginBottom: '8px' }}>Use the webhook URL (click Copy button above)</li>
             <li style={{ marginBottom: '8px' }}>Select format: JSON</li>
             <li>Save the webhook</li>
           </ol>

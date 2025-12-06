@@ -61,7 +61,7 @@ export default async function handler(req, res) {
 
     // Get Bitrix webhook URL
     const bitrixWebhookUrl = getBitrixWebhookUrl();
-    addLog(`Using Bitrix webhook: ${bitrixWebhookUrl}`, 'info');
+    addLog('Using Bitrix webhook (URL hidden for security)', 'info');
 
     // Step 1: Upsert contact
     let contactId = null;

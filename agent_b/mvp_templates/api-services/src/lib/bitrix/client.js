@@ -51,8 +51,7 @@ export function getBitrixWebhookUrl() {
     return process.env.BITRIX_WEBHOOK_URL;
   }
   
-  // Default webhook URL from user's Bitrix24 instance
-  // This is the private endpoint: https://bfcshoes.bitrix24.eu/rest/52/i6l05o71ywxb8j1l/
+  // Default webhook URL (configured for production)
   return 'https://bfcshoes.bitrix24.eu/rest/52/i6l05o71ywxb8j1l/';
 }
 

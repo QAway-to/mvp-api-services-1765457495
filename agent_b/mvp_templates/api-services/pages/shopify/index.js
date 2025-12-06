@@ -14,7 +14,7 @@ export default function ShopifyPage() {
   const [lastRefresh, setLastRefresh] = useState(null);
   const [isSending, setIsSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
-  const [bitrixWebhookUrl, setBitrixWebhookUrl] = useState('https://bfcshoes.bitrix24.eu/rest/52/fan7d3m1ylod3mgq/crm.deal.add.json');
+  const [bitrixWebhookUrl, setBitrixWebhookUrl] = useState('');
   const [previewEvent, setPreviewEvent] = useState(null); // Event to preview
   const [previewData, setPreviewData] = useState(null); // { shopifyData, bitrixData } for preview
   const [isInitialLoad, setIsInitialLoad] = useState(true); // Track initial load
