@@ -504,48 +504,6 @@ export default function Home() {
             <div style={{ marginTop: 12, fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
               Примеры: "покажи средние продажи", "создай график тренда", "найди аномалии"
             </div>
-            
-            {/* История запросов */}
-            {queryHistory.length > 0 && (
-              <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #334155' }}>
-                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#94a3b8', marginBottom: 12 }}>📜 История запросов</h3>
-                <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-                  {queryHistory.slice(0, 5).map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => repeatQuery(item)}
-                      style={{
-                        padding: '8px 12px',
-                        marginBottom: 8,
-                        background: 'rgba(99, 102, 241, 0.1)',
-                        border: '1px solid rgba(99, 102, 241, 0.2)',
-                        borderRadius: 6,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        fontSize: 12
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)';
-                        e.currentTarget.style.borderColor = '#6366f1';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
-                        e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.2)';
-                      }}
-                    >
-                      <div style={{ color: '#f8fafc', marginBottom: 4, wordBreak: 'break-word' }}>
-                        {item.query.length > 50 ? `${item.query.substring(0, 50)}...` : item.query}
-                      </div>
-                      <div style={{ color: '#64748b', fontSize: 11 }}>
-                        {new Date(item.timestamp).toLocaleString('ru-RU')}
-                        {item.hasChart && ' 📊'}
-                        {item.hasTable && ' 📋'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </section>
 
@@ -581,17 +539,78 @@ export default function Home() {
         </section>
       </div>
 
-      {/* Фильтрация данных */}
-      {data && data.columnNames && (
-        <section style={{ ...section, marginBottom: 20 }}>
-          <DataFilter
-            columns={data.columnNames}
-            columnTypes={columnTypes}
-            onFilter={handleFilter}
-            onClear={handleClearFilter}
-          />
+      {/* Второй ряд: Фильтрация данных и История запросов */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+        gap: 20,
+        marginBottom: 20,
+        minHeight: 0,
+        height: isMobile ? 'auto' : '400px' // Фиксированная высота
+      }}>
+        {/* Левая колонка: Фильтрация данных */}
+        {data && data.columnNames && (
+          <section style={section}>
+            <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>🔍 Фильтрация данных</h2>
+            <div style={sectionContent}>
+              <DataFilter
+                columns={data.columnNames}
+                columnTypes={columnTypes}
+                onFilter={handleFilter}
+                onClear={handleClearFilter}
+              />
+            </div>
+          </section>
+        )}
+
+        {/* Правая колонка: История запросов */}
+        <section style={section}>
+          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📜 История запросов</h2>
+          <div style={sectionContent}>
+            {queryHistory.length > 0 ? (
+              <div>
+                {queryHistory.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => repeatQuery(item)}
+                    style={{
+                      padding: '10px 12px',
+                      marginBottom: 10,
+                      background: 'rgba(99, 102, 241, 0.1)',
+                      border: '1px solid rgba(99, 102, 241, 0.2)',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      fontSize: 12
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)';
+                      e.currentTarget.style.borderColor = '#6366f1';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.2)';
+                    }}
+                  >
+                    <div style={{ color: '#f8fafc', marginBottom: 6, wordBreak: 'break-word', fontWeight: 500 }}>
+                      {item.query}
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>{new Date(item.timestamp).toLocaleString('ru-RU')}</span>
+                      {item.hasChart && <span>📊</span>}
+                      {item.hasTable && <span>📋</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 13 }}>
+                💡 История запросов появится здесь после отправки запросов
+              </div>
+            )}
+          </div>
         </section>
-      )}
+      </div>
 
       {/* Нижний ряд: Результаты анализа (на всю ширину) */}
       {(results && (results.chart || results.table || results.correlations)) && (

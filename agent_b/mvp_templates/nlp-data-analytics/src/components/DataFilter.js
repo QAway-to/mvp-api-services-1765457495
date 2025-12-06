@@ -60,11 +60,7 @@ export default function DataFilter({ columns, columnTypes, onFilter, onClear }) 
 
   return (
     <div style={{
-      padding: 16,
-      background: '#1e1f33',
-      borderRadius: 12,
-      border: '1px solid rgba(59,130,246,0.2)',
-      marginBottom: 16
+      padding: 0
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#f8fafc' }}>🔍 Фильтрация данных</h3>
