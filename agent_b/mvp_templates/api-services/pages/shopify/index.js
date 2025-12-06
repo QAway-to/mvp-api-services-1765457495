@@ -12,6 +12,7 @@ export default function ShopifyPage() {
   const [lastRefresh, setLastRefresh] = useState(null);
   const [isSending, setIsSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
+  const [bitrixWebhookUrl, setBitrixWebhookUrl] = useState('https://bfcshoes.bitrix24.eu/rest/52/fan7d3m1ylod3mgq/crm.deal.add.json');
 
   const fetchEvents = async () => {
     setIsLoading(true);
@@ -51,6 +52,11 @@ export default function ShopifyPage() {
       return;
     }
 
+    if (!bitrixWebhookUrl || bitrixWebhookUrl.trim() === '') {
+      alert('Пожалуйста, укажите URL вебхука Bitrix');
+      return;
+    }
+
     setIsSending(true);
     setSendResult(null);
 
@@ -60,21 +66,39 @@ export default function ShopifyPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ selectedEvents })
+        body: JSON.stringify({ 
+          selectedEvents,
+          bitrixWebhookUrl: bitrixWebhookUrl.trim()
+        })
       });
 
       const result = await response.json();
 
-      if (response.ok) {
-        setSendResult({ success: true, message: result.message });
-        // Optionally clear selection after successful send
-        // setSelectedEvents([]);
+      if (response.ok || response.status === 207) {
+        // 200 - все успешно, 207 - частичный успех
+        setSendResult({ 
+          success: result.success !== false, 
+          message: result.message,
+          details: result.errors && result.errors.length > 0 ? result.errors : null,
+          total: result.total,
+          successful: result.successful,
+          failed: result.failed
+        });
       } else {
-        setSendResult({ success: false, message: result.error || 'Failed to send' });
+        // 400, 500 - ошибки
+        setSendResult({ 
+          success: false, 
+          message: result.error || 'Failed to send',
+          details: result.details || (result.errors && result.errors.length > 0 ? result.errors : null)
+        });
       }
     } catch (error) {
       console.error('Send to Bitrix error:', error);
-      setSendResult({ success: false, message: 'Network error' });
+      setSendResult({ 
+        success: false, 
+        message: 'Network error',
+        details: [{ error: error.message || 'Unknown network error' }]
+      });
     } finally {
       setIsSending(false);
     }
@@ -131,14 +155,40 @@ export default function ShopifyPage() {
 
         {sendResult && (
           <div style={{
-            padding: '12px 16px',
+            padding: '16px',
             borderRadius: '8px',
             marginBottom: '20px',
             background: sendResult.success ? 'rgba(5, 150, 105, 0.1)' : 'rgba(239, 68, 68, 0.1)',
             border: `1px solid ${sendResult.success ? '#059669' : '#ef4444'}`,
             color: sendResult.success ? '#059669' : '#ef4444'
           }}>
-            {sendResult.message}
+            <div style={{ fontWeight: 600, marginBottom: '8px' }}>
+              {sendResult.message}
+            </div>
+            {sendResult.total !== undefined && (
+              <div style={{ fontSize: '0.9rem', marginTop: '8px', opacity: 0.9 }}>
+                Всего: {sendResult.total} | Успешно: {sendResult.successful || 0} | Ошибок: {sendResult.failed || 0}
+              </div>
+            )}
+            {sendResult.details && sendResult.details.length > 0 && (
+              <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${sendResult.success ? 'rgba(5, 150, 105, 0.3)' : 'rgba(239, 68, 68, 0.3)'}` }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '8px' }}>Детали ошибок:</div>
+                {sendResult.details.map((err, idx) => (
+                  <div key={idx} style={{ 
+                    fontSize: '0.8rem', 
+                    marginBottom: '6px',
+                    padding: '6px 8px',
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderRadius: '4px'
+                  }}>
+                    {err.eventId && <strong>Event ID {err.eventId}: </strong>}
+                    {err.error || err.message || 'Unknown error'}
+                    {err.details && <div style={{ marginTop: '4px', opacity: 0.8 }}>{err.details}</div>}
+                    {err.status && <div style={{ marginTop: '4px', opacity: 0.8 }}>HTTP {err.status}: {err.statusText || ''}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -162,7 +212,7 @@ export default function ShopifyPage() {
         )}
 
         {/* Webhook Configuration */}
-        <WebhookInfo />
+        <WebhookInfo onBitrixUrlChange={setBitrixWebhookUrl} />
 
         {/* Events List and Details */}
         <div style={{
