@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 
-export default function WebhookInfo() {
+export default function WebhookInfo({ onBitrixUrlChange }) {
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [bitrixWebhookUrl, setBitrixWebhookUrl] = useState('https://bfcshoes.bitrix24.eu/rest/52/fan7d3m1ylod3mgq/crm.deal.add.json');
   const [copied, setCopied] = useState(false);
+  const [bitrixCopied, setBitrixCopied] = useState(false);
 
   useEffect(() => {
     // Get webhook URL from current origin
@@ -12,10 +14,23 @@ export default function WebhookInfo() {
     setWebhookUrl(url);
   }, []);
 
+  useEffect(() => {
+    // Notify parent component about Bitrix URL change
+    if (onBitrixUrlChange) {
+      onBitrixUrlChange(bitrixWebhookUrl);
+    }
+  }, [bitrixWebhookUrl, onBitrixUrlChange]);
+
   const handleCopy = () => {
     navigator.clipboard.writeText(webhookUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleBitrixCopy = () => {
+    navigator.clipboard.writeText(bitrixWebhookUrl);
+    setBitrixCopied(true);
+    setTimeout(() => setBitrixCopied(false), 2000);
   };
 
   return (
@@ -52,6 +67,45 @@ export default function WebhookInfo() {
               style={{ whiteSpace: 'nowrap' }}
             >
               {copied ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <p style={{ color: '#94a3b8', marginBottom: '8px', fontSize: '0.9rem' }}>
+            Bitrix24 Webhook URL for sending events:
+          </p>
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center',
+            padding: '12px',
+            background: '#1e293b',
+            borderRadius: '8px',
+            border: '1px solid #334155'
+          }}>
+            <input
+              type="text"
+              value={bitrixWebhookUrl}
+              onChange={(e) => setBitrixWebhookUrl(e.target.value)}
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: 'none',
+                color: '#f1f5f9',
+                fontSize: '0.9rem',
+                fontFamily: 'monospace',
+                outline: 'none',
+                padding: '4px 0'
+              }}
+              placeholder="Enter Bitrix webhook URL"
+            />
+            <button
+              onClick={handleBitrixCopy}
+              className="btn"
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {bitrixCopied ? '✓ Copied' : 'Copy'}
             </button>
           </div>
         </div>
