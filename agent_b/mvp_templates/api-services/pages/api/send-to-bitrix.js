@@ -1,4 +1,4 @@
-import { shopifyAdapter } from '../../../src/lib/adapters/shopify/index.js';
+import { shopifyAdapter } from '../../src/lib/adapters/shopify';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
