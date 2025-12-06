@@ -5,6 +5,12 @@ export default function WebhookInfo({ onBitrixUrlChange }) {
   const [bitrixWebhookUrl, setBitrixWebhookUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [bitrixCopied, setBitrixCopied] = useState(false);
+  const [shopifyPassword, setShopifyPassword] = useState('');
+  const [bitrixPassword, setBitrixPassword] = useState('');
+  const [shopifyUnlocked, setShopifyUnlocked] = useState(false);
+  const [bitrixUnlocked, setBitrixUnlocked] = useState(false);
+  
+  const CORRECT_PASSWORD = '1spotify2';
 
   useEffect(() => {
     // Get webhook URL from current origin
@@ -33,6 +39,28 @@ export default function WebhookInfo({ onBitrixUrlChange }) {
     setTimeout(() => setBitrixCopied(false), 2000);
   };
 
+  const handleShopifyPasswordSubmit = (e) => {
+    e.preventDefault();
+    if (shopifyPassword === CORRECT_PASSWORD) {
+      setShopifyUnlocked(true);
+      setShopifyPassword('');
+    } else {
+      alert('Incorrect password');
+      setShopifyPassword('');
+    }
+  };
+
+  const handleBitrixPasswordSubmit = (e) => {
+    e.preventDefault();
+    if (bitrixPassword === CORRECT_PASSWORD) {
+      setBitrixUnlocked(true);
+      setBitrixPassword('');
+    } else {
+      alert('Incorrect password');
+      setBitrixPassword('');
+    }
+  };
+
   // Mask URL for security (show only domain)
   const maskUrl = (url) => {
     try {
@@ -53,72 +81,163 @@ export default function WebhookInfo({ onBitrixUrlChange }) {
           <p style={{ color: '#94a3b8', marginBottom: '8px', fontSize: '0.9rem' }}>
             Shopify webhook endpoint is configured and ready to receive events.
           </p>
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'center',
-            padding: '12px',
-            background: '#1e293b',
-            borderRadius: '8px',
-            border: '1px solid #334155'
-          }}>
-            <code style={{
-              flex: 1,
-              color: '#94a3b8',
-              fontSize: '0.9rem',
-              fontFamily: 'monospace'
+          {!shopifyUnlocked ? (
+            <form onSubmit={handleShopifyPasswordSubmit} style={{ marginBottom: '8px' }}>
+              <div style={{
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'center',
+                padding: '12px',
+                background: '#1e293b',
+                borderRadius: '8px',
+                border: '1px solid #334155'
+              }}>
+                <input
+                  type="password"
+                  value={shopifyPassword}
+                  onChange={(e) => setShopifyPassword(e.target.value)}
+                  placeholder="Enter password to view URL"
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#f1f5f9',
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    padding: '4px 8px'
+                  }}
+                />
+                <button
+                  type="submit"
+                  className="btn"
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  Unlock
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center',
+              padding: '12px',
+              background: '#1e293b',
+              borderRadius: '8px',
+              border: '1px solid #334155'
             }}>
-              {maskUrl(webhookUrl)}
-            </code>
-            <button
-              onClick={handleCopy}
-              className="btn"
-              style={{ whiteSpace: 'nowrap' }}
-              title="Copy webhook URL"
-            >
-              {copied ? '✓ Copied' : 'Copy'}
-            </button>
-          </div>
+              <code style={{
+                flex: 1,
+                color: '#f1f5f9',
+                fontSize: '0.9rem',
+                wordBreak: 'break-all',
+                fontFamily: 'monospace'
+              }}>
+                {webhookUrl}
+              </code>
+              <button
+                onClick={handleCopy}
+                className="btn"
+                style={{ whiteSpace: 'nowrap' }}
+                title="Copy webhook URL"
+              >
+                {copied ? '✓ Copied' : 'Copy'}
+              </button>
+              <button
+                onClick={() => setShopifyUnlocked(false)}
+                className="btn"
+                style={{ whiteSpace: 'nowrap', background: '#6b7280' }}
+                title="Lock URL"
+              >
+                🔒 Lock
+              </button>
+            </div>
+          )}
         </div>
 
         <div style={{ marginBottom: '16px' }}>
           <p style={{ color: '#94a3b8', marginBottom: '8px', fontSize: '0.9rem' }}>
             Bitrix24 webhook is configured for sending events.
           </p>
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'center',
-            padding: '12px',
-            background: '#1e293b',
-            borderRadius: '8px',
-            border: '1px solid #334155'
-          }}>
-            <input
-              type="password"
-              value={bitrixWebhookUrl}
-              onChange={(e) => setBitrixWebhookUrl(e.target.value)}
-              style={{
-                flex: 1,
-                background: 'transparent',
-                border: 'none',
-                color: '#f1f5f9',
-                fontSize: '0.9rem',
-                fontFamily: 'monospace',
-                outline: 'none',
-                padding: '4px 0'
-              }}
-              placeholder="Enter Bitrix webhook URL"
-            />
-            <button
-              onClick={handleBitrixCopy}
-              className="btn"
-              style={{ whiteSpace: 'nowrap' }}
-              title="Copy webhook URL"
-            >
-              {bitrixCopied ? '✓ Copied' : 'Copy'}
-            </button>
-          </div>
+          {!bitrixUnlocked ? (
+            <form onSubmit={handleBitrixPasswordSubmit} style={{ marginBottom: '8px' }}>
+              <div style={{
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'center',
+                padding: '12px',
+                background: '#1e293b',
+                borderRadius: '8px',
+                border: '1px solid #334155'
+              }}>
+                <input
+                  type="password"
+                  value={bitrixPassword}
+                  onChange={(e) => setBitrixPassword(e.target.value)}
+                  placeholder="Enter password to view/edit URL"
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#f1f5f9',
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    padding: '4px 8px'
+                  }}
+                />
+                <button
+                  type="submit"
+                  className="btn"
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  Unlock
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center',
+              padding: '12px',
+              background: '#1e293b',
+              borderRadius: '8px',
+              border: '1px solid #334155'
+            }}>
+              <input
+                type="text"
+                value={bitrixWebhookUrl}
+                onChange={(e) => setBitrixWebhookUrl(e.target.value)}
+                style={{
+                  flex: 1,
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#f1f5f9',
+                  fontSize: '0.9rem',
+                  fontFamily: 'monospace',
+                  outline: 'none',
+                  padding: '4px 8px'
+                }}
+                placeholder="Enter Bitrix webhook URL"
+              />
+              <button
+                onClick={handleBitrixCopy}
+                className="btn"
+                style={{ whiteSpace: 'nowrap' }}
+                title="Copy webhook URL"
+              >
+                {bitrixCopied ? '✓ Copied' : 'Copy'}
+              </button>
+              <button
+                onClick={() => setBitrixUnlocked(false)}
+                className="btn"
+                style={{ whiteSpace: 'nowrap', background: '#6b7280' }}
+                title="Lock URL"
+              >
+                🔒 Lock
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="alert alert-info" style={{ marginTop: '20px' }}>
