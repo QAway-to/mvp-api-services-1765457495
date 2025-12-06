@@ -1,0 +1,89 @@
+import { useState, useEffect } from 'react';
+
+export default function WebhookInfo() {
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    // Get webhook URL from current origin
+    const url = typeof window !== 'undefined' 
+      ? `${window.location.origin}/api/webhook/shopify`
+      : '/api/webhook/shopify';
+    setWebhookUrl(url);
+  }, []);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="card">
+      <header className="card-header">
+        <h2>Webhook Configuration</h2>
+      </header>
+      <div style={{ padding: '20px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <p style={{ color: '#94a3b8', marginBottom: '8px', fontSize: '0.9rem' }}>
+            Use this URL in your Shopify admin to receive webhook events:
+          </p>
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center',
+            padding: '12px',
+            background: '#1e293b',
+            borderRadius: '8px',
+            border: '1px solid #334155'
+          }}>
+            <code style={{
+              flex: 1,
+              color: '#f1f5f9',
+              fontSize: '0.9rem',
+              wordBreak: 'break-all',
+              fontFamily: 'monospace'
+            }}>
+              {webhookUrl}
+            </code>
+            <button
+              onClick={handleCopy}
+              className="btn"
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {copied ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+
+        <div className="alert alert-info" style={{ marginTop: '20px' }}>
+          <strong>Setup Instructions:</strong>
+          <ol style={{ marginTop: '12px', paddingLeft: '20px', color: '#cbd5e1' }}>
+            <li style={{ marginBottom: '8px' }}>Go to your Shopify Admin</li>
+            <li style={{ marginBottom: '8px' }}>Navigate to Settings → Notifications</li>
+            <li style={{ marginBottom: '8px' }}>Scroll to "Webhooks" section</li>
+            <li style={{ marginBottom: '8px' }}>Click "Create webhook"</li>
+            <li style={{ marginBottom: '8px' }}>Select event type (e.g., "Order creation")</li>
+            <li style={{ marginBottom: '8px' }}>Paste the webhook URL above</li>
+            <li style={{ marginBottom: '8px' }}>Select format: JSON</li>
+            <li>Save the webhook</li>
+          </ol>
+        </div>
+
+        <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+          <p style={{ color: '#60a5fa', fontWeight: 600, marginBottom: '8px' }}>ℹ Supported Webhook Schema</p>
+          <p style={{ color: '#cbd5e1', fontSize: '0.9rem', marginBottom: '4px' }}>
+            The endpoint accepts Shopify webhook payloads with the following structure:
+          </p>
+          <ul style={{ color: '#cbd5e1', fontSize: '0.85rem', paddingLeft: '20px', marginTop: '8px' }}>
+            <li>Order ID, email, created_at, currency, total_price</li>
+            <li>Line items (id, title, quantity, price, sku)</li>
+            <li>Discount codes (code, amount, type)</li>
+            <li>Customer information (id, first_name, last_name, email)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+

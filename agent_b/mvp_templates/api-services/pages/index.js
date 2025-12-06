@@ -10,6 +10,13 @@ export default function Home() {
       href: '/wayback',
       status: 'ready',
     },
+    {
+      icon: '🛍️',
+      title: 'Shopify Webhook',
+      description: 'Receive and monitor Shopify webhook events in real-time.',
+      href: '/shopify',
+      status: 'ready',
+    },
   ];
 
   return (
