@@ -277,6 +277,16 @@ class MVPGenerator:
             adapters_src = template_path / "src" / "lib" / "adapters"
             adapters_dest = project_path / "src" / "lib" / "adapters"
             
+            # Enhanced diagnostics
+            log_agent_action("Agent B", f"🔍 Checking web-scraper adapters: template_path={template_path}, adapters_src={adapters_src}")
+            log_agent_action("Agent B", f"🔍 Template path exists: {template_path.exists()}")
+            if template_path.exists():
+                src_lib = template_path / "src" / "lib"
+                log_agent_action("Agent B", f"🔍 src/lib exists: {src_lib.exists()}")
+                if src_lib.exists():
+                    all_dirs = [d.name for d in src_lib.iterdir() if d.is_dir()]
+                    log_agent_action("Agent B", f"🔍 Directories in src/lib: {all_dirs}")
+            
             if adapters_src.exists():
                 log_agent_action("Agent B", f"🔧 Post-verifying adapters directory for web-scraper")
                 # Check if adapters were copied
@@ -315,8 +325,22 @@ class MVPGenerator:
                         log_agent_action("Agent B", f"🔍 Files in adapters dir: {[str(f.relative_to(adapters_dest)) for f in all_files if f.is_file()]}")
                     raise FileNotFoundError(f"Web-scraper adapter files not found after copy. Index: {adapters_index.exists()}, Base: {adapters_base.exists()}, AFLTables index: {afltables_index.exists()}, parser: {afltables_parser.exists()}, urlExpander: {afltables_urlExpander.exists()}")
             else:
-                log_agent_action("Agent B", f"❌❌❌ CRITICAL: Adapters source directory does not exist: {adapters_src}")
-                raise FileNotFoundError(f"Adapters source directory does not exist: {adapters_src}")
+                # Instead of raising error immediately, check if adapters were copied by copytree
+                log_agent_action("Agent B", f"⚠️ Adapters source directory not found at {adapters_src}, checking if copytree copied it...")
+                if adapters_dest.exists():
+                    log_agent_action("Agent B", f"✅ Adapters directory exists in destination (copied by copytree), skipping explicit copy")
+                    # Still verify files
+                    adapters_index = adapters_dest / "index.js"
+                    adapters_base = adapters_dest / "base.js"
+                    if adapters_index.exists() and adapters_base.exists():
+                        log_agent_action("Agent B", f"✅✅✅ Adapter files verified in destination")
+                    else:
+                        log_agent_action("Agent B", f"❌❌❌ CRITICAL: Adapters directory exists but critical files missing!")
+                        raise FileNotFoundError(f"Adapters directory exists but critical files (index.js, base.js) are missing")
+                else:
+                    log_agent_action("Agent B", f"❌❌❌ CRITICAL: Adapters source directory does not exist: {adapters_src}")
+                    log_agent_action("Agent B", f"❌ And adapters destination directory also does not exist: {adapters_dest}")
+                    raise FileNotFoundError(f"Adapters source directory does not exist: {adapters_src}")
         
         if template_id in ["web-scraper", "brand-mention-monitor", "data-formatter"]:
             lib_files_map = {
