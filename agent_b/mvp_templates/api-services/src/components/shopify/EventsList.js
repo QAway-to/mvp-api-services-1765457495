@@ -1,4 +1,4 @@
-export default function EventsList({ events, onSelectionChange, selectedEvents = [] }) {
+export default function EventsList({ events, onSelectionChange, selectedEvents = [], onPreviewEvent }) {
   if (!events || events.length === 0) {
     return (
       <div className="card">
@@ -75,6 +75,9 @@ export default function EventsList({ events, onSelectionChange, selectedEvents =
               <th style={{ padding: '12px', textAlign: 'left', color: '#94a3b8' }}>Currency</th>
               <th style={{ padding: '12px', textAlign: 'left', color: '#94a3b8' }}>Received At</th>
               <th style={{ padding: '12px', textAlign: 'left', color: '#94a3b8' }}>Items</th>
+              {onPreviewEvent && (
+                <th style={{ padding: '12px', textAlign: 'left', color: '#94a3b8', width: '100px' }}>Preview</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -105,6 +108,27 @@ export default function EventsList({ events, onSelectionChange, selectedEvents =
                 <td style={{ padding: '12px', color: '#f1f5f9' }}>
                   {event.line_items ? event.line_items.length : 0}
                 </td>
+                {onPreviewEvent && (
+                  <td style={{ padding: '12px' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPreviewEvent(event);
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        background: '#3b82f6',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: '#f1f5f9',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      👁️ Preview
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

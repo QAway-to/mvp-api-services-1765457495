@@ -1,3 +1,5 @@
+import { shopifyAdapter } from '../../../src/lib/adapters/shopify/index.js';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -42,6 +44,24 @@ export default async function handler(req, res) {
   for (let i = 0; i < selectedEvents.length; i++) {
     const event = selectedEvents[i];
     
+    // Transform Shopify order to Bitrix24 format
+    let bitrixData;
+    let transformError = null;
+    
+    try {
+      bitrixData = shopifyAdapter.transformToBitrix(event);
+    } catch (transformErr) {
+      transformError = {
+        eventId: event.id,
+        success: false,
+        error: 'Transformation error',
+        details: transformErr.message,
+        type: 'TransformationError'
+      };
+      errors.push(transformError);
+      continue;
+    }
+    
     // Create AbortController for timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
@@ -52,7 +72,7 @@ export default async function handler(req, res) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(event),
+        body: JSON.stringify(bitrixData),
         signal: controller.signal
       });
 
@@ -74,7 +94,9 @@ export default async function handler(req, res) {
           success: true,
           status: response.status,
           response: result,
-          message: 'Successfully sent to Bitrix'
+          message: 'Successfully sent to Bitrix',
+          shopifyData: event, // Original Shopify data for preview
+          bitrixData: bitrixData // Transformed Bitrix data for preview
         });
       } else {
         errors.push({
@@ -83,7 +105,9 @@ export default async function handler(req, res) {
           status: response.status,
           statusText: response.statusText,
           response: result,
-          error: `HTTP ${response.status}: ${response.statusText}`
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          shopifyData: event, // Original Shopify data for preview
+          bitrixData: bitrixData // Transformed Bitrix data for preview
         });
       }
     } catch (fetchError) {
@@ -108,7 +132,9 @@ export default async function handler(req, res) {
         success: false,
         error: errorMessage,
         details: errorDetails,
-        type: fetchError.name || 'NetworkError'
+        type: fetchError.name || 'NetworkError',
+        shopifyData: event, // Original Shopify data for preview
+        bitrixData: bitrixData // Transformed Bitrix data for preview
       });
     }
   }

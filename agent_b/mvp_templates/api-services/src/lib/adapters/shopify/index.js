@@ -170,6 +170,101 @@ export class ShopifyAdapter {
     this.storage.length = 0;
     return count;
   }
+
+  /**
+   * Transform Shopify order to Bitrix24 crm.deal.add format
+   * @param {Object} shopifyOrder - Shopify webhook order data
+   * @returns {Object} Bitrix24 deal format
+   */
+  transformToBitrix(shopifyOrder) {
+    if (!shopifyOrder || typeof shopifyOrder !== 'object') {
+      throw new Error('Invalid Shopify order data');
+    }
+
+    // Helper function to safely get value or null
+    const getValue = (value, transform = null) => {
+      if (value === undefined || value === null || value === '') {
+        return null;
+      }
+      return transform ? transform(value) : value;
+    };
+
+    // Helper to parse number from string
+    const parseNumber = (value) => {
+      if (value === null || value === undefined || value === '') return null;
+      const num = typeof value === 'string' ? parseFloat(value) : value;
+      return isNaN(num) ? null : num;
+    };
+
+    // Helper to format date
+    const formatDate = (dateString) => {
+      if (!dateString) return null;
+      try {
+        const date = new Date(dateString);
+        return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      } catch {
+        return null;
+      }
+    };
+
+    // Calculate totals
+    const totalPrice = parseNumber(shopifyOrder.total_price);
+    const totalTax = parseNumber(shopifyOrder.total_tax);
+    const totalDiscount = shopifyOrder.discount_codes && shopifyOrder.discount_codes.length > 0
+      ? shopifyOrder.discount_codes.reduce((sum, code) => sum + parseNumber(code.amount) || 0, 0)
+      : null;
+    const shippingPrice = parseNumber(shopifyOrder.total_shipping_price_set?.shop_money?.amount || shopifyOrder.shipping_price);
+
+    // Format line items
+    const lineItems = shopifyOrder.line_items && Array.isArray(shopifyOrder.line_items)
+      ? shopifyOrder.line_items.map(item => ({
+          id: item.id || null,
+          title: item.title || null,
+          quantity: item.quantity || null,
+          price: parseNumber(item.price),
+          sku: item.sku || null,
+          variant_id: item.variant_id || null,
+          product_id: item.product_id || null
+        }))
+      : null;
+
+    // Customer name
+    const customerName = shopifyOrder.customer
+      ? `${getValue(shopifyOrder.customer.first_name) || ''} ${getValue(shopifyOrder.customer.last_name) || ''}`.trim() || null
+      : null;
+
+    // Customer email
+    const customerEmail = shopifyOrder.customer?.email || shopifyOrder.email || null;
+
+    // Build Bitrix24 deal structure
+    const bitrixDeal = {
+      fields: {
+        TITLE: getValue(shopifyOrder.name) || `Order #${shopifyOrder.id || 'Unknown'}`,
+        TYPE_ID: null, // Not available in Shopify order
+        STAGE_ID: null, // Not available in Shopify order
+        CATEGORY_ID: null, // Not available in Shopify order
+        CURRENCY_ID: getValue(shopifyOrder.currency) || null,
+        OPPORTUNITY: totalPrice,
+        ASSIGNED_BY_ID: null, // Not available in Shopify order
+        COMMENTS: getValue(shopifyOrder.note) || null,
+        UF_SHOPIFY_ORDER_ID: getValue(shopifyOrder.id?.toString()) || null,
+        UF_SHOPIFY_CUSTOMER_EMAIL: customerEmail,
+        UF_SHOPIFY_CUSTOMER_NAME: customerName,
+        UF_SHOPIFY_LINE_ITEMS: lineItems,
+        UF_SHOPIFY_TOTAL_TAX: totalTax,
+        UF_SHOPIFY_TOTAL_DISCOUNT: totalDiscount,
+        UF_SHOPIFY_SHIPPING_PRICE: shippingPrice,
+        CONTACT_ID: null, // Not available in Shopify order
+        COMPANY_ID: null, // Not available in Shopify order
+        BEGINDATE: formatDate(shopifyOrder.created_at),
+        CLOSEDATE: formatDate(shopifyOrder.updated_at || shopifyOrder.created_at),
+        SOURCE_ID: null, // Not available in Shopify order
+        SOURCE_DESCRIPTION: getValue(shopifyOrder.source_name) || null
+      }
+    };
+
+    return bitrixDeal;
+  }
 }
 
 // Export singleton instance

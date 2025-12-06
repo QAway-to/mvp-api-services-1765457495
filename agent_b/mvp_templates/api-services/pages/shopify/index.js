@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import WebhookInfo from '../../src/components/shopify/WebhookInfo';
 import EventsList from '../../src/components/shopify/EventsList';
+import DataPreview from '../../src/components/shopify/DataPreview';
+import { shopifyAdapter } from '../../src/lib/adapters/shopify/index.js';
 
 export default function ShopifyPage() {
   const [events, setEvents] = useState([]);
@@ -13,6 +15,8 @@ export default function ShopifyPage() {
   const [isSending, setIsSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
   const [bitrixWebhookUrl, setBitrixWebhookUrl] = useState('https://bfcshoes.bitrix24.eu/rest/52/fan7d3m1ylod3mgq/crm.deal.add.json');
+  const [previewEvent, setPreviewEvent] = useState(null); // Event to preview
+  const [previewData, setPreviewData] = useState(null); // { shopifyData, bitrixData } for preview
 
   const fetchEvents = async () => {
     setIsLoading(true);
@@ -82,14 +86,16 @@ export default function ShopifyPage() {
           details: result.errors && result.errors.length > 0 ? result.errors : null,
           total: result.total,
           successful: result.successful,
-          failed: result.failed
+          failed: result.failed,
+          results: result.results || [] // Store results for preview
         });
       } else {
         // 400, 500 - ошибки
         setSendResult({ 
           success: false, 
           message: result.error || 'Failed to send',
-          details: result.details || (result.errors && result.errors.length > 0 ? result.errors : null)
+          details: result.details || (result.errors && result.errors.length > 0 ? result.errors : null),
+          results: result.results || [] // Store results for preview
         });
       }
     } catch (error) {
@@ -101,6 +107,29 @@ export default function ShopifyPage() {
       });
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handlePreviewEvent = (event) => {
+    try {
+      const bitrixData = shopifyAdapter.transformToBitrix(event);
+      setPreviewEvent(event);
+      setPreviewData({
+        shopifyData: event,
+        bitrixData: bitrixData
+      });
+    } catch (error) {
+      alert(`Ошибка при трансформации: ${error.message}`);
+    }
+  };
+
+  const handlePreviewFromResult = (resultItem) => {
+    if (resultItem.shopifyData && resultItem.bitrixData) {
+      setPreviewEvent(resultItem.shopifyData);
+      setPreviewData({
+        shopifyData: resultItem.shopifyData,
+        bitrixData: resultItem.bitrixData
+      });
     }
   };
 
@@ -179,12 +208,74 @@ export default function ShopifyPage() {
                     marginBottom: '6px',
                     padding: '6px 8px',
                     background: 'rgba(0, 0, 0, 0.2)',
-                    borderRadius: '4px'
+                    borderRadius: '4px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
                   }}>
-                    {err.eventId && <strong>Event ID {err.eventId}: </strong>}
-                    {err.error || err.message || 'Unknown error'}
-                    {err.details && <div style={{ marginTop: '4px', opacity: 0.8 }}>{err.details}</div>}
-                    {err.status && <div style={{ marginTop: '4px', opacity: 0.8 }}>HTTP {err.status}: {err.statusText || ''}</div>}
+                    <div>
+                      {err.eventId && <strong>Event ID {err.eventId}: </strong>}
+                      {err.error || err.message || 'Unknown error'}
+                      {err.details && <div style={{ marginTop: '4px', opacity: 0.8 }}>{err.details}</div>}
+                      {err.status && <div style={{ marginTop: '4px', opacity: 0.8 }}>HTTP {err.status}: {err.statusText || ''}</div>}
+                    </div>
+                    {(err.shopifyData && err.bitrixData) && (
+                      <button
+                        onClick={() => handlePreviewFromResult(err)}
+                        style={{
+                          padding: '4px 8px',
+                          background: '#3b82f6',
+                          border: 'none',
+                          borderRadius: '4px',
+                          color: '#f1f5f9',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          marginLeft: '8px'
+                        }}
+                      >
+                        👁️ Preview
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {sendResult.results && sendResult.results.length > 0 && (
+              <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${sendResult.success ? 'rgba(5, 150, 105, 0.3)' : 'rgba(239, 68, 68, 0.3)'}` }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '8px' }}>Результаты отправки:</div>
+                {sendResult.results.map((result, idx) => (
+                  <div key={idx} style={{ 
+                    fontSize: '0.8rem', 
+                    marginBottom: '6px',
+                    padding: '6px 8px',
+                    background: result.success ? 'rgba(5, 150, 105, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      {result.eventId && <strong>Event ID {result.eventId}: </strong>}
+                      {result.success ? '✓ Успешно отправлено' : (result.error || 'Ошибка отправки')}
+                      {result.status && <div style={{ marginTop: '4px', opacity: 0.8 }}>HTTP {result.status}</div>}
+                    </div>
+                    {(result.shopifyData && result.bitrixData) && (
+                      <button
+                        onClick={() => handlePreviewFromResult(result)}
+                        style={{
+                          padding: '4px 8px',
+                          background: '#3b82f6',
+                          border: 'none',
+                          borderRadius: '4px',
+                          color: '#f1f5f9',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          marginLeft: '8px'
+                        }}
+                      >
+                        👁️ Preview
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -225,6 +316,7 @@ export default function ShopifyPage() {
             events={events}
             selectedEvents={selectedEvents}
             onSelectionChange={setSelectedEvents}
+            onPreviewEvent={handlePreviewEvent}
           />
           <div className="card">
             <header className="card-header">
@@ -266,6 +358,15 @@ export default function ShopifyPage() {
             </div>
           </div>
         </div>
+
+        {/* Data Preview */}
+        {previewData && previewEvent && (
+          <DataPreview
+            shopifyData={previewData.shopifyData}
+            bitrixData={previewData.bitrixData}
+            eventId={previewEvent.id}
+          />
+        )}
       </main>
     </>
   );
