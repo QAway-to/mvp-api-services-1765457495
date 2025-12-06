@@ -602,6 +602,13 @@ export default function Home() {
               <div style={{ fontSize: 14 }}>⏳ Обработка запроса...</div>
             </div>
           )}
+
+          {!loading && results.correlations && (
+            <div style={{ marginBottom: 20 }}>
+              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 15, fontWeight: 500, color: '#e2e8f0' }}>🔗 Корреляционная матрица</h3>
+              <CorrelationMatrix correlationData={results.correlations} />
+            </div>
+          )}
           
           {!loading && results.chart && (
             <div style={{ marginBottom: 20 }}>
