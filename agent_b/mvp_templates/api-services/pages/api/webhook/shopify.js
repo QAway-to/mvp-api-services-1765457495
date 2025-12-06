@@ -1,10 +1,8 @@
 // Shopify Webhook endpoint
 import { shopifyAdapter } from '../../../src/lib/adapters/shopify/index.js';
-import { getBitrixWebhookUrl } from '../../../src/lib/bitrix/client.js';
+import { getBitrixWebhookUrl, callBitrixAPI } from '../../../src/lib/bitrix/client.js';
 import { mapShopifyOrderToBitrixDealFields } from '../../../src/lib/bitrix/dealMapper.js';
 import { upsertBitrixContact } from '../../../src/lib/bitrix/contact.js';
-import { createProductRowsFromOrder, setBitrixDealProductRows } from '../../../src/lib/bitrix/productRows.js';
-import { callBitrixAPI } from '../../../src/lib/bitrix/client.js';
 
 // Configure body parser to accept raw JSON
 export const config = {
@@ -109,27 +107,48 @@ export default async function handler(req, res) {
       });
     }
 
-    // Step 4: Set product rows
-    if (dealId) {
+    // Step 4: Set product rows (minimal implementation - always add at least one product)
+    if (dealId && payload.line_items && payload.line_items.length > 0) {
       try {
         addLog('Setting product rows for deal...', 'info');
-        const productRows = createProductRowsFromOrder(payload);
         
-        if (productRows.length > 0) {
-          addLog(`Created ${productRows.length} product rows`, 'info');
-          const productRowsSuccess = await setBitrixDealProductRows(bitrixWebhookUrl, dealId, productRows);
-          
-          if (productRowsSuccess) {
-            addLog(`Product rows set successfully for deal ${dealId}`, 'success');
-          } else {
-            addLog(`Failed to set product rows (non-blocking)`, 'warning');
+        // Take first line item from Shopify payload
+        const item = payload.line_items[0];
+        
+        // Create minimal product row array
+        const rows = [
+          {
+            PRODUCT_ID: 1, // Hardcoded for testing
+            PRICE: Number(item.price || 0),
+            QUANTITY: item.quantity || 1
           }
+        ];
+
+        addLog(`Calling crm.deal.productrows.set with deal ID: ${dealId}`, 'info');
+        addLog(`Product row: PRODUCT_ID=1, PRICE=${rows[0].PRICE}, QUANTITY=${rows[0].QUANTITY}`, 'info');
+        
+        const productRowsResult = await callBitrixAPI(bitrixWebhookUrl, 'crm.deal.productrows.set', {
+          id: dealId,
+          rows: rows
+        });
+
+        if (productRowsResult.result) {
+          addLog(`Product rows set successfully for deal ${dealId}`, 'success');
         } else {
-          addLog('No product rows to set (no matching SKUs found)', 'warning');
+          addLog(`Product rows result: ${JSON.stringify(productRowsResult)}`, 'warning');
         }
       } catch (productRowsError) {
         addLog(`Product rows error (non-blocking): ${productRowsError.message}`, 'error');
+        if (productRowsError.stack) {
+          addLog(`Product rows error stack: ${productRowsError.stack}`, 'error');
+        }
         // Don't throw - deal is already created
+      }
+    } else {
+      if (!dealId) {
+        addLog('No deal ID available, skipping product rows', 'warning');
+      } else {
+        addLog('No line items in order, skipping product rows', 'warning');
       }
     }
 
