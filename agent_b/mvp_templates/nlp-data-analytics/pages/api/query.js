@@ -85,7 +85,8 @@ export default async function handler(req, res) {
       description: geminiResponse.description || '',
       table: null,
       chart: null,
-      statistics: null
+      statistics: null,
+      correlations: null
     };
 
     // Process based on Gemini response type
@@ -242,6 +243,22 @@ export default async function handler(req, res) {
     } else {
       // Text response - return sample data
       result.table = data.slice(0, 20);
+    }
+
+    // Check if user asked for correlations
+    const queryLower = query.toLowerCase();
+    if (queryLower.includes('коррел') || queryLower.includes('correlation') || queryLower.includes('зависимост')) {
+      if (numericColumns.length >= 2) {
+        addLog('Вычисление корреляций...');
+        const correlations = calculateCorrelations(data, numericColumns);
+        if (correlations) {
+          result.correlations = correlations;
+          result.type = 'correlations';
+          addLog(`✅ Вычислены корреляции для ${numericColumns.length} колонок`);
+        }
+      } else {
+        addLog('⚠️ Для корреляций требуется минимум 2 числовые колонки');
+      }
     }
 
     // If no specific visualization but we have numeric data, create default chart

@@ -224,6 +224,8 @@ export default function Home() {
   const [logs, setLogs] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
   const [queryHistory, setQueryHistory] = useState([]);
+  const [filteredData, setFilteredData] = useState(null);
+  const [columnTypes, setColumnTypes] = useState({});
 
   // Определение мобильного устройства
   useEffect(() => {
@@ -295,16 +297,41 @@ export default function Home() {
 
   const handleDataLoaded = (loadedData) => {
     setData(loadedData);
+    setFilteredData(null);
     if (loadedData.logs && loadedData.logs.length > 0) {
       setLogs(loadedData.logs);
     }
+    
+    // Detect column types for filtering
+    if (loadedData.data && loadedData.columnNames) {
+      const types = detectColumnTypes(loadedData.data, loadedData.columnNames);
+      setColumnTypes(types);
+    }
+  };
+
+  const handleFilter = (filters) => {
+    if (!data || !data.data) return;
+    
+    const filtered = advancedFilterData(data.data, filters);
+    setFilteredData(filtered);
+    setResults({
+      type: 'filtered',
+      message: `Отфильтровано: ${filtered.length} из ${data.data.length} строк`,
+      table: filtered.slice(0, 100), // Show first 100 rows
+      chart: null
+    });
+  };
+
+  const handleClearFilter = () => {
+    setFilteredData(null);
+    setResults(null);
   };
 
   const handleQuerySubmit = async (q) => {
     if (!q.trim()) return;
     
-    // Get data from state or sessionStorage
-    let currentData = data?.data;
+    // Get data from state or sessionStorage (use filtered data if available)
+    let currentData = filteredData || data?.data;
     let currentColumns = data?.columnNames;
 
     if (!currentData) {
@@ -554,8 +581,20 @@ export default function Home() {
         </section>
       </div>
 
+      {/* Фильтрация данных */}
+      {data && data.columnNames && (
+        <section style={{ ...section, marginBottom: 20 }}>
+          <DataFilter
+            columns={data.columnNames}
+            columnTypes={columnTypes}
+            onFilter={handleFilter}
+            onClear={handleClearFilter}
+          />
+        </section>
+      )}
+
       {/* Нижний ряд: Результаты анализа (на всю ширину) */}
-      {(results && (results.chart || results.table)) && (
+      {(results && (results.chart || results.table || results.correlations)) && (
         <section style={{ ...section, marginBottom: 20 }}>
           <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📊 Результаты анализа</h2>
           {loading && (
