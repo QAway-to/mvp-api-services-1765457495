@@ -3,8 +3,11 @@ import FileUploader from '../src/components/FileUploader';
 import ChatInterface from '../src/components/ChatInterface';
 import DataTable from '../src/components/DataTable';
 import ChartPanel from '../src/components/ChartPanel';
+import CorrelationMatrix from '../src/components/CorrelationMatrix';
+import DataFilter from '../src/components/DataFilter';
 import sampleData from '../src/mock-data/sample';
 import { exportToCSV, exportToExcel, exportToJSON, exportChartToPNG, exportToPDF } from '../src/lib/exportUtils.js';
+import { advancedFilterData, detectColumnTypes } from '../src/lib/dataProcessor.js';
 
 // Стили для скроллбара (современный вид)
 const scrollbarStyles = `

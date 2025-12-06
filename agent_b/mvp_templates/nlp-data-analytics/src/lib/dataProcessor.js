@@ -197,3 +197,134 @@ export function detectColumnTypes(data, columns) {
   return types;
 }
 
+/**
+ * Calculate correlation matrix for numeric columns
+ */
+export function calculateCorrelations(data, numericColumns) {
+  if (!data || data.length === 0 || !numericColumns || numericColumns.length < 2) {
+    return null;
+  }
+
+  const matrix = {};
+  
+  // Initialize matrix
+  numericColumns.forEach(col1 => {
+    matrix[col1] = {};
+    numericColumns.forEach(col2 => {
+      matrix[col1][col2] = 0;
+    });
+  });
+
+  // Calculate correlations
+  numericColumns.forEach(col1 => {
+    numericColumns.forEach(col2 => {
+      if (col1 === col2) {
+        matrix[col1][col2] = 1.0;
+      } else {
+        const values1 = data.map(row => parseFloat(row[col1])).filter(v => !isNaN(v));
+        const values2 = data.map(row => parseFloat(row[col2])).filter(v => !isNaN(v));
+        
+        // Align values by index
+        const pairs = [];
+        for (let i = 0; i < data.length; i++) {
+          const v1 = parseFloat(data[i][col1]);
+          const v2 = parseFloat(data[i][col2]);
+          if (!isNaN(v1) && !isNaN(v2)) {
+            pairs.push({ x: v1, y: v2 });
+          }
+        }
+
+        if (pairs.length < 2) {
+          matrix[col1][col2] = 0;
+        } else {
+          matrix[col1][col2] = calculatePearsonCorrelation(pairs);
+        }
+      }
+    });
+  });
+
+  return {
+    matrix,
+    columns: numericColumns
+  };
+}
+
+/**
+ * Calculate Pearson correlation coefficient
+ */
+function calculatePearsonCorrelation(pairs) {
+  const n = pairs.length;
+  if (n < 2) return 0;
+
+  const sumX = pairs.reduce((sum, p) => sum + p.x, 0);
+  const sumY = pairs.reduce((sum, p) => sum + p.y, 0);
+  const sumXY = pairs.reduce((sum, p) => sum + p.x * p.y, 0);
+  const sumX2 = pairs.reduce((sum, p) => sum + p.x * p.x, 0);
+  const sumY2 = pairs.reduce((sum, p) => sum + p.y * p.y, 0);
+
+  const numerator = n * sumXY - sumX * sumY;
+  const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+
+  if (denominator === 0) return 0;
+
+  const correlation = numerator / denominator;
+  return Math.round(correlation * 1000) / 1000; // Round to 3 decimal places
+}
+
+/**
+ * Advanced filter data with multiple conditions
+ */
+export function advancedFilterData(data, filterConditions) {
+  if (!data || !filterConditions || filterConditions.length === 0) {
+    return data;
+  }
+
+  return data.filter(row => {
+    // Support AND/OR logic
+    return filterConditions.every(condition => {
+      const { column, operator, value, logic = 'AND' } = condition;
+      const cellValue = row[column];
+
+      if (cellValue === null || cellValue === undefined) {
+        return operator === 'isNull' || operator === 'isEmpty';
+      }
+
+      switch (operator) {
+        case 'equals':
+          return String(cellValue).toLowerCase() === String(value).toLowerCase();
+        case 'notEquals':
+          return String(cellValue).toLowerCase() !== String(value).toLowerCase();
+        case 'contains':
+          return String(cellValue).toLowerCase().includes(String(value).toLowerCase());
+        case 'notContains':
+          return !String(cellValue).toLowerCase().includes(String(value).toLowerCase());
+        case 'startsWith':
+          return String(cellValue).toLowerCase().startsWith(String(value).toLowerCase());
+        case 'endsWith':
+          return String(cellValue).toLowerCase().endsWith(String(value).toLowerCase());
+        case 'greater':
+          return parseFloat(cellValue) > parseFloat(value);
+        case 'greaterOrEqual':
+          return parseFloat(cellValue) >= parseFloat(value);
+        case 'less':
+          return parseFloat(cellValue) < parseFloat(value);
+        case 'lessOrEqual':
+          return parseFloat(cellValue) <= parseFloat(value);
+        case 'between':
+          const [min, max] = Array.isArray(value) ? value : [value, value];
+          const numValue = parseFloat(cellValue);
+          return numValue >= parseFloat(min) && numValue <= parseFloat(max);
+        case 'in':
+          const values = Array.isArray(value) ? value : [value];
+          return values.some(v => String(cellValue).toLowerCase() === String(v).toLowerCase());
+        case 'isNull':
+          return cellValue === null || cellValue === undefined || cellValue === '';
+        case 'isEmpty':
+          return cellValue === null || cellValue === undefined || cellValue === '';
+        default:
+          return true;
+      }
+    });
+  });
+}
+

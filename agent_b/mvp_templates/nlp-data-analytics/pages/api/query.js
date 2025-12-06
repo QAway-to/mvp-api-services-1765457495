@@ -5,7 +5,9 @@ import {
   filterData,
   groupBy,
   aggregateGroups,
-  detectColumnTypes
+  detectColumnTypes,
+  calculateCorrelations,
+  advancedFilterData
 } from '../../src/lib/dataProcessor.js';
 import { detectDateColumns, groupByPeriod } from '../../src/lib/dateUtils.js';
 
