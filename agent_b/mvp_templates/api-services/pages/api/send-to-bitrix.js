@@ -3,44 +3,155 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { selectedEvents } = req.body;
+  const { selectedEvents, bitrixWebhookUrl } = req.body;
 
   if (!selectedEvents || !Array.isArray(selectedEvents) || selectedEvents.length === 0) {
-    return res.status(400).json({ error: 'No selected events provided' });
+    return res.status(400).json({ 
+      error: 'No selected events provided',
+      details: 'Please select at least one event to send'
+    });
   }
 
-  const BITRIX_WEBHOOK_URL = 'https://bfcshoes.bitrix24.eu/rest/52/fan7d3m1ylod3mqg/';
+  if (!bitrixWebhookUrl || typeof bitrixWebhookUrl !== 'string' || bitrixWebhookUrl.trim() === '') {
+    return res.status(400).json({ 
+      error: 'Bitrix webhook URL is required',
+      details: 'Please provide a valid Bitrix webhook URL'
+    });
+  }
 
+  // Validate URL format
+  let validUrl;
   try {
-    const results = [];
+    validUrl = new URL(bitrixWebhookUrl);
+    if (!['http:', 'https:'].includes(validUrl.protocol)) {
+      return res.status(400).json({ 
+        error: 'Invalid URL protocol',
+        details: 'Bitrix webhook URL must use http or https protocol'
+      });
+    }
+  } catch (urlError) {
+    return res.status(400).json({ 
+      error: 'Invalid URL format',
+      details: 'Please provide a valid URL for Bitrix webhook'
+    });
+  }
 
-    for (const event of selectedEvents) {
-      const response = await fetch(BITRIX_WEBHOOK_URL, {
+  const results = [];
+  const errors = [];
+
+  for (let i = 0; i < selectedEvents.length; i++) {
+    const event = selectedEvents[i];
+    
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+
+    try {
+      const response = await fetch(bitrixWebhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(event)
+        body: JSON.stringify(event),
+        signal: controller.signal
       });
 
-      const result = await response.json();
-      results.push({
+      clearTimeout(timeoutId);
+
+      let result;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        result = await response.json();
+      } else {
+        const text = await response.text();
+        result = { raw: text };
+      }
+
+      if (response.ok) {
+        results.push({
+          eventId: event.id,
+          success: true,
+          status: response.status,
+          response: result,
+          message: 'Successfully sent to Bitrix'
+        });
+      } else {
+        errors.push({
+          eventId: event.id,
+          success: false,
+          status: response.status,
+          statusText: response.statusText,
+          response: result,
+          error: `HTTP ${response.status}: ${response.statusText}`
+        });
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      let errorMessage = 'Unknown error';
+      let errorDetails = null;
+
+      if (fetchError.name === 'AbortError' || fetchError.name === 'TimeoutError') {
+        errorMessage = 'Request timeout';
+        errorDetails = 'The request to Bitrix took too long (exceeded 30 seconds)';
+      } else if (fetchError.code === 'ENOTFOUND' || fetchError.code === 'ECONNREFUSED') {
+        errorMessage = 'Connection error';
+        errorDetails = `Cannot connect to Bitrix server: ${fetchError.message}`;
+      } else if (fetchError.message) {
+        errorMessage = fetchError.message;
+        errorDetails = fetchError.message;
+      }
+
+      errors.push({
         eventId: event.id,
-        success: response.ok,
-        response: result
+        success: false,
+        error: errorMessage,
+        details: errorDetails,
+        type: fetchError.name || 'NetworkError'
       });
     }
+  }
 
-    const successful = results.filter(r => r.success).length;
-    const failed = results.length - successful;
+  const successful = results.length;
+  const failed = errors.length;
+  const total = selectedEvents.length;
 
+  // Combine results and errors
+  const allResults = [...results, ...errors];
+
+  // Return appropriate status code
+  if (failed === 0) {
+    // All successful
     res.status(200).json({
-      message: `Отправлено ${successful} событий успешно, ${failed} неудачно`,
-      results
+      success: true,
+      message: `Все ${successful} событий успешно отправлены в Bitrix`,
+      total,
+      successful,
+      failed,
+      results: allResults
     });
-
-  } catch (error) {
-    console.error('Error sending to Bitrix:', error);
-    res.status(500).json({ error: 'Failed to send data to Bitrix' });
+  } else if (successful === 0) {
+    // All failed
+    res.status(500).json({
+      success: false,
+      message: `Не удалось отправить события в Bitrix`,
+      total,
+      successful,
+      failed,
+      errors: errors,
+      results: allResults
+    });
+  } else {
+    // Partial success
+    res.status(207).json({
+      success: false,
+      message: `Отправлено ${successful} из ${total} событий. ${failed} событий не удалось отправить`,
+      total,
+      successful,
+      failed,
+      errors: errors,
+      results: allResults
+    });
   }
 }
