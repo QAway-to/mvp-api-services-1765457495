@@ -17,6 +17,7 @@ export default function ShopifyPage() {
   const [bitrixWebhookUrl, setBitrixWebhookUrl] = useState('https://bfcshoes.bitrix24.eu/rest/52/fan7d3m1ylod3mgq/crm.deal.add.json');
   const [previewEvent, setPreviewEvent] = useState(null); // Event to preview
   const [previewData, setPreviewData] = useState(null); // { shopifyData, bitrixData } for preview
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // Track initial load
 
   const fetchEvents = async () => {
     setIsLoading(true);
@@ -27,8 +28,14 @@ export default function ShopifyPage() {
       const data = await response.json();
 
       if (data.success) {
-        setEvents(data.events || []);
+        const fetchedEvents = data.events || [];
+        setEvents(fetchedEvents);
         setLastRefresh(new Date());
+        // Auto-select all events only on initial load if none are selected
+        if (isInitialLoad && selectedEvents.length === 0 && fetchedEvents.length > 0) {
+          setSelectedEvents(fetchedEvents);
+          setIsInitialLoad(false);
+        }
       } else {
         setError(data.error || 'Failed to fetch events');
       }
@@ -133,6 +140,74 @@ export default function ShopifyPage() {
     }
   };
 
+  const handleSelectAll = () => {
+    if (events.length > 0) {
+      setSelectedEvents(events);
+    }
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedEvents([]);
+  };
+
+  const handleSendPreviewEvent = async () => {
+    if (!previewEvent) {
+      alert('Нет события для отправки');
+      return;
+    }
+
+    if (!bitrixWebhookUrl || bitrixWebhookUrl.trim() === '') {
+      alert('Пожалуйста, укажите URL вебхука Bitrix');
+      return;
+    }
+
+    setIsSending(true);
+    setSendResult(null);
+
+    try {
+      const response = await fetch('/api/send-to-bitrix', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          selectedEvents: [previewEvent],
+          bitrixWebhookUrl: bitrixWebhookUrl.trim()
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok || response.status === 207) {
+        setSendResult({ 
+          success: result.success !== false, 
+          message: result.message,
+          details: result.errors && result.errors.length > 0 ? result.errors : null,
+          total: result.total,
+          successful: result.successful,
+          failed: result.failed,
+          results: result.results || []
+        });
+      } else {
+        setSendResult({ 
+          success: false, 
+          message: result.error || 'Failed to send',
+          details: result.details || (result.errors && result.errors.length > 0 ? result.errors : null),
+          results: result.results || []
+        });
+      }
+    } catch (error) {
+      console.error('Send to Bitrix error:', error);
+      setSendResult({ 
+        success: false, 
+        message: 'Network error',
+        details: [{ error: error.message || 'Unknown network error' }]
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   return (
     <>
       <Head>
@@ -152,6 +227,43 @@ export default function ShopifyPage() {
             </p>
           </div>
           <div className="header-actions">
+            {events.length > 0 && (
+              <>
+                {selectedEvents.length === events.length ? (
+                  <button
+                    onClick={handleDeselectAll}
+                    className="btn"
+                    style={{
+                      marginRight: '12px',
+                      background: '#6b7280',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      color: 'white',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Снять выбор
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSelectAll}
+                    className="btn"
+                    style={{
+                      marginRight: '12px',
+                      background: '#3b82f6',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      color: 'white',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✓ Выбрать все ({events.length})
+                  </button>
+                )}
+              </>
+            )}
             <button
               onClick={handleSendToBitrix}
               className="btn"
@@ -365,6 +477,8 @@ export default function ShopifyPage() {
             shopifyData={previewData.shopifyData}
             bitrixData={previewData.bitrixData}
             eventId={previewEvent.id}
+            onSendEvent={handleSendPreviewEvent}
+            isSending={isSending}
           />
         )}
       </main>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function DataPreview({ shopifyData, bitrixData, eventId }) {
+export default function DataPreview({ shopifyData, bitrixData, eventId, onSendEvent, isSending }) {
   const [activeTab, setActiveTab] = useState('shopify'); // 'shopify' or 'bitrix'
 
   if (!shopifyData && !bitrixData) {
@@ -12,7 +12,26 @@ export default function DataPreview({ shopifyData, bitrixData, eventId }) {
       <header className="card-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>Data Preview {eventId && `(Order #${eventId})`}</h2>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {onSendEvent && shopifyData && (
+              <button
+                onClick={onSendEvent}
+                disabled={isSending}
+                style={{
+                  padding: '6px 12px',
+                  background: isSending ? '#6b7280' : '#059669',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#f1f5f9',
+                  cursor: isSending ? 'not-allowed' : 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: 600
+                }}
+              >
+                {isSending ? 'Отправка...' : '📤 Отправить это событие'}
+              </button>
+            )}
+            <div style={{ display: 'flex', gap: '8px' }}>
             {shopifyData && (
               <button
                 onClick={() => setActiveTab('shopify')}
