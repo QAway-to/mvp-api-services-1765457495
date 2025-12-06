@@ -549,7 +549,7 @@ export default function Home() {
         {/* Левая колонка: Фильтрация данных */}
         {data && data.columnNames && (
           <section style={{ ...section, height: '250px' }}>
-            <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>🔍 Фильтрация данных</h2>
+            <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc', outline: 'none', border: 'none', boxShadow: 'none' }}>🔍 Фильтрация данных</h2>
             <div style={sectionContent}>
               <DataFilter
                 columns={data.columnNames}
@@ -563,7 +563,7 @@ export default function Home() {
 
         {/* Правая колонка: История запросов */}
         <section style={{ ...section, height: '250px' }}>
-          <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📜 История запросов</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc', outline: 'none', border: 'none', boxShadow: 'none' }}>📜 История запросов</h2>
           <div style={sectionContent}>
             {queryHistory.length > 0 ? (
               <div>
