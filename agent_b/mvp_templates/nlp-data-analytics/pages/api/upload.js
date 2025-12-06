@@ -102,7 +102,7 @@ export default async function handler(req, res) {
     });
     addLog(`Удалено пустых строк: ${beforeClean - data.length}`);
 
-    addLog(`✅ Успешно обработано: ${data.length} строк, ${columns.length} колонок`);
+      addLog(`✓ Успешно обработано: ${data.length} строк, ${columns.length} колонок`);
 
     // Calculate missing values
     addLog('Подсчет пропущенных значений...');

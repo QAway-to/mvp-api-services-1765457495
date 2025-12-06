@@ -63,6 +63,7 @@ export default function DataFilter({ columns, columnTypes, onFilter, onClear }) 
       padding: 0
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#f8fafc' }}>Фильтрация данных</h3>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={addFilter}

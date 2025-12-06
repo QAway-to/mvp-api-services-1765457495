@@ -20,10 +20,10 @@ import {
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#06b6d4'];
 
 const CHART_TYPES = [
-  { id: 'bar', label: '📊 Столбчатая', icon: '📊' },
-  { id: 'line', label: '📈 Линейная', icon: '📈' },
-  { id: 'pie', label: '🥧 Круговая', icon: '🥧' },
-  { id: 'scatter', label: '🔵 Точечная', icon: '🔵' }
+  { id: 'bar', label: 'Столбчатая', icon: '▦' },
+  { id: 'line', label: 'Линейная', icon: '▲' },
+  { id: 'pie', label: 'Круговая', icon: '◉' },
+  { id: 'scatter', label: 'Точечная', icon: '●' }
 ];
 
 export default function ChartPanel({ data, onChartTypeChange }) {
@@ -138,8 +138,11 @@ export default function ChartPanel({ data, onChartTypeChange }) {
                 background: '#1e293b',
                 border: '1px solid #334155',
                 borderRadius: 8,
-                color: '#f8fafc'
+                color: '#f8fafc',
+                fontSize: 12,
+                padding: '8px 12px'
               }}
+              formatter={(value, name) => [typeof value === 'number' ? value.toFixed(2) : value, name]}
             />
             <Legend />
           </PieChart>
@@ -176,8 +179,11 @@ export default function ChartPanel({ data, onChartTypeChange }) {
                 background: '#1e293b',
                 border: '1px solid #334155',
                 borderRadius: 8,
-                color: '#f8fafc'
+                color: '#f8fafc',
+                fontSize: 12,
+                padding: '8px 12px'
               }}
+              formatter={(value, name) => [typeof value === 'number' ? value.toFixed(2) : value, name]}
             />
             <Scatter 
               dataKey={data.yKey || 'y'} 
@@ -216,8 +222,11 @@ export default function ChartPanel({ data, onChartTypeChange }) {
               background: '#1e293b',
               border: '1px solid #334155',
               borderRadius: 8,
-              color: '#f8fafc'
+              color: '#f8fafc',
+              fontSize: 12,
+              padding: '8px 12px'
             }}
+            formatter={(value, name) => [typeof value === 'number' ? value.toFixed(2) : value, name]}
           />
           <Legend />
           <DataComponent

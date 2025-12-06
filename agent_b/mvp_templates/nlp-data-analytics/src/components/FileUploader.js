@@ -71,7 +71,7 @@ export default function FileUploader({ onDataLoaded }) {
             missingValues: result.missingValues,
             logs: result.logs || []
           });
-          console.log('[FileUploader] ✅ Файл успешно загружен');
+          console.log('[FileUploader] ✓ Файл успешно загружен');
           setUploading(false); // Сбрасываем состояние загрузки
         } catch (error) {
           console.error('[FileUploader] Ошибка:', error);
@@ -123,7 +123,7 @@ export default function FileUploader({ onDataLoaded }) {
           color: '#ef4444',
           fontSize: 14
         }}>
-          ❌ {error}
+          <span style={{ color: '#ef4444' }}>✕</span> {error}
         </div>
       )}
     </div>

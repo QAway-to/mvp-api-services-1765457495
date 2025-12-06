@@ -5,6 +5,7 @@ import DataTable from '../src/components/DataTable';
 import ChartPanel from '../src/components/ChartPanel';
 import CorrelationMatrix from '../src/components/CorrelationMatrix';
 import DataFilter from '../src/components/DataFilter';
+import InsightsPanel from '../src/components/InsightsPanel';
 import sampleData from '../src/mock-data/sample';
 import { exportToCSV, exportToExcel, exportToJSON, exportChartToPNG, exportToPDF } from '../src/lib/exportUtils.js';
 import { advancedFilterData, detectColumnTypes } from '../src/lib/dataProcessor.js';
@@ -360,7 +361,7 @@ export default function Home() {
         table: null,
         chart: null
       });
-      setLogs([{ timestamp: new Date().toISOString(), message: '❌ ОШИБКА: Нет данных для анализа' }]);
+      setLogs([{ timestamp: new Date().toISOString(), message: '✕ ОШИБКА: Нет данных для анализа' }]);
       return;
     }
     
@@ -402,7 +403,7 @@ export default function Home() {
         if (result.details) {
           errorMessage += `\n\nДетали:\n${JSON.stringify(result.details, null, 2)}`;
           if (result.details.suggestion) {
-            errorMessage += `\n\n💡 Решение: ${result.details.suggestion}`;
+            errorMessage += `\n\nℹ Решение: ${result.details.suggestion}`;
           }
         }
         
@@ -436,7 +437,7 @@ export default function Home() {
         ...prev, 
         { 
           timestamp: new Date().toISOString(), 
-          message: `❌ ОШИБКА: ${errorMessage}` 
+          message: `✕ ОШИБКА: ${errorMessage}` 
         },
         {
           timestamp: new Date().toISOString(),
@@ -452,7 +453,7 @@ export default function Home() {
     <main style={container}>
       <style dangerouslySetInnerHTML={{ __html: scrollbarStyles }} />
       <header style={header}>
-        <h1 style={{ fontSize: 28, margin: 0, fontWeight: 700, color: '#f8fafc' }}>📊 NLP Data Analytics</h1>
+        <h1 style={{ fontSize: 24, margin: 0, fontWeight: 700, color: '#f8fafc' }}>NLP Data Analytics</h1>
         <p style={{ color: '#94a3b8', marginTop: 8, fontSize: 14 }}>
           Анализ данных через естественный язык. Загрузите CSV/Excel или подключите БД.
         </p>
@@ -462,17 +463,17 @@ export default function Home() {
       <div style={topRowStyle(isMobile)}>
         {/* Левая колонка: Загрузка данных */}
         <section style={section}>
-          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📁 Загрузка данных</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 16, flexShrink: 0, fontSize: 16, fontWeight: 600, color: '#f8fafc' }}>Загрузка данных</h2>
           <div style={sectionContent}>
             <FileUploader onDataLoaded={handleDataLoaded} />
             {data && (
               <>
                 <div style={info}>
-                  ✅ Загружено: {data.rows} строк, {data.columns} колонок
+                  <span style={{ color: '#10b981', marginRight: 6 }}>✓</span> Загружено: {data.rows} строк, {data.columns} колонок
                 </div>
                 {data.missingValues && Object.keys(data.missingValues).length > 0 && (
                   <div style={{ marginTop: 12, padding: 12, background: 'rgba(251, 191, 36, 0.1)', borderRadius: 8, fontSize: 12 }}>
-                    <div style={{ color: '#fbbf24', fontWeight: 600, marginBottom: 8 }}>⚠️ Пропущенные значения:</div>
+                    <div style={{ color: '#fbbf24', fontWeight: 600, marginBottom: 8 }}><span style={{ marginRight: 6 }}>⚠</span> Пропущенные значения:</div>
                     {Object.entries(data.missingValues)
                       .filter(([_, info]) => info.count > 0)
                       .slice(0, 5)
@@ -492,7 +493,7 @@ export default function Home() {
             )}
             {!data && (
               <div style={{ marginTop: 12, padding: 10, background: '#11162a', borderRadius: 8, fontSize: 12, color: '#94a3b8', border: '1px solid #334155' }}>
-                💡 <strong>Демо режим:</strong> Используются примерные данные для демонстрации. Загрузите свой файл для реального анализа.
+                <span style={{ color: '#6366f1', marginRight: 6 }}>ℹ</span> <strong>Демо режим:</strong> Используются примерные данные для демонстрации. Загрузите свой файл для реального анализа.
               </div>
             )}
           </div>
@@ -500,7 +501,7 @@ export default function Home() {
 
         {/* Средняя колонка: Задайте вопрос */}
         <section style={section}>
-          <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>💬 Задайте вопрос</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 16, fontWeight: 600, color: '#f8fafc' }}>Задайте вопрос</h2>
           <div style={sectionContent}>
             <ChatInterface 
               query={query}
@@ -516,7 +517,7 @@ export default function Home() {
 
         {/* Правая колонка: Логи обработки */}
         <section style={section}>
-          <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📝 Логи обработки</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 16, fontWeight: 600, color: '#f8fafc' }}>Логи обработки</h2>
           <div style={sectionContent}>
             {logs.length > 0 ? (
               <div style={{
@@ -526,7 +527,7 @@ export default function Home() {
                 {logs.slice(-50).map((log, idx) => (
                   <div key={idx} style={{ 
                     marginBottom: 8, 
-                    color: log.message.includes('ОШИБКА') || log.message.includes('❌') ? '#ef4444' : '#94a3b8',
+                    color: log.message.includes('ОШИБКА') || log.message.includes('✕') ? '#ef4444' : '#94a3b8',
                     whiteSpace: 'pre-wrap'
                   }}>
                     <span style={{ color: '#6366f1' }}>
@@ -539,7 +540,7 @@ export default function Home() {
               </div>
             ) : (
               <div style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 13 }}>
-                💡 Логи обработки появятся здесь после отправки запроса
+                <span style={{ color: '#6366f1', marginRight: 6 }}>ℹ</span> Логи обработки появятся здесь после отправки запроса
               </div>
             )}
           </div>
@@ -600,15 +601,15 @@ export default function Home() {
                     </div>
                     <div style={{ color: '#64748b', fontSize: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span>{new Date(item.timestamp).toLocaleString('ru-RU')}</span>
-                      {item.hasChart && <span>📊</span>}
-                      {item.hasTable && <span>📋</span>}
+                      {item.hasChart && <span style={{ fontSize: 12 }}>▦</span>}
+                      {item.hasTable && <span style={{ fontSize: 12 }}>☰</span>}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
               <div style={{ padding: 16, textAlign: 'center', color: '#64748b', fontSize: 12 }}>
-                💡 История запросов появится здесь после отправки запросов
+                <span style={{ color: '#6366f1', marginRight: 6 }}>ℹ</span> История запросов появится здесь после отправки запросов
               </div>
             )}
           </div>
@@ -624,17 +625,21 @@ export default function Home() {
             </div>
           )}
 
+          {!loading && results.insights && results.insights.length > 0 && (
+            <InsightsPanel insights={results.insights} />
+          )}
+
           {!loading && results.correlations && (
             <div style={{ marginBottom: 20 }}>
-              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 15, fontWeight: 500, color: '#e2e8f0' }}>🔗 Корреляционная матрица</h3>
+              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 14, fontWeight: 500, color: '#e2e8f0' }}>Корреляционная матрица</h3>
               <CorrelationMatrix correlationData={results.correlations} />
             </div>
           )}
-          
+
           {!loading && results.chart && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: 15, fontWeight: 500, color: '#e2e8f0' }}>📈 Визуализация</h3>
+                <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: 14, fontWeight: 500, color: '#e2e8f0' }}>Визуализация</h3>
                 <button
                   onClick={() => exportChartToPNG('chart-container', `chart-${Date.now()}.png`)}
                   style={{
@@ -649,8 +654,8 @@ export default function Home() {
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.3)'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)'}
-                >
-                  📥 PNG
+                  >
+                  ↓ PNG
                 </button>
               </div>
               <div id="chart-container">
@@ -662,7 +667,7 @@ export default function Home() {
           {!loading && results.table && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-                <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: 15, fontWeight: 500, color: '#e2e8f0' }}>📋 Данные</h3>
+                <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: 14, fontWeight: 500, color: '#e2e8f0' }}>Данные</h3>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button
                     onClick={() => exportToCSV(results.table, `data-${Date.now()}.csv`)}
@@ -679,7 +684,7 @@ export default function Home() {
                     onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.3)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)'}
                   >
-                    📥 CSV
+                    ↓ CSV
                   </button>
                   <button
                     onClick={() => exportToExcel(results.table, `data-${Date.now()}.xlsx`)}
@@ -696,7 +701,7 @@ export default function Home() {
                     onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'}
                   >
-                    📥 Excel
+                    ↓ Excel
                   </button>
                   <button
                     onClick={() => exportToJSON(results.table, `data-${Date.now()}.json`)}
@@ -713,7 +718,7 @@ export default function Home() {
                     onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.3)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)'}
                   >
-                    📥 JSON
+                    ↓ JSON
                   </button>
                   <button
                     onClick={() => exportToPDF(results.table, 'chart-container', `analysis-${Date.now()}.pdf`)}
@@ -730,7 +735,7 @@ export default function Home() {
                     onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
                   >
-                    📥 PDF
+                    ↓ PDF
                   </button>
                 </div>
               </div>
@@ -745,7 +750,7 @@ export default function Home() {
       {/* Нижний ряд: Ответ от LLM (на всю ширину) */}
       {results && results.message && (
         <section style={section}>
-          <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>💬 Ответ от LLM</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 16, fontWeight: 600, color: '#f8fafc' }}>Ответ от LLM</h2>
           <div style={{
             color: results.type === 'error' ? '#ef4444' : '#e2e8f0',
             whiteSpace: 'pre-wrap',

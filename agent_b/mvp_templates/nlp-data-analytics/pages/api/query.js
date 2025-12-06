@@ -63,16 +63,16 @@ export default async function handler(req, res) {
     try {
       addLog('Вызов processNLQuery...');
       geminiResponse = await processNLQuery(query, schema, sampleData);
-      addLog(`✅ Получен ответ от Gemini: type=${geminiResponse?.type || 'undefined'}`);
+      addLog(`✓ Получен ответ от Gemini: type=${geminiResponse?.type || 'undefined'}`);
       addLog(`Ответ Gemini: ${JSON.stringify(geminiResponse).substring(0, 200)}...`);
     } catch (geminiError) {
-      addLog(`❌ ОШИБКА Gemini API: ${geminiError.message}`);
+      addLog(`✕ ОШИБКА Gemini API: ${geminiError.message}`);
       addLog(`Тип ошибки: ${geminiError.constructor.name}`);
       addLog(`Stack: ${geminiError.stack?.substring(0, 500)}`);
       
       // Check if it's an API key issue
       if (geminiError.message.includes('API_KEY') || geminiError.message.includes('api key')) {
-        addLog('⚠️ ПРОБЛЕМА: GEMINI_API_KEY не установлен или неверный!');
+        addLog('⚠ ПРОБЛЕМА: GEMINI_API_KEY не установлен или неверный!');
         addLog('Решение: Добавьте GEMINI_API_KEY в Environment Variables на Vercel');
       }
       
@@ -83,6 +83,7 @@ export default async function handler(req, res) {
       type: geminiResponse.type || 'text',
       message: geminiResponse.message || 'Запрос обработан',
       description: geminiResponse.description || '',
+      insights: geminiResponse.insights || [],
       table: null,
       chart: null,
       statistics: null,
@@ -107,11 +108,23 @@ export default async function handler(req, res) {
       result.statistics = stats;
       result.table = Object.entries(stats).map(([col, stat]) => ({
         column: col,
+        count: stat.count,
         mean: stat.mean,
         median: stat.median,
+        mode: stat.mode,
+        stdDev: stat.stdDev,
+        variance: stat.variance,
         min: stat.min,
+        q1: stat.q1,
+        median: stat.median,
+        q3: stat.q3,
         max: stat.max,
-        count: stat.count
+        iqr: stat.iqr,
+        p90: stat.p90,
+        p95: stat.p95,
+        p99: stat.p99,
+        skewness: stat.skewness,
+        kurtosis: stat.kurtosis
       }));
 
       // Create bar chart for means
@@ -254,10 +267,10 @@ export default async function handler(req, res) {
         if (correlations) {
           result.correlations = correlations;
           result.type = 'correlations';
-          addLog(`✅ Вычислены корреляции для ${numericColumns.length} колонок`);
+          addLog(`✓ Вычислены корреляции для ${numericColumns.length} колонок`);
         }
       } else {
-        addLog('⚠️ Для корреляций требуется минимум 2 числовые колонки');
+        addLog('⚠ Для корреляций требуется минимум 2 числовые колонки');
       }
     }
 
@@ -306,14 +319,14 @@ export default async function handler(req, res) {
       }
     }
 
-    addLog('✅ Запрос успешно обработан');
+    addLog('✓ Запрос успешно обработан');
     return res.status(200).json({
       ...result,
       logs: logs
     });
   } catch (error) {
     console.error('Query processing error:', error);
-    addLog(`❌ КРИТИЧЕСКАЯ ОШИБКА: ${error.message}`);
+    addLog(`✕ КРИТИЧЕСКАЯ ОШИБКА: ${error.message}`);
     addLog(`Тип ошибки: ${error.constructor.name}`);
     addLog(`Stack trace: ${error.stack?.substring(0, 1000)}`);
     

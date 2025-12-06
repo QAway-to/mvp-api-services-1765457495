@@ -3,7 +3,7 @@
  */
 
 /**
- * Calculate basic statistics for numeric columns
+ * Calculate comprehensive statistics for numeric columns
  */
 export function calculateStatistics(data, column) {
   if (!data || data.length === 0) {
@@ -19,20 +19,73 @@ export function calculateStatistics(data, column) {
   }
 
   const sorted = [...values].sort((a, b) => a - b);
+  const n = values.length;
   const sum = values.reduce((a, b) => a + b, 0);
-  const mean = sum / values.length;
-  const median = sorted.length % 2 === 0
-    ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
-    : sorted[Math.floor(sorted.length / 2)];
+  const mean = sum / n;
+  
+  // Median
+  const median = n % 2 === 0
+    ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2
+    : sorted[Math.floor(n / 2)];
+
+  // Standard deviation and variance
+  const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / n;
+  const stdDev = Math.sqrt(variance);
+
+  // Quartiles
+  const q1Index = Math.floor(n * 0.25);
+  const q3Index = Math.floor(n * 0.75);
+  const q1 = sorted[q1Index];
+  const q3 = sorted[q3Index];
+  const iqr = q3 - q1;
+
+  // Percentiles
+  const percentile = (arr, p) => {
+    const index = Math.floor(arr.length * p);
+    return arr[Math.min(index, arr.length - 1)];
+  };
+
+  // Mode (most frequent value)
+  const frequency = {};
+  values.forEach(v => {
+    const rounded = Math.round(v * 100) / 100;
+    frequency[rounded] = (frequency[rounded] || 0) + 1;
+  });
+  const mode = Object.entries(frequency).reduce((a, b) => 
+    frequency[a[0]] > frequency[b[0]] ? a : b
+  )[0];
+
+  // Skewness (asymmetry)
+  const skewness = n > 2 ? values.reduce((sum, val) => {
+    return sum + Math.pow((val - mean) / stdDev, 3);
+  }, 0) / n : 0;
+
+  // Kurtosis (tailedness)
+  const kurtosis = n > 3 ? values.reduce((sum, val) => {
+    return sum + Math.pow((val - mean) / stdDev, 4);
+  }, 0) / n - 3 : 0;
 
   return {
     column,
-    count: values.length,
-    mean: Math.round(mean * 100) / 100,
-    median: Math.round(median * 100) / 100,
+    count: n,
+    mean: Math.round(mean * 1000) / 1000,
+    median: Math.round(median * 1000) / 1000,
+    mode: parseFloat(mode),
     min: Math.min(...values),
     max: Math.max(...values),
-    sum: Math.round(sum * 100) / 100
+    sum: Math.round(sum * 1000) / 1000,
+    stdDev: Math.round(stdDev * 1000) / 1000,
+    variance: Math.round(variance * 1000) / 1000,
+    q1: Math.round(q1 * 1000) / 1000,
+    q3: Math.round(q3 * 1000) / 1000,
+    iqr: Math.round(iqr * 1000) / 1000,
+    p25: Math.round(percentile(sorted, 0.25) * 1000) / 1000,
+    p75: Math.round(percentile(sorted, 0.75) * 1000) / 1000,
+    p90: Math.round(percentile(sorted, 0.90) * 1000) / 1000,
+    p95: Math.round(percentile(sorted, 0.95) * 1000) / 1000,
+    p99: Math.round(percentile(sorted, 0.99) * 1000) / 1000,
+    skewness: Math.round(skewness * 1000) / 1000,
+    kurtosis: Math.round(kurtosis * 1000) / 1000
   };
 }
 
