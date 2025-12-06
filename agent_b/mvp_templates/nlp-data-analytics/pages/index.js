@@ -556,7 +556,6 @@ export default function Home() {
         {/* Левая колонка: Фильтрация данных */}
         {data && data.columnNames && (
           <section style={{ ...section, height: '250px' }}>
-            <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc', outline: 'none', border: 'none', boxShadow: 'none' }}>🔍 Фильтрация данных</h2>
             <div style={sectionContent}>
               <DataFilter
                 columns={data.columnNames}
@@ -570,7 +569,6 @@ export default function Home() {
 
         {/* Правая колонка: История запросов */}
         <section style={{ ...section, height: '250px' }}>
-          <h2 style={{ marginTop: 0, marginBottom: 12, flexShrink: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc', outline: 'none', border: 'none', boxShadow: 'none' }}>📜 История запросов</h2>
           <div style={sectionContent}>
             {queryHistory.length > 0 ? (
               <div>
@@ -620,7 +618,6 @@ export default function Home() {
       {/* Нижний ряд: Результаты анализа (на всю ширину) */}
       {(results && (results.chart || results.table || results.correlations)) && (
         <section style={{ ...section, marginBottom: 20 }}>
-          <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>📊 Результаты анализа</h2>
           {loading && (
             <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8' }}>
               <div style={{ fontSize: 14 }}>⏳ Обработка запроса...</div>
