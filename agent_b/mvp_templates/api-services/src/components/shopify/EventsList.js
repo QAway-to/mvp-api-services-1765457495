@@ -32,15 +32,24 @@ export default function EventsList({ events, onSelectionChange, selectedEvents =
   };
 
   const handleSelectEvent = (event, checked) => {
+    // Use event.id (unique event ID) for comparison, not orderId
+    const eventId = event.id || event.eventId;
+    
     if (checked) {
-      onSelectionChange([...selectedEvents, event]);
+      // Only add if not already selected
+      if (!selectedEvents.some(e => (e.id || e.eventId) === eventId)) {
+        onSelectionChange([...selectedEvents, event]);
+      }
     } else {
-      onSelectionChange(selectedEvents.filter(e => e.id !== event.id));
+      // Remove by unique event ID
+      onSelectionChange(selectedEvents.filter(e => (e.id || e.eventId) !== eventId));
     }
   };
 
   const isSelected = (event) => {
-    return selectedEvents.some(e => e.id === event.id);
+    // Use unique event ID for comparison
+    const eventId = event.id || event.eventId;
+    return selectedEvents.some(e => (e.id || e.eventId) === eventId);
   };
 
   const isAllSelected = events.length > 0 && selectedEvents.length === events.length;
@@ -81,24 +90,35 @@ export default function EventsList({ events, onSelectionChange, selectedEvents =
             </tr>
           </thead>
           <tbody>
-            {events.map((event, index) => (
+            {events.map((event, index) => {
+              const eventId = event.id || event.eventId || `event-${index}`;
+              const orderId = event.orderId || event.id || 'N/A';
+              const isEventSelected = isSelected(event);
+              
+              return (
               <tr
-                key={event.id || index}
+                key={eventId}
                 style={{
                   borderBottom: '1px solid #334155',
-                  backgroundColor: isSelected(event) ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                  backgroundColor: isEventSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                   transition: 'background-color 0.2s'
                 }}
               >
                 <td style={{ padding: '12px' }}>
                   <input
                     type="checkbox"
-                    checked={isSelected(event)}
-                    onChange={(e) => handleSelectEvent(event, e.target.checked)}
-                    style={{ margin: 0 }}
+                    checked={isEventSelected}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleSelectEvent(event, e.target.checked);
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                    style={{ margin: 0, cursor: 'pointer' }}
                   />
                 </td>
-                <td style={{ padding: '12px', color: '#f1f5f9' }}>{event.id || 'N/A'}</td>
+                <td style={{ padding: '12px', color: '#f1f5f9' }}>{orderId}</td>
                 <td style={{ padding: '12px', color: '#f1f5f9' }}>{event.email || 'N/A'}</td>
                 <td style={{ padding: '12px', color: '#f1f5f9' }}>{event.total_price || 'N/A'}</td>
                 <td style={{ padding: '12px', color: '#f1f5f9' }}>{event.currency || 'N/A'}</td>
@@ -130,7 +150,8 @@ export default function EventsList({ events, onSelectionChange, selectedEvents =
                   </td>
                 )}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

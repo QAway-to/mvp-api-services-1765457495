@@ -124,10 +124,15 @@ export class ShopifyAdapter {
    * @returns {Object} Stored event with timestamp
    */
   storeEvent(payload) {
+    // Generate unique event ID (timestamp + random to ensure uniqueness)
+    const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     const event = {
       ...payload,
       received_at: new Date().toISOString(),
-      id: payload.id || Date.now() // Use provided id or generate one
+      id: uniqueId, // Unique ID for each event
+      eventId: uniqueId, // Also store as eventId for clarity
+      orderId: payload.id || null // Store original order ID separately
     };
     
     this.storage.push(event);
@@ -135,11 +140,27 @@ export class ShopifyAdapter {
   }
 
   /**
-   * Get all events (newest first)
+   * Get all events (newest first, deduplicated by orderId + received_at)
    * @returns {Array<Object>} All stored events
    */
   getAllEvents() {
-    return [...this.storage].reverse(); // Return newest first
+    // Remove duplicates: keep only the latest event for each unique orderId
+    const seen = new Map();
+    const uniqueEvents = [];
+    
+    // Process in reverse order (newest first) and keep only the first occurrence
+    for (let i = this.storage.length - 1; i >= 0; i--) {
+      const event = this.storage[i];
+      const orderId = event.orderId || event.id;
+      
+      // If we haven't seen this orderId yet, or this event is newer, keep it
+      if (!seen.has(orderId)) {
+        seen.set(orderId, event);
+        uniqueEvents.unshift(event); // Add to beginning to maintain newest-first order
+      }
+    }
+    
+    return uniqueEvents;
   }
 
   /**
