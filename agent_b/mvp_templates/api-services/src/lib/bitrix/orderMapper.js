@@ -38,15 +38,15 @@ export function mapShopifyOrderToBitrixDeal(order) {
   // Map source name to source ID
   const sourceId = sourceNameToSourceId(order.source_name);
 
-  // Deal fields
+  // Deal fields (matching Python script structure)
   const dealFields = {
     TITLE: order.name || `Order #${order.id}`,
-    OPPORTUNITY: totalPrice,
+    OPPORTUNITY: totalPrice, // Final amount as in Shopify
     CURRENCY_ID: order.currency || 'EUR',
     COMMENTS: `Shopify order ${order.name || order.id}`,
-    CATEGORY_ID: BITRIX_CONFIG.CATEGORY_ID > 0 ? BITRIX_CONFIG.CATEGORY_ID : null,
-    STAGE_ID: stageId,
-    SOURCE_ID: sourceId,
+    CATEGORY_ID: BITRIX_CONFIG.CATEGORY_ID > 0 ? BITRIX_CONFIG.CATEGORY_ID : 0, // Use 0 if not configured
+    STAGE_ID: stageId || 'NEW', // Default to 'NEW' if not mapped
+    SOURCE_ID: sourceId || 'WEB', // Default to 'WEB' if not mapped
     SOURCE_DESCRIPTION: sourceName,
 
     // Key to Shopify order
@@ -54,7 +54,7 @@ export function mapShopifyOrderToBitrixDeal(order) {
     UF_SHOPIFY_CUSTOMER_EMAIL: order.email || order.customer?.email || null,
     UF_SHOPIFY_CUSTOMER_NAME: customerName,
 
-    // Aggregates for reports
+    // Aggregates for reports (as in Python script)
     UF_SHOPIFY_TOTAL_DISCOUNT: totalDiscount,
     UF_SHOPIFY_SHIPPING_PRICE: shippingPrice,
     UF_SHOPIFY_TOTAL_TAX: totalTax,
@@ -65,40 +65,63 @@ export function mapShopifyOrderToBitrixDeal(order) {
 
   if (order.line_items && Array.isArray(order.line_items)) {
     for (const item of order.line_items) {
-      const productId = BITRIX_CONFIG.SKU_TO_PRODUCT_ID[item.sku];
-
+      // Try to get product ID from SKU mapping
+      let productId = BITRIX_CONFIG.SKU_TO_PRODUCT_ID[item.sku];
+      
+      // If not found, try to use a default product ID (e.g., for socks)
+      // This is a fallback - ideally all SKUs should be mapped
       if (!productId || productId === 0) {
-        console.warn(`[ORDER MAPPER] SKU ${item.sku} not found in mapping or not configured, skipping`);
-        continue;
+        // Default product ID for socks (as per Python script example)
+        productId = 2900; // PRODUCT_ID_SOCK
+        console.warn(`[ORDER MAPPER] SKU ${item.sku} not found in mapping, using default product ID ${productId}`);
       }
 
-      const lineDiscount = Number(item.total_discount || 0);
-      const quantity = item.quantity || 1;
+      // Calculate discount per item
+      const lineDiscount = Number(item.total_discount || item.discount_allocations?.[0]?.amount || 0);
+      const quantity = Number(item.quantity || 1);
       const discountPerItem = quantity > 0 ? lineDiscount / quantity : 0;
-      const price = Number(item.price); // Price before discount
+      
+      // Get price - try different fields
+      const priceBeforeDiscount = Number(item.price || item.price_set?.shop_money?.amount || 0);
+      const priceAfterDiscount = priceBeforeDiscount - discountPerItem;
 
-      productRows.push({
-        PRODUCT_ID: productId,
-        PRICE: price - discountPerItem, // Actual price after discount
-        QUANTITY: quantity,
-        DISCOUNT_TYPE_ID: 1, // Monetary discount
-        DISCOUNT_SUM: discountPerItem,
-        TAX_INCLUDED: 'Y',
-        TAX_RATE: 19, // TODO: Get from order or config
-      });
+      // Get tax rate from item or order
+      let taxRate = 19.0; // Default
+      if (item.tax_lines && item.tax_lines.length > 0) {
+        taxRate = Number(item.tax_lines[0].rate || 0) * 100;
+      } else if (order.tax_lines && order.tax_lines.length > 0) {
+        taxRate = Number(order.tax_lines[0].rate || 0) * 100;
+      }
+
+      // Add one row per quantity (as in Python script example)
+      for (let i = 0; i < quantity; i++) {
+        productRows.push({
+          PRODUCT_ID: productId,
+          PRICE: priceAfterDiscount, // Price after discount
+          QUANTITY: 1,
+          DISCOUNT_TYPE_ID: 1, // Monetary discount
+          DISCOUNT_SUM: discountPerItem,
+          TAX_INCLUDED: order.taxes_included ? 'Y' : 'N',
+          TAX_RATE: taxRate,
+        });
+      }
     }
   }
 
-  // Shipping as separate row
-  if (shippingPrice > 0 && BITRIX_CONFIG.SHIPPING_PRODUCT_ID > 0) {
+  // Shipping as separate row (use hardcoded ID as per Python script)
+  if (shippingPrice > 0) {
+    const shippingProductId = BITRIX_CONFIG.SHIPPING_PRODUCT_ID > 0 
+      ? BITRIX_CONFIG.SHIPPING_PRODUCT_ID 
+      : 3000; // Default shipping product ID
+    
     productRows.push({
-      PRODUCT_ID: BITRIX_CONFIG.SHIPPING_PRODUCT_ID,
+      PRODUCT_ID: shippingProductId,
       PRICE: shippingPrice,
       QUANTITY: 1,
       DISCOUNT_TYPE_ID: 1,
-      DISCOUNT_SUM: 0,
-      TAX_INCLUDED: 'Y',
-      TAX_RATE: 19, // TODO: Get from order or config
+      DISCOUNT_SUM: 0.0,
+      TAX_INCLUDED: order.taxes_included ? 'Y' : 'N',
+      TAX_RATE: 19.0, // Default tax rate for shipping
     });
   }
 

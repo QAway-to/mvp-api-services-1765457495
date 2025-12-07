@@ -103,6 +103,12 @@ export default function EventsList({ events, onSelectionChange, selectedEvents =
                   backgroundColor: isEventSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                   transition: 'background-color 0.2s'
                 }}
+                onMouseEnter={() => {
+                  // Do nothing on hover - prevent auto-selection
+                }}
+                onMouseLeave={() => {
+                  // Do nothing on hover - prevent auto-selection
+                }}
               >
                 <td style={{ padding: '12px' }}>
                   <input

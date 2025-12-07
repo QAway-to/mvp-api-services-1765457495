@@ -41,9 +41,13 @@ export async function findContactByEmail(webhookUrl, email) {
  */
 export async function createContact(webhookUrl, contactData) {
   try {
+    // Match Python script structure
     const fields = {
-      NAME: contactData.firstName || '',
-      LAST_NAME: contactData.lastName || '',
+      NAME: contactData.firstName || 'Shopify',
+      LAST_NAME: contactData.lastName || 'Customer',
+      OPENED: 'Y',
+      TYPE_ID: 'CLIENT',
+      SOURCE_ID: 'WEB', // Default source
       EMAIL: contactData.email ? [{ VALUE: contactData.email, VALUE_TYPE: 'WORK' }] : [],
     };
 

@@ -50,8 +50,8 @@ export default function ShopifyPage() {
           }
         }
         
-        // Auto-select all events only on initial load if none are selected
-        if (isInitialLoad && selectedEvents.length === 0 && fetchedEvents.length > 0) {
+        // Auto-select all events only on initial load (first time only)
+        if (isInitialLoad && fetchedEvents.length > 0) {
           setSelectedEvents(fetchedEvents);
           setIsInitialLoad(false);
         }
