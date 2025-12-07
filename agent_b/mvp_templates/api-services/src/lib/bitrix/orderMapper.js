@@ -76,14 +76,23 @@ export function mapShopifyOrderToBitrixDeal(order) {
         console.warn(`[ORDER MAPPER] SKU ${item.sku} not found in mapping, using default product ID ${productId}`);
       }
 
-      // Calculate discount per item
-      const lineDiscount = Number(item.total_discount || item.discount_allocations?.[0]?.amount || 0);
-      const quantity = Number(item.quantity || 1);
-      const discountPerItem = quantity > 0 ? lineDiscount / quantity : 0;
+      // Get original price (before discount) - this is PRICE_BRUTTO
+      const priceBrutto = Number(item.price || item.price_set?.shop_money?.amount || 0);
       
-      // Get price - try different fields
-      const priceBeforeDiscount = Number(item.price || item.price_set?.shop_money?.amount || 0);
-      const priceAfterDiscount = priceBeforeDiscount - discountPerItem;
+      // Get discount from discount_allocations (this is the correct field in Shopify)
+      // discount_allocations contains the discount amount allocated to this line item
+      const discountAmount = Number(
+        item.discount_allocations?.[0]?.amount || 
+        item.discount_allocations?.[0]?.amount_set?.shop_money?.amount ||
+        item.total_discount ||
+        0
+      );
+      
+      // Calculate price after discount (this is PRICE)
+      const priceAfterDiscount = priceBrutto - discountAmount;
+      
+      // Calculate discount rate in percentage
+      const discountRate = priceBrutto > 0 ? (discountAmount / priceBrutto) * 100 : 0;
 
       // Get tax rate from item or order
       let taxRate = 19.0; // Default
@@ -93,14 +102,18 @@ export function mapShopifyOrderToBitrixDeal(order) {
         taxRate = Number(order.tax_lines[0].rate || 0) * 100;
       }
 
+      const quantity = Number(item.quantity || 1);
+
       // Add one row per quantity (as in Python script example)
       for (let i = 0; i < quantity; i++) {
         productRows.push({
           PRODUCT_ID: productId,
-          PRICE: priceAfterDiscount, // Price after discount
+          PRICE: priceAfterDiscount,        // Price after discount (net price)
+          PRICE_BRUTTO: priceBrutto,         // Price before discount (original price)
           QUANTITY: 1,
-          DISCOUNT_TYPE_ID: 1, // Monetary discount
-          DISCOUNT_SUM: discountPerItem,
+          DISCOUNT_TYPE_ID: 1,               // Monetary discount
+          DISCOUNT_SUM: discountAmount,      // Discount amount
+          DISCOUNT_RATE: discountRate,       // Discount rate in percentage
           TAX_INCLUDED: order.taxes_included ? 'Y' : 'N',
           TAX_RATE: taxRate,
         });
