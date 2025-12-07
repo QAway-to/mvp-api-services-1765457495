@@ -3,12 +3,7 @@
  * Returns both deal fields and product rows
  */
 
-// SKU to Product ID mapping
-const skuToProductId = {
-  'ALB0002': 2900,       // Real IDs from Bitrix
-  'ALB0005': 2901,
-  'SHIPPING': 3000,      // Product/service "Доставка"
-};
+import { BITRIX_CONFIG, financialStatusToStageId, sourceNameToSourceId } from './config.js';
 
 /**
  * Map Shopify order to Bitrix24 deal fields and product rows
@@ -37,15 +32,21 @@ export function mapShopifyOrderToBitrixDeal(order) {
     ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || null
     : null;
 
+  // Map financial status to stage ID
+  const stageId = financialStatusToStageId(order.financial_status) || BITRIX_CONFIG.STAGES.DEFAULT;
+  
+  // Map source name to source ID
+  const sourceId = sourceNameToSourceId(order.source_name);
+
   // Deal fields
   const dealFields = {
     TITLE: order.name || `Order #${order.id}`,
     OPPORTUNITY: totalPrice,
     CURRENCY_ID: order.currency || 'EUR',
     COMMENTS: `Shopify order ${order.name || order.id}`,
-    CATEGORY_ID: 0,
-    STAGE_ID: 'NEW', // Hardcoded for now, later move to config
-    SOURCE_ID: 'WEB',
+    CATEGORY_ID: BITRIX_CONFIG.CATEGORY_ID > 0 ? BITRIX_CONFIG.CATEGORY_ID : null,
+    STAGE_ID: stageId,
+    SOURCE_ID: sourceId,
     SOURCE_DESCRIPTION: sourceName,
 
     // Key to Shopify order
@@ -64,10 +65,10 @@ export function mapShopifyOrderToBitrixDeal(order) {
 
   if (order.line_items && Array.isArray(order.line_items)) {
     for (const item of order.line_items) {
-      const productId = skuToProductId[item.sku];
+      const productId = BITRIX_CONFIG.SKU_TO_PRODUCT_ID[item.sku];
 
-      if (!productId) {
-        console.warn(`[ORDER MAPPER] SKU ${item.sku} not found in mapping, skipping`);
+      if (!productId || productId === 0) {
+        console.warn(`[ORDER MAPPER] SKU ${item.sku} not found in mapping or not configured, skipping`);
         continue;
       }
 
@@ -83,24 +84,23 @@ export function mapShopifyOrderToBitrixDeal(order) {
         DISCOUNT_TYPE_ID: 1, // Monetary discount
         DISCOUNT_SUM: discountPerItem,
         TAX_INCLUDED: 'Y',
-        TAX_RATE: 19, // Hardcoded for now
+        TAX_RATE: 19, // TODO: Get from order or config
       });
     }
   }
 
   // Shipping as separate row
-  if (shippingPrice > 0 && skuToProductId.SHIPPING) {
+  if (shippingPrice > 0 && BITRIX_CONFIG.SHIPPING_PRODUCT_ID > 0) {
     productRows.push({
-      PRODUCT_ID: skuToProductId.SHIPPING,
+      PRODUCT_ID: BITRIX_CONFIG.SHIPPING_PRODUCT_ID,
       PRICE: shippingPrice,
       QUANTITY: 1,
       DISCOUNT_TYPE_ID: 1,
       DISCOUNT_SUM: 0,
       TAX_INCLUDED: 'Y',
-      TAX_RATE: 19,
+      TAX_RATE: 19, // TODO: Get from order or config
     });
   }
 
   return { dealFields, productRows };
 }
-

@@ -102,7 +102,7 @@ async function handleOrderUpdated(order) {
 
   // Optionally: move stage when order is paid
   if (isPaid) {
-    fields.STAGE_ID = 'WON'; // Or your "Paid" stage ID
+    fields.STAGE_ID = BITRIX_CONFIG.STAGES.PAID || 'WON'; // Use configured stage ID
   }
 
   // Update other fields if needed
