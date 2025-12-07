@@ -58,7 +58,7 @@ export function getBitrixWebhookBase() {
     return url.endsWith('/') ? url : `${url}/`;
   }
   
-  // Default webhook base URL (configured for production)
+  // Hardcoded webhook base URL
   return 'https://bfcshoes.bitrix24.eu/rest/52/i6l05o71ywxb8j1l/';
 }
 

@@ -67,7 +67,11 @@ export default async function handler(req, res) {
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
 
     try {
-      const response = await fetch(bitrixWebhookUrl, {
+      // Ensure URL ends with / and add method
+      const baseUrl = bitrixWebhookUrl.endsWith('/') ? bitrixWebhookUrl : `${bitrixWebhookUrl}/`;
+      const apiUrl = `${baseUrl}crm.deal.add.json`;
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

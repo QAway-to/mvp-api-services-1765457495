@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 
 export default function WebhookInfo({ onBitrixUrlChange }) {
   const [webhookUrl, setWebhookUrl] = useState('');
-  const [bitrixWebhookUrl, setBitrixWebhookUrl] = useState('');
+  // Hardcoded Bitrix webhook base URL
+  const [bitrixWebhookUrl, setBitrixWebhookUrl] = useState('https://bfcshoes.bitrix24.eu/rest/52/i6l05o71ywxb8j1l');
   const [copied, setCopied] = useState(false);
   const [bitrixCopied, setBitrixCopied] = useState(false);
   const [shopifyPassword, setShopifyPassword] = useState('');
