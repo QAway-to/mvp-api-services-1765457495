@@ -5,6 +5,7 @@
 
 import { BITRIX_CONFIG, financialStatusToStageId, sourceNameToSourceId } from './config.js';
 import skuMapping from './skuMapping.json' assert { type: 'json' };
+import handleMapping from './handleMapping.json' assert { type: 'json' };
 import { resolveResponsibleId } from './responsible.js';
 
 /**
@@ -73,38 +74,39 @@ export function mapShopifyOrderToBitrixDeal(order) {
 
   if (order.line_items && Array.isArray(order.line_items)) {
     for (const item of order.line_items) {
-      // Try to get product ID from external SKU mapping (generated from Bitrix + Shopify exports),
-      // fallback to config if present
-      const productIdFromFile = skuMapping[item.sku];
-      const productIdFromConfig = BITRIX_CONFIG.SKU_TO_PRODUCT_ID[item.sku];
-      const productId = productIdFromFile || productIdFromConfig || null;
+      // Try SKU mapping first
+      const productIdFromFile = item.sku ? skuMapping[item.sku] : null;
+      const productIdFromConfig = item.sku ? BITRIX_CONFIG.SKU_TO_PRODUCT_ID[item.sku] : null;
 
-      // If still not found — skip the row (не подставляем дефолтный товар)
-      if (!productId || productId === 0) {
-        console.warn(`[ORDER MAPPER] SKU ${item.sku} not mapped, skipping product row`);
-        continue;
-      }
+      // Try handle-based mapping (with a small normalization removing "barefoot-")
+      const rawHandle = item.handle || item.product_handle || null;
+      const normHandle = rawHandle ? rawHandle.toLowerCase().replace('barefoot-', '') : null;
+      const productIdFromHandle = normHandle ? (handleMapping[normHandle] || handleMapping[rawHandle]) : null;
 
-      // Get original price (before discount) - this is PRICE_BRUTTO
+      const productId = productIdFromFile || productIdFromHandle || productIdFromConfig || null;
+
+      // Build descriptive name with size/variant/vendor/color/model if available
+      const parts = [item.title || ''];
+      if (item.variant_title) parts.push(`size: ${item.variant_title}`);
+      if (item.option1 && item.option1 !== item.variant_title) parts.push(`opt1: ${item.option1}`);
+      if (item.option2) parts.push(`opt2: ${item.option2}`);
+      if (item.option3) parts.push(`opt3: ${item.option3}`);
+      if (item.vendor) parts.push(`brand: ${item.vendor}`);
+      const productName = parts.filter(Boolean).join(' | ');
+
+      // Prices and discounts
       const priceBrutto = Number(item.price || item.price_set?.shop_money?.amount || 0);
-      
-      // Get discount from discount_allocations (this is the correct field in Shopify)
-      // discount_allocations contains the discount amount allocated to this line item
       const discountAmount = Number(
-        item.discount_allocations?.[0]?.amount || 
+        item.discount_allocations?.[0]?.amount ||
         item.discount_allocations?.[0]?.amount_set?.shop_money?.amount ||
         item.total_discount ||
         0
       );
-      
-      // Calculate price after discount (this is PRICE)
       const priceAfterDiscount = priceBrutto - discountAmount;
-      
-      // Calculate discount rate in percentage
       const discountRate = priceBrutto > 0 ? (discountAmount / priceBrutto) * 100 : 0;
 
-      // Get tax rate from item or order
-      let taxRate = 19.0; // Default
+      // Tax
+      let taxRate = 19.0;
       if (item.tax_lines && item.tax_lines.length > 0) {
         taxRate = Number(item.tax_lines[0].rate || 0) * 100;
       } else if (order.tax_lines && order.tax_lines.length > 0) {
@@ -113,19 +115,25 @@ export function mapShopifyOrderToBitrixDeal(order) {
 
       const quantity = Number(item.quantity || 1);
 
-      // Add one row per quantity (as in Python script example)
+      // Add one row per quantity; if PRODUCT_ID missing, use PRODUCT_NAME to keep counts aligned
       for (let i = 0; i < quantity; i++) {
-        productRows.push({
-          PRODUCT_ID: productId,
-          PRICE: priceAfterDiscount,        // Price after discount (net price)
-          PRICE_BRUTTO: priceBrutto,         // Price before discount (original price)
+        const row = {
+          PRICE: priceAfterDiscount,
+          PRICE_BRUTTO: priceBrutto,
           QUANTITY: 1,
-          DISCOUNT_TYPE_ID: 1,               // Monetary discount
-          DISCOUNT_SUM: discountAmount,      // Discount amount
-          DISCOUNT_RATE: discountRate,       // Discount rate in percentage
+          DISCOUNT_TYPE_ID: 1,
+          DISCOUNT_SUM: discountAmount,
+          DISCOUNT_RATE: discountRate,
           TAX_INCLUDED: order.taxes_included ? 'Y' : 'N',
           TAX_RATE: taxRate,
-        });
+        };
+        if (productId && productId !== 0) {
+          row.PRODUCT_ID = productId;
+        } else {
+          row.PRODUCT_NAME = productName || item.title || item.sku || 'Shopify item';
+          console.warn(`[ORDER MAPPER] SKU ${item.sku || 'N/A'} not mapped, sending as custom row`);
+        }
+        productRows.push(row);
       }
     }
   }
