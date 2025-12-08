@@ -155,9 +155,34 @@ export function mapShopifyOrderToBitrixDeal(order) {
   if (order.line_items && Array.isArray(order.line_items) && order.line_items.length > 0) {
     const firstItem = order.line_items[0];
     
-    // Size: from variant_title
+    console.log(`[ORDER MAPPER] Processing first line_item for UF-fields:`, {
+      title: firstItem.title,
+      variant_title: firstItem.variant_title,
+      vendor: firstItem.vendor,
+      sku: firstItem.sku,
+      properties: firstItem.properties
+    });
+    
+    // Size: from variant_title (primary source)
+    // Fallback: try to extract from name after dash if variant_title is empty
+    let sizeValue = null;
     if (firstItem.variant_title) {
-      dealFields.UF_CRM_1739793720585 = String(firstItem.variant_title).trim();
+      sizeValue = String(firstItem.variant_title).trim();
+      console.log(`[ORDER MAPPER] Size from variant_title: "${sizeValue}"`);
+    } else if (firstItem.name) {
+      // Try to extract from name (format: "Product Name - 31")
+      const nameParts = firstItem.name.split(' - ');
+      if (nameParts.length > 1) {
+        sizeValue = nameParts[nameParts.length - 1].trim();
+        console.log(`[ORDER MAPPER] Size from name (after dash): "${sizeValue}"`);
+      }
+    }
+    
+    if (sizeValue) {
+      dealFields.UF_CRM_1739793720585 = sizeValue;
+      console.log(`[ORDER MAPPER] ✅ Size field UF_CRM_1739793720585 set to: "${sizeValue}"`);
+    } else {
+      console.warn(`[ORDER MAPPER] ⚠️ Size not found in variant_title or name for item:`, firstItem);
     }
     
     // Color: from properties or title
@@ -189,7 +214,16 @@ export function mapShopifyOrderToBitrixDeal(order) {
       model: dealFields.UF_CRM_1739793668182 || 'N/A',
       brand: dealFields.UF_CRM_1741642513658 || 'N/A'
     });
+  } else {
+    console.warn(`[ORDER MAPPER] ⚠️ No line_items found in order, cannot extract product properties`);
   }
+  
+  // Log all UF-fields that will be sent to Bitrix
+  const ufFields = Object.keys(dealFields).filter(key => key.startsWith('UF_'));
+  console.log(`[ORDER MAPPER] All UF-fields in dealFields:`, ufFields.map(key => ({
+    field: key,
+    value: dealFields[key]
+  })));
 
   // Product rows
   const productRows = [];
