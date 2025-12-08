@@ -71,9 +71,21 @@ export function mapShopifyOrderToBitrixDeal(order) {
 
   // Product rows
   const productRows = [];
+  
+  // Shipping variables (defined early for final validation)
+  let actualShippingPrice = 0;
+  let shippingLineTitle = null;
 
   if (order.line_items && Array.isArray(order.line_items)) {
+    // Get shipping product ID to avoid confusion
+    const shippingProductId = BITRIX_CONFIG.SHIPPING_PRODUCT_ID > 0 
+      ? BITRIX_CONFIG.SHIPPING_PRODUCT_ID 
+      : 3000; // Default shipping product ID
+    
     for (const item of order.line_items) {
+      // CRITICAL: line_items are ALWAYS products, NEVER shipping
+      // Even if a product has the same ID as shipping, it's still a product from line_items
+      
       // Try SKU mapping first
       const productIdFromFile = item.sku ? skuMapping[item.sku] : null;
       const productIdFromConfig = item.sku ? BITRIX_CONFIG.SKU_TO_PRODUCT_ID[item.sku] : null;
@@ -83,7 +95,13 @@ export function mapShopifyOrderToBitrixDeal(order) {
       const normHandle = rawHandle ? rawHandle.toLowerCase().replace('barefoot-', '') : null;
       const productIdFromHandle = normHandle ? (handleMapping[normHandle] || handleMapping[rawHandle]) : null;
 
-      const productId = productIdFromFile || productIdFromHandle || productIdFromConfig || null;
+      let productId = productIdFromFile || productIdFromHandle || productIdFromConfig || null;
+      
+      // Safety check: if product ID matches shipping ID, log warning but keep it as product
+      // (line_items are always products, even if they accidentally have shipping ID)
+      if (productId && productId == shippingProductId) {
+        console.warn(`[ORDER MAPPER] WARNING: Product from line_items (SKU: ${item.sku || 'N/A'}, Title: ${item.title || 'N/A'}) has PRODUCT_ID ${productId} which matches shipping ID. Treating as product (not shipping).`);
+      }
 
       // Extract size and properties from Shopify line_item
       // variant_title usually contains the size (e.g., "31", "36-39", "S", "M")
@@ -192,21 +210,86 @@ export function mapShopifyOrderToBitrixDeal(order) {
     }
   }
 
-  // Shipping as separate row (use hardcoded ID as per Python script)
-  if (shippingPrice > 0) {
+  // Shipping as separate row - ONLY from shipping_lines, NEVER from line_items
+  // Extract shipping price STRICTLY from shipping_lines to avoid confusion with regular products
+  if (order.shipping_lines && Array.isArray(order.shipping_lines) && order.shipping_lines.length > 0) {
+    // Get shipping from the first shipping_line (most reliable source)
+    const shippingLine = order.shipping_lines[0];
+    actualShippingPrice = Number(
+      shippingLine.price ||
+      shippingLine.price_set?.shop_money?.amount ||
+      shippingLine.amount ||
+      0
+    );
+    shippingLineTitle = shippingLine.title || shippingLine.code || 'Shipping';
+  } else {
+    // Fallback: try to get from order-level shipping fields (less reliable)
+    actualShippingPrice = Number(
+      order.current_total_shipping_price_set?.shop_money?.amount ||
+      order.total_shipping_price_set?.shop_money?.amount ||
+      order.shipping_price ||
+      0
+    );
+    shippingLineTitle = 'Shipping';
+  }
+  
+  // Only add shipping row if we have actual shipping_lines OR explicit shipping price > 0
+  // AND shipping price matches what we calculated (to avoid confusion with products)
+  const hasShippingLines = order.shipping_lines && Array.isArray(order.shipping_lines) && order.shipping_lines.length > 0;
+  const hasExplicitShippingPrice = actualShippingPrice > 0 && Math.abs(actualShippingPrice - shippingPrice) < 0.01;
+  
+  if (actualShippingPrice > 0 && (hasShippingLines || hasExplicitShippingPrice)) {
     const shippingProductId = BITRIX_CONFIG.SHIPPING_PRODUCT_ID > 0 
       ? BITRIX_CONFIG.SHIPPING_PRODUCT_ID 
-      : 3000; // Default shipping product ID
+      : 3000; // Default shipping product ID (WARNING: ensure this ID is NOT used for regular products!)
     
+    // CRITICAL: Always include PRODUCT_NAME for shipping to avoid confusion
+    // This ensures shipping is clearly identified in Bitrix24
     productRows.push({
       PRODUCT_ID: shippingProductId,
-      PRICE: shippingPrice,
+      PRODUCT_NAME: `Shipping: ${shippingLineTitle}`, // Explicit name to avoid confusion
+      PRICE: actualShippingPrice,
       QUANTITY: 1,
       DISCOUNT_TYPE_ID: 1,
       DISCOUNT_SUM: 0.0,
       TAX_INCLUDED: order.taxes_included ? 'Y' : 'N',
       TAX_RATE: 19.0, // Default tax rate for shipping
     });
+    
+    console.log(`[ORDER MAPPER] Added shipping row: ${shippingLineTitle}, Price: ${actualShippingPrice}, Product ID: ${shippingProductId}`);
+  } else if (shippingPrice > 0 && !hasShippingLines) {
+    // Log warning if we have shipping price but no shipping_lines (potential data issue)
+    console.warn(`[ORDER MAPPER] Shipping price detected (${shippingPrice}) but no shipping_lines found. Skipping shipping row to avoid confusion.`);
+  }
+
+  // Final validation: count products vs shipping
+  const productRowsCount = productRows.length;
+  const shippingRowsCount = productRows.filter(r => 
+    r.PRODUCT_NAME && r.PRODUCT_NAME.toLowerCase().includes('shipping')
+  ).length;
+  const regularProductRowsCount = productRowsCount - shippingRowsCount;
+  
+  // Count expected items from Shopify
+  const expectedLineItemsCount = order.line_items 
+    ? order.line_items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
+    : 0;
+  const expectedShippingCount = (order.shipping_lines && order.shipping_lines.length > 0 && actualShippingPrice > 0) ? 1 : 0;
+  const expectedTotalRows = expectedLineItemsCount + expectedShippingCount;
+  
+  // Log summary for debugging
+  console.log(`[ORDER MAPPER] Order ${order.name || order.id} mapping summary:`);
+  console.log(`  - Line items in Shopify: ${order.line_items?.length || 0} (total quantity: ${expectedLineItemsCount})`);
+  console.log(`  - Shipping lines in Shopify: ${order.shipping_lines?.length || 0}`);
+  console.log(`  - Product rows created: ${regularProductRowsCount}`);
+  console.log(`  - Shipping rows created: ${shippingRowsCount}`);
+  console.log(`  - Total rows: ${productRowsCount} (expected: ${expectedTotalRows})`);
+  
+  if (regularProductRowsCount !== expectedLineItemsCount) {
+    console.warn(`[ORDER MAPPER] WARNING: Product rows count mismatch! Expected ${expectedLineItemsCount} from line_items, got ${regularProductRowsCount}`);
+  }
+  
+  if (shippingRowsCount !== expectedShippingCount) {
+    console.warn(`[ORDER MAPPER] WARNING: Shipping rows count mismatch! Expected ${expectedShippingCount}, got ${shippingRowsCount}`);
   }
 
   return { dealFields, productRows };
