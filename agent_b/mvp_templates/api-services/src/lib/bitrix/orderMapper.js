@@ -5,6 +5,7 @@
 
 import { BITRIX_CONFIG, financialStatusToStageId, sourceNameToSourceId } from './config.js';
 import skuMapping from './skuMapping.json' assert { type: 'json' };
+import { resolveResponsibleId } from './responsible.js';
 
 /**
  * Map Shopify order to Bitrix24 deal fields and product rows
@@ -60,6 +61,12 @@ export function mapShopifyOrderToBitrixDeal(order) {
     UF_SHOPIFY_SHIPPING_PRICE: shippingPrice,
     UF_SHOPIFY_TOTAL_TAX: totalTax,
   };
+
+  // Resolve responsible (ASSIGNED_BY_ID) based on mapping
+  const assigneeId = resolveResponsibleId(order);
+  if (assigneeId) {
+    dealFields.ASSIGNED_BY_ID = assigneeId;
+  }
 
   // Product rows
   const productRows = [];
