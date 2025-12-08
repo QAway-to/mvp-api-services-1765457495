@@ -85,13 +85,60 @@ export function mapShopifyOrderToBitrixDeal(order) {
 
       const productId = productIdFromFile || productIdFromHandle || productIdFromConfig || null;
 
+      // Extract size and properties from Shopify line_item
+      // variant_title usually contains the size (e.g., "31", "36-39", "S", "M")
+      const variantTitle = item.variant_title || null;
+      
+      // Extract properties (array of {name, value} objects)
+      const properties = item.properties || [];
+      const sizeProperty = properties.find(p => 
+        p.name && (
+          p.name.toLowerCase().includes('size') || 
+          p.name.toLowerCase().includes('размер') ||
+          p.name.toLowerCase() === 'size'
+        )
+      );
+      const colorProperty = properties.find(p => 
+        p.name && (
+          p.name.toLowerCase().includes('color') || 
+          p.name.toLowerCase().includes('цвет') ||
+          p.name.toLowerCase() === 'color'
+        )
+      );
+      
+      // Get size from variant_title or properties
+      const size = variantTitle || sizeProperty?.value || null;
+      
       // Build descriptive name with size/variant/vendor/color/model if available
       const parts = [item.title || ''];
-      if (item.variant_title) parts.push(`size: ${item.variant_title}`);
-      if (item.option1 && item.option1 !== item.variant_title) parts.push(`opt1: ${item.option1}`);
-      if (item.option2) parts.push(`opt2: ${item.option2}`);
-      if (item.option3) parts.push(`opt3: ${item.option3}`);
-      if (item.vendor) parts.push(`brand: ${item.vendor}`);
+      
+      // Add size if available (most important - should be visible)
+      if (size) {
+        parts.push(`Size: ${size}`);
+      }
+      
+      // Add color if available
+      if (colorProperty?.value) {
+        parts.push(`Color: ${colorProperty.value}`);
+      }
+      
+      // Add other options if they differ from variant_title
+      if (item.option1 && item.option1 !== variantTitle && item.option1 !== size) {
+        parts.push(item.option1);
+      }
+      if (item.option2 && item.option2 !== variantTitle && item.option2 !== size) {
+        parts.push(item.option2);
+      }
+      if (item.option3) {
+        parts.push(item.option3);
+      }
+      
+      // Add vendor/brand if available
+      if (item.vendor) {
+        parts.push(`Brand: ${item.vendor}`);
+      }
+      
+      // Join all parts with separator
       const productName = parts.filter(Boolean).join(' | ');
 
       // Prices and discounts
@@ -115,7 +162,9 @@ export function mapShopifyOrderToBitrixDeal(order) {
 
       const quantity = Number(item.quantity || 1);
 
-      // Add one row per quantity; if PRODUCT_ID missing, use PRODUCT_NAME to keep counts aligned
+      // Add one row per quantity
+      // IMPORTANT: Always include PRODUCT_NAME even when PRODUCT_ID is set
+      // This ensures size and properties are visible in Bitrix24 product card
       for (let i = 0; i < quantity; i++) {
         const row = {
           PRICE: priceAfterDiscount,
@@ -127,12 +176,17 @@ export function mapShopifyOrderToBitrixDeal(order) {
           TAX_INCLUDED: order.taxes_included ? 'Y' : 'N',
           TAX_RATE: taxRate,
         };
+        
+        // Always set PRODUCT_NAME with size and properties for visibility in Bitrix24
+        row.PRODUCT_NAME = productName || item.title || item.sku || 'Shopify item';
+        
+        // Set PRODUCT_ID if mapped (for linking to catalog)
         if (productId && productId !== 0) {
           row.PRODUCT_ID = productId;
         } else {
-          row.PRODUCT_NAME = productName || item.title || item.sku || 'Shopify item';
-          console.warn(`[ORDER MAPPER] SKU ${item.sku || 'N/A'} not mapped, sending as custom row`);
+          console.warn(`[ORDER MAPPER] SKU ${item.sku || 'N/A'} not mapped, sending as custom row with name: ${productName}`);
         }
+        
         productRows.push(row);
       }
     }
