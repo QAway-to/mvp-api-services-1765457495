@@ -215,13 +215,23 @@ export function mapShopifyOrderToBitrixDeal(order) {
   if (order.shipping_lines && Array.isArray(order.shipping_lines) && order.shipping_lines.length > 0) {
     // Get shipping from the first shipping_line (most reliable source)
     const shippingLine = order.shipping_lines[0];
-    actualShippingPrice = Number(
-      shippingLine.price ||
-      shippingLine.price_set?.shop_money?.amount ||
-      shippingLine.amount ||
-      0
-    );
-    shippingLineTitle = shippingLine.title || shippingLine.code || 'Shipping';
+    
+    // CRITICAL VALIDATION: shipping_lines should NOT contain product information
+    // If shipping_line has product-like fields (sku, variant_id, product_id), it's likely a data error
+    if (shippingLine.sku || shippingLine.variant_id || shippingLine.product_id || shippingLine.line_item_id) {
+      console.error(`[ORDER MAPPER] ERROR: shipping_line contains product data! This should NEVER happen. Skipping shipping to avoid confusion.`, shippingLine);
+      // Don't process this as shipping - it's likely a product incorrectly placed in shipping_lines
+      actualShippingPrice = 0;
+      shippingLineTitle = null;
+    } else {
+      actualShippingPrice = Number(
+        shippingLine.price ||
+        shippingLine.price_set?.shop_money?.amount ||
+        shippingLine.amount ||
+        0
+      );
+      shippingLineTitle = shippingLine.title || shippingLine.code || 'Shipping';
+    }
   } else {
     // Fallback: try to get from order-level shipping fields (less reliable)
     actualShippingPrice = Number(
@@ -235,19 +245,22 @@ export function mapShopifyOrderToBitrixDeal(order) {
   
   // Only add shipping row if we have actual shipping_lines OR explicit shipping price > 0
   // AND shipping price matches what we calculated (to avoid confusion with products)
+  // AND shippingLineTitle is valid (not null, which would indicate invalid shipping data)
   const hasShippingLines = order.shipping_lines && Array.isArray(order.shipping_lines) && order.shipping_lines.length > 0;
   const hasExplicitShippingPrice = actualShippingPrice > 0 && Math.abs(actualShippingPrice - shippingPrice) < 0.01;
+  const hasValidShippingTitle = shippingLineTitle && shippingLineTitle.trim().length > 0;
   
-  if (actualShippingPrice > 0 && (hasShippingLines || hasExplicitShippingPrice)) {
-    const shippingProductId = BITRIX_CONFIG.SHIPPING_PRODUCT_ID > 0 
-      ? BITRIX_CONFIG.SHIPPING_PRODUCT_ID 
-      : 3000; // Default shipping product ID (WARNING: ensure this ID is NOT used for regular products!)
+  if (actualShippingPrice > 0 && hasValidShippingTitle && (hasShippingLines || hasExplicitShippingPrice)) {
+    // CRITICAL: Shipping should NEVER use PRODUCT_ID to avoid conflicts with regular products
+    // Some products may have PRODUCT_ID = 3000 (or SHIPPING_PRODUCT_ID), which would cause confusion
+    // Solution: Use ONLY PRODUCT_NAME for shipping, NO PRODUCT_ID
+    // This ensures shipping is always displayed correctly, regardless of product mappings
     
-    // CRITICAL: Always include PRODUCT_NAME for shipping to avoid confusion
-    // This ensures shipping is clearly identified in Bitrix24
+    const shippingName = `Shipping: ${shippingLineTitle}`;
+    
     productRows.push({
-      PRODUCT_ID: shippingProductId,
-      PRODUCT_NAME: `Shipping: ${shippingLineTitle}`, // Explicit name to avoid confusion
+      // DO NOT set PRODUCT_ID for shipping - this prevents conflicts with products that might have the same ID
+      PRODUCT_NAME: shippingName, // Explicit name - this is the ONLY identifier for shipping
       PRICE: actualShippingPrice,
       QUANTITY: 1,
       DISCOUNT_TYPE_ID: 1,
@@ -256,7 +269,7 @@ export function mapShopifyOrderToBitrixDeal(order) {
       TAX_RATE: 19.0, // Default tax rate for shipping
     });
     
-    console.log(`[ORDER MAPPER] Added shipping row: ${shippingLineTitle}, Price: ${actualShippingPrice}, Product ID: ${shippingProductId}`);
+    console.log(`[ORDER MAPPER] Added shipping row (NO PRODUCT_ID): ${shippingName}, Price: ${actualShippingPrice}`);
   } else if (shippingPrice > 0 && !hasShippingLines) {
     // Log warning if we have shipping price but no shipping_lines (potential data issue)
     console.warn(`[ORDER MAPPER] Shipping price detected (${shippingPrice}) but no shipping_lines found. Skipping shipping row to avoid confusion.`);
