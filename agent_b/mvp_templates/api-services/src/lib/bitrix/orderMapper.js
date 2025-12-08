@@ -6,7 +6,88 @@
 import { BITRIX_CONFIG, financialStatusToStageId, sourceNameToSourceId } from './config.js';
 import skuMapping from './skuMapping.json' assert { type: 'json' };
 import handleMapping from './handleMapping.json' assert { type: 'json' };
+import brandMapping from './brandMapping.json' assert { type: 'json' };
 import { resolveResponsibleId } from './responsible.js';
+
+/**
+ * Parse model name from product title
+ * Example: "Wellie Paint KL tractor blue Barefoot Kids Rubber Boots" → "Wellie Paint KL"
+ * @param {string} title - Product title from Shopify
+ * @returns {string|null} Model name or null
+ */
+function parseModelFromTitle(title) {
+  if (!title || typeof title !== 'string') return null;
+  
+  // Common patterns: "Brand Model Color Type" or "Model Color Type"
+  // Try to extract model (usually first 2-3 words before color)
+  const words = title.split(/\s+/);
+  
+  // Look for color keywords to split model from color
+  const colorKeywords = ['blue', 'red', 'green', 'yellow', 'black', 'white', 'pink', 'fuchsia', 'violet', 'cyan', 'tractor', 'flowers'];
+  let modelEndIndex = words.length;
+  
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i].toLowerCase();
+    if (colorKeywords.some(keyword => word.includes(keyword))) {
+      modelEndIndex = i;
+      break;
+    }
+  }
+  
+  // Extract model (first part before color)
+  if (modelEndIndex > 0) {
+    return words.slice(0, modelEndIndex).join(' ').trim() || null;
+  }
+  
+  // Fallback: return first 2-3 words
+  return words.slice(0, Math.min(3, words.length)).join(' ').trim() || null;
+}
+
+/**
+ * Parse color from product title or properties
+ * @param {string} title - Product title
+ * @param {Array} properties - Product properties array
+ * @returns {string|null} Color name or null
+ */
+function parseColorFromTitle(title, properties = []) {
+  // First try properties
+  const colorProperty = properties.find(p => 
+    p.name && (
+      p.name.toLowerCase().includes('color') || 
+      p.name.toLowerCase().includes('цвет')
+    )
+  );
+  if (colorProperty?.value) {
+    return colorProperty.value.trim();
+  }
+  
+  // Then try to extract from title
+  if (!title || typeof title !== 'string') return null;
+  
+  const colorKeywords = {
+    'blue': 'blue',
+    'red': 'red',
+    'green': 'green',
+    'yellow': 'yellow',
+    'black': 'black',
+    'white': 'white',
+    'pink': 'pink',
+    'fuchsia': 'fuchsia',
+    'violet': 'violet',
+    'cyan': 'cyan',
+    'tractor blue': 'tractor blue',
+    'flowers': 'flowers'
+  };
+  
+  const titleLower = title.toLowerCase();
+  for (const [keyword, color] of Object.entries(colorKeywords)) {
+    if (titleLower.includes(keyword)) {
+      return color;
+    }
+  }
+  
+  return null;
+}
 
 /**
  * Map Shopify order to Bitrix24 deal fields and product rows
@@ -67,6 +148,47 @@ export function mapShopifyOrderToBitrixDeal(order) {
   const assigneeId = resolveResponsibleId(order);
   if (assigneeId) {
     dealFields.ASSIGNED_BY_ID = assigneeId;
+  }
+
+  // Extract product properties from first line_item for UF-fields
+  // Using only first item as per business logic requirement
+  if (order.line_items && Array.isArray(order.line_items) && order.line_items.length > 0) {
+    const firstItem = order.line_items[0];
+    
+    // Size: from variant_title
+    if (firstItem.variant_title) {
+      dealFields.UF_CRM_1739793720585 = String(firstItem.variant_title).trim();
+    }
+    
+    // Color: from properties or title
+    const color = parseColorFromTitle(firstItem.title, firstItem.properties || []);
+    if (color) {
+      dealFields.UF_CRM_1739793651654 = color;
+    }
+    
+    // Model: from title
+    const model = parseModelFromTitle(firstItem.title);
+    if (model) {
+      dealFields.UF_CRM_1739793668182 = model;
+    }
+    
+    // Brand: from vendor with enum mapping
+    if (firstItem.vendor) {
+      const vendorUpper = String(firstItem.vendor).toUpperCase().trim();
+      const brandId = brandMapping[vendorUpper];
+      if (brandId) {
+        dealFields.UF_CRM_1741642513658 = brandId; // Enum field - use ID
+      } else {
+        console.warn(`[ORDER MAPPER] Brand "${vendorUpper}" not found in brandMapping.json, skipping UF_CRM_1741642513658`);
+      }
+    }
+    
+    console.log(`[ORDER MAPPER] Extracted product properties from first item:`, {
+      size: dealFields.UF_CRM_1739793720585 || 'N/A',
+      color: dealFields.UF_CRM_1739793651654 || 'N/A',
+      model: dealFields.UF_CRM_1739793668182 || 'N/A',
+      brand: dealFields.UF_CRM_1741642513658 || 'N/A'
+    });
   }
 
   // Product rows
