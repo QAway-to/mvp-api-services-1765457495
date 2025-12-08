@@ -4,6 +4,7 @@
  */
 
 import { BITRIX_CONFIG, financialStatusToStageId, sourceNameToSourceId } from './config.js';
+import skuMapping from './skuMapping.json' assert { type: 'json' };
 
 /**
  * Map Shopify order to Bitrix24 deal fields and product rows
@@ -65,15 +66,16 @@ export function mapShopifyOrderToBitrixDeal(order) {
 
   if (order.line_items && Array.isArray(order.line_items)) {
     for (const item of order.line_items) {
-      // Try to get product ID from SKU mapping
-      let productId = BITRIX_CONFIG.SKU_TO_PRODUCT_ID[item.sku];
-      
-      // If not found, try to use a default product ID (e.g., for socks)
-      // This is a fallback - ideally all SKUs should be mapped
+      // Try to get product ID from external SKU mapping (generated from Bitrix + Shopify exports),
+      // fallback to config if present
+      const productIdFromFile = skuMapping[item.sku];
+      const productIdFromConfig = BITRIX_CONFIG.SKU_TO_PRODUCT_ID[item.sku];
+      const productId = productIdFromFile || productIdFromConfig || null;
+
+      // If still not found — skip the row (не подставляем дефолтный товар)
       if (!productId || productId === 0) {
-        // Default product ID for socks (as per Python script example)
-        productId = 2900; // PRODUCT_ID_SOCK
-        console.warn(`[ORDER MAPPER] SKU ${item.sku} not found in mapping, using default product ID ${productId}`);
+        console.warn(`[ORDER MAPPER] SKU ${item.sku} not mapped, skipping product row`);
+        continue;
       }
 
       // Get original price (before discount) - this is PRICE_BRUTTO
