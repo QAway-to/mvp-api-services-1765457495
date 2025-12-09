@@ -1097,10 +1097,10 @@ class MVPGenerator:
             status_data = self._safe_json_parse(status_resp, default={})
             state = status_data.get("readyState")
             if state in {"READY", "FROZEN"}:
-                url = status_data.get("url") or deployment.get("url")
-                if url and not url.startswith("http"):
-                    url = f"https://{url}"
-                return url or f"https://{project_name}.vercel.app"
+                # Use production domain format: https://{project_name}.vercel.app
+                # Vercel API may return preview URLs with suffixes (e.g., -41yg45pf5)
+                # but we want the clean production URL format
+                return f"https://{project_name}.vercel.app"
             if state in {"ERROR", "CANCELED"}:
                 # Emit full status for diagnostics
                 try:
