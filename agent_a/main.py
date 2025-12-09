@@ -3,13 +3,14 @@ import os
 import sys
 from pathlib import Path
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
 import logging
 import json
 from datetime import datetime
+from typing import Optional
 
 # Add agent_b to path for template_selector import
 current_dir = Path(__file__).parent.parent
@@ -21,6 +22,10 @@ if str(agent_b_dir) not in sys.path:
 from config import config
 from agents.agent_a import AgentA
 from shared_logger import setup_logging, log_queue, log_agent_action
+from utils.auth import (
+    authenticate, create_session, get_user_from_request, 
+    is_admin, set_session_cookie, clear_session_cookie
+)
 
 # Setup logging
 setup_logging()
@@ -40,11 +45,90 @@ log_agent_action("App", f"📋 Primary keyword: {config.SEARCH_KEYWORD}")
 @app.get("/")
 async def dashboard(request: Request):
     """Main dashboard"""
+    user = get_user_from_request(request)
+    is_user_admin = is_admin(user)
+    
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "mode": config.MODE,
-        "keyword": ", ".join(config.SEARCH_KEYWORDS_LIST)
+        "keyword": ", ".join(config.SEARCH_KEYWORDS_LIST),
+        "user": user,
+        "is_admin": is_user_admin
     })
+
+
+@app.post("/api/login")
+async def login(request: Request):
+    """Login endpoint"""
+    try:
+        data = await request.json()
+        username = data.get("username", "").strip()
+        password = data.get("password", "").strip()
+        
+        if not username or not password:
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "Username and password are required"}
+            )
+        
+        user = authenticate(username, password)
+        if not user:
+            return JSONResponse(
+                status_code=401,
+                content={"status": "error", "message": "Invalid username or password"}
+            )
+        
+        # Create session
+        session_id = create_session(user["username"], user["role"])
+        
+        # Create response
+        response = JSONResponse({
+            "status": "success",
+            "user": {
+                "username": user["username"],
+                "role": user["role"],
+                "name": user["name"]
+            }
+        })
+        
+        # Set session cookie
+        set_session_cookie(response, session_id)
+        
+        return response
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+
+@app.post("/api/logout")
+async def logout():
+    """Logout endpoint"""
+    response = JSONResponse({"status": "success"})
+    clear_session_cookie(response)
+    return response
+
+
+@app.get("/api/auth/status")
+async def auth_status(request: Request):
+    """Get current authentication status"""
+    user = get_user_from_request(request)
+    if user:
+        return {
+            "authenticated": True,
+            "user": {
+                "username": user["username"],
+                "role": user["role"]
+            },
+            "is_admin": is_admin(user)
+        }
+    return {
+        "authenticated": False,
+        "user": None,
+        "is_admin": False
+    }
 
 @app.get("/logs/stream")
 async def stream_logs():
