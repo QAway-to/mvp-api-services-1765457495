@@ -10,6 +10,7 @@ let loginUsername;
 let loginPassword;
 let loginError;
 let agentACard;
+let agentBCard;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
@@ -19,6 +20,15 @@ document.addEventListener('DOMContentLoaded', () => {
     loginPassword = document.getElementById('login-password');
     loginError = document.getElementById('login-error');
     agentACard = document.getElementById('agent-a-card');
+    agentBCard = document.getElementById('agent-b-card');
+    
+    // Blur both agents immediately on page load (before auth check)
+    if (agentACard) {
+        blurAgentA();
+    }
+    if (agentBCard) {
+        blurAgentB();
+    }
     
     // Check authentication status
     checkAuthStatus();
@@ -60,9 +70,12 @@ function showLoginModal() {
     if (loginModal) {
         loginModal.classList.remove('hidden');
     }
-    // Always blur Agent A when showing login (will be unblurred after admin login)
+    // Blur both agents when showing login (will be unblurred after admin login)
     if (agentACard) {
         blurAgentA();
+    }
+    if (agentBCard) {
+        blurAgentB();
     }
 }
 
@@ -71,10 +84,8 @@ function hideLoginModal() {
     if (loginModal) {
         loginModal.classList.add('hidden');
     }
-    // Unblur Agent A for admin users
-    if (agentACard && isAdmin) {
-        unblurAgentA();
-    }
+    // Update UI based on user role (both agents for admin, only Agent B for user)
+    updateUIForUser();
 }
 
 // Blur Agent A card
@@ -121,11 +132,58 @@ function unblurAgentA() {
 // Update UI based on user role
 function updateUIForUser() {
     if (isAdmin) {
-        // Admin: full access, no blur
+        // Admin: full access to both agents, no blur
         unblurAgentA();
-    } else {
-        // Regular user: blur Agent A
+        unblurAgentB();
+    } else if (currentUser) {
+        // Regular user: Agent A blurred, Agent B accessible
         blurAgentA();
+        unblurAgentB();
+    } else {
+        // Not authenticated: both agents blurred
+        blurAgentA();
+        blurAgentB();
+    }
+}
+
+// Blur Agent B card
+function blurAgentB() {
+    if (agentBCard) {
+        agentBCard.classList.add('blurred');
+        
+        // Add overlay message if not exists
+        if (!agentBCard.querySelector('.blur-overlay')) {
+            const overlay = document.createElement('div');
+            overlay.className = 'blur-overlay';
+            overlay.textContent = '🔒 Требуется авторизация';
+            agentBCard.style.position = 'relative';
+            agentBCard.appendChild(overlay);
+        }
+        
+        // Disable all inputs in Agent B
+        const inputs = agentBCard.querySelectorAll('input, button, select, textarea');
+        inputs.forEach(input => {
+            input.disabled = true;
+        });
+    }
+}
+
+// Unblur Agent B card
+function unblurAgentB() {
+    if (agentBCard) {
+        agentBCard.classList.remove('blurred');
+        
+        // Remove overlay
+        const overlay = agentBCard.querySelector('.blur-overlay');
+        if (overlay) {
+            overlay.remove();
+        }
+        
+        // Enable all inputs in Agent B
+        const inputs = agentBCard.querySelectorAll('input, button, select, textarea');
+        inputs.forEach(input => {
+            input.disabled = false;
+        });
     }
 }
 

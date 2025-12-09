@@ -181,6 +181,12 @@ class MVPGenerator:
         elif template_id == "web-scraper":
             template_lib_file = template_path / "src" / "lib" / "scraper_core.js"
             lib_file_name = "scraper_core.js"
+        elif template_id == "brand-mention-monitor":
+            template_lib_file = template_path / "src" / "lib" / "news.js"
+            lib_file_name = "news.js"
+        elif template_id == "data-formatter":
+            template_lib_file = template_path / "src" / "lib" / "quotes.js"
+            lib_file_name = "quotes.js"
         else:
             # For other templates, check if they have lib files
             template_lib = template_path / "src" / "lib"
@@ -190,7 +196,7 @@ class MVPGenerator:
                     template_lib_file = lib_files[0]
                     lib_file_name = template_lib_file.name
         
-        # Only check for mini-etl-pipeline (required), web-scraper will be handled during copy
+        # Verify required lib files exist in template
         if template_id == "mini-etl-pipeline":
             if template_lib_file and template_lib_file.exists():
                 file_size = template_lib_file.stat().st_size
@@ -198,8 +204,18 @@ class MVPGenerator:
             else:
                 log_agent_action("Agent B", f"❌❌❌ CRITICAL: Template file src/lib/spacex.js does NOT exist in template!")
                 raise FileNotFoundError(f"Template file src/lib/spacex.js does not exist in template {template_id}. This file is required for mini-etl-pipeline.")
+        elif template_id == "data-formatter":
+            if template_lib_file and template_lib_file.exists():
+                file_size = template_lib_file.stat().st_size
+                log_agent_action("Agent B", f"✅ Template file exists: src/lib/{lib_file_name} ({file_size} bytes)")
+            else:
+                log_agent_action("Agent B", f"❌❌❌ CRITICAL: Template file src/lib/quotes.js does NOT exist in template!")
+                raise FileNotFoundError(f"Template file src/lib/quotes.js does not exist in template {template_id}. This file is required for data-formatter.")
         elif template_id == "web-scraper" and template_lib_file and template_lib_file.exists():
             # Just log that file exists, don't fail if it doesn't - will be handled during copy
+            file_size = template_lib_file.stat().st_size
+            log_agent_action("Agent B", f"✅ Template file exists: src/lib/{lib_file_name} ({file_size} bytes)")
+        elif template_id == "brand-mention-monitor" and template_lib_file and template_lib_file.exists():
             file_size = template_lib_file.stat().st_size
             log_agent_action("Agent B", f"✅ Template file exists: src/lib/{lib_file_name} ({file_size} bytes)")
 
@@ -427,7 +443,7 @@ class MVPGenerator:
                 "vercel.json"
             ],
             "brand-mention-monitor": ["package.json", "pages/index.js", "src/lib/news.js", "vercel.json"],
-            "data-formatter": ["package.json", "pages/index.js", "src/lib/quotes.js", "vercel.json"],
+            "data-formatter": ["package.json", "pages/index.js", "src/lib/quotes.js", "lib/normalize.js", "vercel.json"],
             "email-campaign-manager": ["package.json", "pages/index.js", "vercel.json"],
             "price-stock-parser": ["package.json", "pages/index.js", "vercel.json"],
             "news-parser": ["package.json", "pages/index.js", "vercel.json"],
@@ -461,6 +477,15 @@ class MVPGenerator:
                 "pages/api/projects/parse.js",
                 "vercel.json",
                 "next.config.js"
+            ],
+            "nlp-data-analytics": [
+                "package.json", 
+                "pages/index.js", 
+                "src/lib/dataProcessor.js",
+                "src/lib/dateUtils.js",
+                "src/lib/exportUtils.js",
+                "src/lib/gemini.js",
+                "vercel.json"
             ],
         }
         
