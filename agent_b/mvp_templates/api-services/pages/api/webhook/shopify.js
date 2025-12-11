@@ -3,6 +3,7 @@ import { shopifyAdapter } from '../../../src/lib/adapters/shopify/index.js';
 import { callBitrix, getBitrixWebhookBase } from '../../../src/lib/bitrix/client.js';
 import { mapShopifyOrderToBitrixDeal } from '../../../src/lib/bitrix/orderMapper.js';
 import { upsertBitrixContact } from '../../../src/lib/bitrix/contact.js';
+import { BITRIX_CONFIG } from '../../../src/lib/bitrix/config.js';
 
 // Configure body parser to accept raw JSON
 export const config = {
