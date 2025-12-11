@@ -58,6 +58,16 @@ class AITemplateSelector:
                 estimated_completion="75%"
             ),
 
+            "telegram-channel-monitor": TemplateInfo(
+                id="telegram-channel-monitor",
+                name="Telegram Channel Monitor",
+                category="telegram-bots",
+                description="Мониторинг Telegram-каналов с поиском сообщений по заданным правилам",
+                features=["мониторинг каналов", "правила поиска", "ключевые слова", "regex", "уведомления", "экспорт"],
+                complexity="medium",
+                estimated_completion="80%"
+            ),
+
             # Parsers
             "news-parser": TemplateInfo(
                 id="news-parser",
@@ -256,6 +266,8 @@ class AITemplateSelector:
         if "telegram" in desc_lower or "телеграм" in desc_lower:
             if "магазин" in desc_lower or "shop" in desc_lower or "товар" in desc_lower:
                 return TemplateMatch("telegram-shop-bot", 0.8, "Keyword match: Telegram + shop", "telegram-bots", ["catalog", "orders"])
+            elif any(keyword in desc_lower for keyword in ["мониторинг", "monitor", "канал", "channel", "поиск", "search", "правил", "rule"]):
+                return TemplateMatch("telegram-channel-monitor", 0.85, "Keyword match: Telegram channel monitoring", "telegram-bots", ["monitoring", "search", "rules"])
             else:
                 return TemplateMatch("telegram-support-bot", 0.7, "Keyword match: Telegram bot", "telegram-bots", ["support", "chat"])
 

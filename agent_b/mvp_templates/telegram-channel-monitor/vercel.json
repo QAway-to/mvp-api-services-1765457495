@@ -1,0 +1,11 @@
+{
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "crons": [
+    {
+      "path": "/api/scan",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
+
