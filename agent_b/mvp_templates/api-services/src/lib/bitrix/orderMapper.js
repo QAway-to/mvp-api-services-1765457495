@@ -7,7 +7,6 @@ import { BITRIX_CONFIG, financialStatusToStageId, sourceNameToSourceId } from '.
 import skuMapping from './skuMapping.json' assert { type: 'json' };
 import handleMapping from './handleMapping.json' assert { type: 'json' };
 import brandMapping from './brandMapping.json' assert { type: 'json' };
-import { resolveResponsibleId } from './responsible.js';
 
 /**
  * Parse model name from product title
@@ -144,60 +143,86 @@ export function mapShopifyOrderToBitrixDeal(order) {
     UF_SHOPIFY_TOTAL_TAX: totalTax,
   };
 
-  // Resolve responsible (ASSIGNED_BY_ID) based on mapping
-  const assigneeId = resolveResponsibleId(order);
-  if (assigneeId) {
-    dealFields.ASSIGNED_BY_ID = assigneeId;
-  }
-
-  // Extract product properties from first line_item for UF-fields
-  // Using only first item as per business logic requirement
+  // Extract product properties from ALL line_items for UF-fields
+  // Aggregate Size and Color across all positions to preserve ordering
   if (order.line_items && Array.isArray(order.line_items) && order.line_items.length > 0) {
-    const firstItem = order.line_items[0];
-    
-    console.log(`[ORDER MAPPER] Processing first line_item for UF-fields:`, {
-      title: firstItem.title,
-      variant_title: firstItem.variant_title,
-      vendor: firstItem.vendor,
-      sku: firstItem.sku,
-      properties: firstItem.properties
-    });
-    
-    // Size: from variant_title (primary source)
-    // Fallback: try to extract from name after dash if variant_title is empty
-    let sizeValue = null;
-    if (firstItem.variant_title) {
-      sizeValue = String(firstItem.variant_title).trim();
-      console.log(`[ORDER MAPPER] Size from variant_title: "${sizeValue}"`);
-    } else if (firstItem.name) {
-      // Try to extract from name (format: "Product Name - 31")
-      const nameParts = firstItem.name.split(' - ');
-      if (nameParts.length > 1) {
-        sizeValue = nameParts[nameParts.length - 1].trim();
-        console.log(`[ORDER MAPPER] Size from name (after dash): "${sizeValue}"`);
+    const lineItems = order.line_items;
+    const itemsCount = lineItems.length;
+
+    console.log(`[ORDER MAPPER] Processing ${itemsCount} line_item(s) for UF-fields`);
+
+    // ===== SIZE AGGREGATION =====
+    if (itemsCount === 1) {
+      const firstItem = lineItems[0];
+      let sizeValue = null;
+      if (firstItem.variant_title) {
+        sizeValue = String(firstItem.variant_title).trim();
+        console.log(`[ORDER MAPPER] Size from variant_title (single): "${sizeValue}"`);
+      } else if (firstItem.name) {
+        const nameParts = firstItem.name.split(' - ');
+        if (nameParts.length > 1) {
+          sizeValue = nameParts[nameParts.length - 1].trim();
+          console.log(`[ORDER MAPPER] Size from name (single): "${sizeValue}"`);
+        }
+      }
+      if (sizeValue) {
+        dealFields.UF_CRM_1739793720585 = sizeValue;
+        console.log(`[ORDER MAPPER] ✅ Size (single) UF_CRM_1739793720585 = "${sizeValue}"`);
+      }
+    } else {
+      const sizeParts = [];
+      for (let i = 0; i < itemsCount; i++) {
+        const item = lineItems[i];
+        const position = i + 1;
+        let sizeValue = null;
+        if (item.variant_title) {
+          sizeValue = String(item.variant_title).trim();
+        } else if (item.name) {
+          const nameParts = item.name.split(' - ');
+          if (nameParts.length > 1) {
+            sizeValue = nameParts[nameParts.length - 1].trim();
+          }
+        }
+        const sizeDisplay = sizeValue || '-';
+        sizeParts.push(`${position}: ${sizeDisplay}`);
+      }
+      if (sizeParts.length > 0) {
+        dealFields.UF_CRM_1739793720585 = sizeParts.join('; ');
+        console.log(`[ORDER MAPPER] ✅ Size (aggregated) UF_CRM_1739793720585 = "${dealFields.UF_CRM_1739793720585}"`);
       }
     }
-    
-    if (sizeValue) {
-      dealFields.UF_CRM_1739793720585 = sizeValue;
-      console.log(`[ORDER MAPPER] ✅ Size field UF_CRM_1739793720585 set to: "${sizeValue}"`);
+
+    // ===== COLOR AGGREGATION =====
+    if (itemsCount === 1) {
+      const firstItem = lineItems[0];
+      const color = parseColorFromTitle(firstItem.title, firstItem.properties || []);
+      if (color) {
+        dealFields.UF_CRM_1739793651654 = color;
+        console.log(`[ORDER MAPPER] ✅ Color (single) UF_CRM_1739793651654 = "${color}"`);
+      }
     } else {
-      console.warn(`[ORDER MAPPER] ⚠️ Size not found in variant_title or name for item:`, firstItem);
+      const colorParts = [];
+      for (let i = 0; i < itemsCount; i++) {
+        const item = lineItems[i];
+        const position = i + 1;
+        const color = parseColorFromTitle(item.title, item.properties || []);
+        const colorDisplay = color || '-';
+        colorParts.push(`${position}: ${colorDisplay}`);
+      }
+      if (colorParts.length > 0) {
+        dealFields.UF_CRM_1739793651654 = colorParts.join('; ');
+        console.log(`[ORDER MAPPER] ✅ Color (aggregated) UF_CRM_1739793651654 = "${dealFields.UF_CRM_1739793651654}"`);
+      }
     }
-    
-    // Color: from properties or title
-    const color = parseColorFromTitle(firstItem.title, firstItem.properties || []);
-    if (color) {
-      dealFields.UF_CRM_1739793651654 = color;
-    }
-    
-    // Model: from title
+
+    // ===== MODEL AND BRAND (first item as reference) =====
+    const firstItem = lineItems[0];
+
     const model = parseModelFromTitle(firstItem.title);
     if (model) {
       dealFields.UF_CRM_1739793668182 = model;
     }
-    
-    // Brand: from vendor with enum mapping
+
     if (firstItem.vendor) {
       const vendorUpper = String(firstItem.vendor).toUpperCase().trim();
       const brandId = brandMapping[vendorUpper];
@@ -207,8 +232,8 @@ export function mapShopifyOrderToBitrixDeal(order) {
         console.warn(`[ORDER MAPPER] Brand "${vendorUpper}" not found in brandMapping.json, skipping UF_CRM_1741642513658`);
       }
     }
-    
-    console.log(`[ORDER MAPPER] Extracted product properties from first item:`, {
+
+    console.log(`[ORDER MAPPER] Extracted UF-fields:`, {
       size: dealFields.UF_CRM_1739793720585 || 'N/A',
       color: dealFields.UF_CRM_1739793651654 || 'N/A',
       model: dealFields.UF_CRM_1739793668182 || 'N/A',
