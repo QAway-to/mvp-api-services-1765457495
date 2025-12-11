@@ -157,7 +157,7 @@ class MVPGenerator:
         valid_templates = [
             "mini-etl-pipeline", "web-scraper", "brand-mention-monitor", "data-formatter",
             "email-campaign-manager", "price-stock-parser", "news-parser",
-            "analytics-dashboard", "telegram-shop-bot", "api-services", "freelance-project-search",
+            "analytics-dashboard", "telegram-shop-bot", "telegram-channel-monitor", "api-services", "freelance-project-search",
             "nlp-data-analytics"
         ]
         if template_id not in valid_templates:
@@ -449,6 +449,7 @@ class MVPGenerator:
             "news-parser": ["package.json", "pages/index.js", "vercel.json"],
             "analytics-dashboard": ["package.json", "pages/index.js", "vercel.json"],
             "telegram-shop-bot": ["package.json", "pages/index.js", "vercel.json"],
+            "telegram-channel-monitor": ["package.json", "pages/index.js", "pages/_app.js", "vercel.json", "next.config.js"],
             "api-services": [
                 "package.json", 
                 "pages/index.js", 
@@ -496,7 +497,7 @@ class MVPGenerator:
         if template_id in ["brand-mention-monitor", "data-formatter"]:
             if (project_path / "next.config.js").exists():
                 critical_files.append("next.config.js")
-        elif template_id in ["email-campaign-manager", "price-stock-parser", "news-parser", "analytics-dashboard", "telegram-shop-bot", "api-services", "freelance-project-search"]:
+        elif template_id in ["email-campaign-manager", "price-stock-parser", "news-parser", "analytics-dashboard", "telegram-shop-bot", "telegram-channel-monitor", "api-services", "freelance-project-search"]:
             if (project_path / "next.config.js").exists():
                 critical_files.append("next.config.js")
             if (project_path / "vercel.json").exists():
