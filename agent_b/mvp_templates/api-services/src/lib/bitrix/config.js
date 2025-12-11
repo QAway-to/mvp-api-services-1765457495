@@ -2,6 +2,7 @@
 // TODO: Replace with actual IDs from your Bitrix24 instance
 
 export const BITRIX_CONFIG = {
+<<<<<<< HEAD
   // Category ID (Funnel ID) for deals - will be determined dynamically based on order tags
   CATEGORY_ID: 2, // Default: Stock (site) - cat_2
 
@@ -30,16 +31,28 @@ export const BITRIX_CONFIG = {
     REFUNDED: 'C2:LOSE',
     CANCELLED: 'C2:LOSE',
     DEFAULT: 'C2:NEW'
+=======
+  // Category ID (Funnel ID) for deals
+  CATEGORY_ID: 0, // Stock (in the shop) - default category
+
+  // Default stage IDs (matching Bitrix24 stages)
+  STAGES: {
+    PAID: 'WON', // Success stage for paid orders
+    PENDING: 'NEW', // New stage for pending payment
+    REFUNDED: 'LOSE', // Loss stage for refunded
+    CANCELLED: 'LOSE', // Loss stage for cancelled
+    DEFAULT: 'NEW' // Default to NEW stage
+>>>>>>> b269a933b0e95fe1f243751ba4af86212d3d5d38
   },
 
   // Source IDs mapping
   SOURCES: {
-    SHOPIFY_DRAFT_ORDER: '', // TODO: Set source ID for shopify_draft_order
-    SHOPIFY: '' // TODO: Set source ID for shopify
+    SHOPIFY_DRAFT_ORDER: 'WEB', // Use WEB for draft orders
+    SHOPIFY: 'WEB' // Use WEB for shopify orders
   },
 
-  // Product ID for shipping
-  SHIPPING_PRODUCT_ID: 0, // TODO: Set product ID for shipping if needed
+  // Product ID for shipping (from working script)
+  SHIPPING_PRODUCT_ID: 3000, // Real shipping product ID
 
   // SKU to Product ID mapping
   // TODO: Replace with actual product IDs from Bitrix24
@@ -50,6 +63,7 @@ export const BITRIX_CONFIG = {
   }
 };
 
+<<<<<<< HEAD
 /**
  * Financial status to stage ID mapping based on category
  * @param {string} financialStatus - Shopify financial_status
@@ -57,10 +71,15 @@ export const BITRIX_CONFIG = {
  * @returns {string} Stage ID
  */
 export const financialStatusToStageId = (financialStatus, categoryId = 2) => {
+=======
+// Financial status to stage ID mapping
+export const financialStatusToStageId = (financialStatus) => {
+>>>>>>> b269a933b0e95fe1f243751ba4af86212d3d5d38
   const status = financialStatus?.toLowerCase() || '';
   const stages = categoryId === 8 ? BITRIX_CONFIG.STAGES_CAT_8 : BITRIX_CONFIG.STAGES_CAT_2;
   
   const mapping = {
+<<<<<<< HEAD
     'paid': stages.PAID,
     'pending': stages.PENDING,
     'authorized': stages.PENDING,
@@ -94,6 +113,17 @@ export const financialStatusToPaymentStatus = (financialStatus) => {
   };
   
   return mapping[status] || 'NOT_PAID';
+=======
+    'paid': BITRIX_CONFIG.STAGES.PAID,
+    'pending': BITRIX_CONFIG.STAGES.PENDING,
+    'refunded': BITRIX_CONFIG.STAGES.REFUNDED,
+    'cancelled': BITRIX_CONFIG.STAGES.CANCELLED,
+    'partially_paid': BITRIX_CONFIG.STAGES.PENDING,
+    'partially_refunded': BITRIX_CONFIG.STAGES.REFUNDED,
+    'voided': BITRIX_CONFIG.STAGES.CANCELLED
+  };
+  return mapping[status] || BITRIX_CONFIG.STAGES.DEFAULT;
+>>>>>>> b269a933b0e95fe1f243751ba4af86212d3d5d38
 };
 
 /**
