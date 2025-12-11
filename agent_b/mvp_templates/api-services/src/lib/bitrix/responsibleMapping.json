@@ -14,7 +14,7 @@
   "bySource": {},
   "weekdaySchedule": {
     "monday": {
-      "managerId": null,
+      "managerId": 1,
       "switchTime": "09:01",
       "timezone": "Asia/Nicosia"
     },
