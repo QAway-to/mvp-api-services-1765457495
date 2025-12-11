@@ -1,67 +1,116 @@
 import mapping from './responsibleMapping.json' assert { type: 'json' };
 
 /**
- * Get current time in Cyprus timezone (UTC+2 or UTC+3 depending on DST)
- * Returns { dayOfWeek: 0-6 (0=Sunday), hour: 0-23, minute: 0-59 }
+ * Get current time in Cyprus timezone (Asia/Nicosia, UTC+2/UTC+3)
+ * Returns date object with Cyprus local time components
+ * @returns {Object} { date: Date, hours: number, minutes: number, day: number }
  */
 function getCyprusTime() {
-  // Cyprus is UTC+2 (EET) or UTC+3 (EEST) - use Europe/Nicosia
   const now = new Date();
-  const cyprusTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Nicosia' }));
+  // Format time in Cyprus timezone
+  const cyprusTimeString = now.toLocaleString('en-US', { 
+    timeZone: 'Asia/Nicosia',
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  // Parse the formatted string to get components
+  // Format: "MM/DD/YYYY, HH:MM"
+  const [datePart, timePart] = cyprusTimeString.split(', ');
+  const [month, day, year] = datePart.split('/').map(Number);
+  const [hours, minutes] = timePart.split(':').map(Number);
+  
+  // Create a date object (in local time, but represents Cyprus time)
+  const cyprusDate = new Date(year, month - 1, day, hours, minutes);
   
   return {
-    dayOfWeek: cyprusTime.getDay(), // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    hour: cyprusTime.getHours(),
-    minute: cyprusTime.getMinutes()
+    date: cyprusDate,
+    hours,
+    minutes,
+    day: cyprusDate.getDay() // 0 = Sunday, 1 = Monday, etc.
   };
 }
 
 /**
- * Determine responsible based on weekday schedule:
- * - Monday 9:01 → Alena (Alena Karakova)
- * - Friday 19:01 → Helen (Helen Bozbei)
- * Otherwise use mapping rules
+ * Check if current time is after switch time for weekday schedule
+ * @param {string} switchTime - Time in format "HH:MM" (e.g., "09:01", "19:01")
+ * @param {Object} cyprusTime - Current time object from getCyprusTime()
+ * @returns {boolean} True if current time is after switch time
  */
-function getResponsibleBySchedule() {
-  const { dayOfWeek, hour, minute } = getCyprusTime();
-  const { byWeekday = {} } = mapping;
+function isAfterSwitchTime(switchTime, cyprusTime) {
+  const [switchHours, switchMinutes] = switchTime.split(':').map(Number);
+  const { hours, minutes } = cyprusTime;
   
-  // Monday = 1, Friday = 5
-  if (dayOfWeek === 1 && hour >= 9 && minute >= 1) {
-    // Monday 9:01+ → Alena
-    return byWeekday['1'] || null;
-  }
-  
-  if (dayOfWeek === 5 && hour >= 19 && minute >= 1) {
-    // Friday 19:01+ → Helen
-    return byWeekday['5'] || null;
-  }
-  
-  // Before Monday 9:01 or between Monday 9:01 and Friday 19:01 → use current weekday
-  if (byWeekday[String(dayOfWeek)]) {
-    return byWeekday[String(dayOfWeek)];
-  }
-  
-  return null;
+  return hours > switchHours || (hours === switchHours && minutes >= switchMinutes);
 }
 
 /**
  * Resolve Bitrix responsible (ASSIGNED_BY_ID) based on Shopify order.
- * Priority: byWeekday schedule -> byTag -> byCountryCode -> bySource -> default.
+ * Priority: byWeekday (with time schedule) -> byTag -> byCountryCode -> bySource -> default.
  * Logs warning if matched by default.
  */
 export function resolveResponsibleId(order) {
   const {
     default: defaultId = null,
+    byWeekday = {},
     byTag = {},
     byCountryCode = {},
     bySource = {},
+    weekdaySchedule = {},
   } = mapping;
 
-  // 0) By weekday schedule (Monday 9:01 → Alena, Friday 19:01 → Helen)
-  const scheduleResponsible = getResponsibleBySchedule();
-  if (scheduleResponsible) {
-    return scheduleResponsible;
+  // 0) By weekday with time schedule (highest priority)
+  const cyprusTime = getCyprusTime();
+  const weekday = cyprusTime.day; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  
+  // Check weekday schedule for Monday (switch at 9:01) and Friday (switch at 19:01)
+  if (weekdaySchedule.monday && weekday === 1) {
+    // Monday: switch to Alena at 9:01
+    if (isAfterSwitchTime(weekdaySchedule.monday.switchTime, cyprusTime)) {
+      const mondayManagerId = weekdaySchedule.monday.managerId;
+      if (mondayManagerId) {
+        console.log(`[RESPONSIBLE] Monday after 9:01 → Alena (ID: ${mondayManagerId})`);
+        return mondayManagerId;
+      }
+    } else {
+      // Monday before 9:01 → previous manager (Lena from Friday)
+      const fridayManagerId = weekdaySchedule.friday?.managerId || defaultId;
+      if (fridayManagerId) {
+        console.log(`[RESPONSIBLE] Monday before 9:01 → previous (Lena, ID: ${fridayManagerId})`);
+        return fridayManagerId;
+      }
+    }
+  }
+  
+  if (weekdaySchedule.friday && weekday === 5) {
+    // Friday: switch to Lena at 19:01
+    if (isAfterSwitchTime(weekdaySchedule.friday.switchTime, cyprusTime)) {
+      const fridayManagerId = weekdaySchedule.friday.managerId;
+      if (fridayManagerId) {
+        console.log(`[RESPONSIBLE] Friday after 19:01 → Lena (ID: ${fridayManagerId})`);
+        return fridayManagerId;
+      }
+    } else {
+      // Friday before 19:01 → previous manager (Alena from Monday)
+      const mondayManagerId = weekdaySchedule.monday?.managerId || defaultId;
+      if (mondayManagerId) {
+        console.log(`[RESPONSIBLE] Friday before 19:01 → previous (Alena, ID: ${mondayManagerId})`);
+        return mondayManagerId;
+      }
+    }
+  }
+  
+  // Fallback to byWeekday mapping (without time schedule)
+  if (byWeekday && byWeekday.hasOwnProperty(String(weekday))) {
+    const weekdayManagerId = byWeekday[String(weekday)];
+    if (weekdayManagerId) {
+      console.log(`[RESPONSIBLE] Weekday ${weekday} → manager ID: ${weekdayManagerId}`);
+      return weekdayManagerId;
+    }
   }
 
   // 1) By tag
@@ -92,11 +141,11 @@ export function resolveResponsibleId(order) {
 
   // 4) Default
   if (defaultId) {
-    console.warn(`Responsible matched by default for order ${order.id}`);
+    console.warn(`[RESPONSIBLE] Matched by default for order ${order.id} → ID: ${defaultId}`);
     return defaultId;
   }
 
-  console.warn(`Responsible not resolved for order ${order.id}`);
+  console.warn(`[RESPONSIBLE] Not resolved for order ${order.id}`);
   return null;
 }
 
