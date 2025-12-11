@@ -3,11 +3,27 @@ import { useState, useEffect } from 'react';
 export default function ChannelManager({ onUpdate }) {
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    channel_id: '',
-    name: '',
-    is_active: true
+  // Загружаем состояние формы из localStorage
+  const [formData, setFormData] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('channelFormData');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          return { channel_id: '', name: '', is_active: true };
+        }
+      }
+    }
+    return { channel_id: '', name: '', is_active: true };
   });
+
+  // Сохраняем состояние формы при изменении
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('channelFormData', JSON.stringify(formData));
+    }
+  }, [formData]);
 
   useEffect(() => {
     loadChannels();
@@ -23,14 +39,34 @@ export default function ChannelManager({ onUpdate }) {
     }
   };
 
+  const parseChannelLink = (input) => {
+    // Парсинг ссылок вида https://t.me/vacancy_it_ulbitv или t.me/vacancy_it_ulbitv
+    if (input.includes('t.me/')) {
+      const match = input.match(/t\.me\/([a-zA-Z0-9_]+)/);
+      if (match) {
+        return '@' + match[1];
+      }
+    }
+    // Если уже @username или числовой ID, возвращаем как есть
+    return input.trim();
+  };
+
   const addChannel = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
+      // Парсим ссылку если это ссылка
+      const parsedChannelId = parseChannelLink(formData.channel_id);
+      
+      const channelData = {
+        ...formData,
+        channel_id: parsedChannelId
+      };
+      
       const res = await fetch('/api/channels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(channelData)
       });
       if (res.ok) {
         setFormData({ channel_id: '', name: '', is_active: true });
@@ -84,15 +120,18 @@ export default function ChannelManager({ onUpdate }) {
         </div>
         <form onSubmit={addChannel}>
           <div className="form-group">
-            <label className="form-label">Идентификатор канала</label>
+            <label className="form-label">Ссылка на канал или идентификатор</label>
             <input
               type="text"
               className="form-input"
-              placeholder="@channel_username или -1001234567890"
+              placeholder="https://t.me/vacancy_it_ulbitv или @channel_username"
               value={formData.channel_id}
               onChange={(e) => setFormData({ ...formData, channel_id: e.target.value })}
               required
             />
+            <p style={{ color: '#9ca3af', fontSize: '0.75rem', marginTop: '4px' }}>
+              Поддерживаются ссылки вида: https://t.me/username или @username
+            </p>
           </div>
           <div className="form-group">
             <label className="form-label">Название</label>

@@ -4,10 +4,28 @@ export default function MatchesList() {
   const [matches, setMatches] = useState([]);
   const [channels, setChannels] = useState([]);
   const [rules, setRules] = useState([]);
-  const [filters, setFilters] = useState({
-    channel_id: '',
-    rule_id: ''
+  
+  // Загружаем фильтры из localStorage
+  const [filters, setFilters] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('matchesFilters');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          return { channel_id: '', rule_id: '' };
+        }
+      }
+    }
+    return { channel_id: '', rule_id: '' };
   });
+
+  // Сохраняем фильтры при изменении
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('matchesFilters', JSON.stringify(filters));
+    }
+  }, [filters]);
 
   useEffect(() => {
     loadChannels();

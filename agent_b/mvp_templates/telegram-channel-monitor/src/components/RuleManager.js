@@ -3,12 +3,27 @@ import { useState, useEffect } from 'react';
 export default function RuleManager({ onUpdate }) {
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    rule_type: 'keywords',
-    pattern: '',
-    is_active: true
+  // Загружаем состояние формы из localStorage
+  const [formData, setFormData] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ruleFormData');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          return { name: '', rule_type: 'keywords', pattern: '', is_active: true };
+        }
+      }
+    }
+    return { name: '', rule_type: 'keywords', pattern: '', is_active: true };
   });
+
+  // Сохраняем состояние формы при изменении
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ruleFormData', JSON.stringify(formData));
+    }
+  }, [formData]);
 
   useEffect(() => {
     loadRules();

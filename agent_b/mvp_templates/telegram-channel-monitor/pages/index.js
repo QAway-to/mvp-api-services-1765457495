@@ -6,8 +6,21 @@ import MatchesList from '../src/components/MatchesList';
 import StatsPanel from '../src/components/StatsPanel';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('channels');
+  // Загружаем активную вкладку из localStorage
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('activeTab') || 'channels';
+    }
+    return 'channels';
+  });
   const [stats, setStats] = useState(null);
+
+  // Сохраняем активную вкладку при изменении
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('activeTab', activeTab);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     loadStats();
