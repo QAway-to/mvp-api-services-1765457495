@@ -124,6 +124,28 @@ async function handleOrderUpdated(order) {
     console.log(`[SHOPIFY WEBHOOK] No fields to update for deal ${dealId}`);
   }
 
+  // 4. Update product rows (including shipping) to reflect any changes
+  try {
+    const { productRows } = mapShopifyOrderToBitrixDeal(order);
+    if (productRows && productRows.length > 0) {
+      await callBitrix('/crm.deal.productrows.set.json', {
+        id: dealId,
+        rows: productRows,
+      });
+      console.log(`[SHOPIFY WEBHOOK] Product rows updated for deal ${dealId}: ${productRows.length} rows`);
+    } else {
+      // If no product rows (e.g., all items removed), clear rows to keep Bitrix in sync
+      await callBitrix('/crm.deal.productrows.set.json', {
+        id: dealId,
+        rows: [],
+      });
+      console.log(`[SHOPIFY WEBHOOK] Product rows cleared for deal ${dealId}`);
+    }
+  } catch (productRowsError) {
+    console.error(`[SHOPIFY WEBHOOK] Product rows update error (non-blocking):`, productRowsError);
+    // Do not throw to keep the webhook handler resilient
+  }
+
   return dealId;
 }
 
