@@ -7,7 +7,6 @@ import { BITRIX_CONFIG, financialStatusToStageId, sourceNameToSourceId } from '.
 import skuMapping from './skuMapping.json' assert { type: 'json' };
 import handleMapping from './handleMapping.json' assert { type: 'json' };
 import brandMapping from './brandMapping.json' assert { type: 'json' };
-import preOrderWhitelist from './preOrderWhitelist.json' assert { type: 'json' };
 import { resolveResponsibleId } from './responsible.js';
 
 /**
@@ -108,49 +107,16 @@ export function mapShopifyOrderToBitrixDeal(order) {
     0
   );
 
-  // Determine category ID based on stock/preorder logic
-  let categoryId = 2; // Default: Stock (site)
-  const lineItems = order.line_items || [];
-  
-  // Check if any item has stock (inventory_quantity > 0 or fulfillable_quantity > 0)
-  const hasStock = lineItems.some(item => {
-    const qty = item.inventory_quantity ?? item.fulfillable_quantity ?? 0;
-    return typeof qty === 'number' && qty > 0;
-  });
-  
-  if (!hasStock) {
-    // Check if any item is marked as preorder
-    const isPreorder = lineItems.some(item => {
-      // Check tags
-      const tags = Array.isArray(item.product?.tags) 
-        ? item.product.tags 
-        : String(item.product?.tags || '').split(',').map(t => t.trim());
-      const hasPreorderTag = tags.some(t => t.toLowerCase() === 'preorder');
-      
-      // Check metafield
-      const mfPreorder = item.product?.metafields?.custom?.preorder === true;
-      
-      // Check whitelist
-      const sku = item.sku || '';
-      const handle = item.product?.handle || '';
-      const inWhitelist = (preOrderWhitelist && (preOrderWhitelist[sku] || preOrderWhitelist[handle])) ? true : false;
-      
-      return hasPreorderTag || mfPreorder || inWhitelist;
-    });
-    
-    if (isPreorder) {
-      categoryId = 8; // Pre-order (site)
-    }
-  }
-  
-  const sourceName = categoryId === 8 ? 'online (pre-order)' : 'online (stock)';
+  // Determine if preorder
+  const isPreorder = order.source_name === 'pos'; // Add your conditions if needed
+  const sourceName = isPreorder ? 'offline (pre-order)' : 'online (stock)';
 
   // Customer name
   const customerName = order.customer
     ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || null
     : null;
 
-  // Map financial status to stage ID (category-specific)
+  // Map financial status to stage ID
   const stageId = financialStatusToStageId(order.financial_status) || BITRIX_CONFIG.STAGES.DEFAULT;
   
   // Map source name to source ID
@@ -162,9 +128,9 @@ export function mapShopifyOrderToBitrixDeal(order) {
     OPPORTUNITY: totalPrice, // Final amount as in Shopify
     CURRENCY_ID: order.currency || 'EUR',
     COMMENTS: `Shopify order ${order.name || order.id}`,
-    CATEGORY_ID: categoryId,
-    STAGE_ID: stageId || 'C2:NEW', // Default to C2:NEW if not mapped
-    SOURCE_ID: sourceId || 'WEB', // Default to 'WEB' if not mapped
+    CATEGORY_ID: BITRIX_CONFIG.CATEGORY_ID >= 0 ? BITRIX_CONFIG.CATEGORY_ID : 0, // Use 0 if not configured
+    STAGE_ID: stageId || BITRIX_CONFIG.STAGES.DEFAULT || 'NEW', // Default to 'NEW' if not mapped
+    SOURCE_ID: sourceId || BITRIX_CONFIG.SOURCES.SHOPIFY || 'WEB', // Default to 'WEB' if not mapped
     SOURCE_DESCRIPTION: sourceName,
 
     // Key to Shopify order
@@ -172,11 +138,22 @@ export function mapShopifyOrderToBitrixDeal(order) {
     UF_SHOPIFY_CUSTOMER_EMAIL: order.email || order.customer?.email || null,
     UF_SHOPIFY_CUSTOMER_NAME: customerName,
 
-    // Aggregates for reports (as in Python script)
-    UF_SHOPIFY_TOTAL_DISCOUNT: totalDiscount,
-    UF_SHOPIFY_SHIPPING_PRICE: shippingPrice,
-    UF_SHOPIFY_TOTAL_TAX: totalTax,
+    // Aggregates for reports (as in Python script) - always set, even if 0
+    UF_SHOPIFY_TOTAL_DISCOUNT: totalDiscount || 0,
+    UF_SHOPIFY_SHIPPING_PRICE: shippingPrice || 0,
+    UF_SHOPIFY_TOTAL_TAX: totalTax || 0,
   };
+  
+  console.log(`[ORDER MAPPER] Deal fields prepared:`, {
+    TITLE: dealFields.TITLE,
+    OPPORTUNITY: dealFields.OPPORTUNITY,
+    CATEGORY_ID: dealFields.CATEGORY_ID,
+    STAGE_ID: dealFields.STAGE_ID,
+    SOURCE_ID: dealFields.SOURCE_ID,
+    UF_SHOPIFY_TOTAL_DISCOUNT: dealFields.UF_SHOPIFY_TOTAL_DISCOUNT,
+    UF_SHOPIFY_SHIPPING_PRICE: dealFields.UF_SHOPIFY_SHIPPING_PRICE,
+    UF_SHOPIFY_TOTAL_TAX: dealFields.UF_SHOPIFY_TOTAL_TAX,
+  });
 
   // Resolve responsible: assign explicitly on create per mapping (Bitrix can reassign later)
   const assigneeId = resolveResponsibleId(order);
@@ -473,16 +450,16 @@ export function mapShopifyOrderToBitrixDeal(order) {
   const hasValidShippingTitle = shippingLineTitle && shippingLineTitle.trim().length > 0;
   
   if (actualShippingPrice > 0 && hasValidShippingTitle && (hasShippingLines || hasExplicitShippingPrice)) {
-    // CRITICAL: Shipping should NEVER use PRODUCT_ID to avoid conflicts with regular products
-    // Some products may have PRODUCT_ID = 3000 (or SHIPPING_PRODUCT_ID), which would cause confusion
-    // Solution: Use ONLY PRODUCT_NAME for shipping, NO PRODUCT_ID
-    // This ensures shipping is always displayed correctly, regardless of product mappings
+    // Use PRODUCT_ID for shipping (matching working script)
+    const shippingProductId = BITRIX_CONFIG.SHIPPING_PRODUCT_ID > 0 
+      ? BITRIX_CONFIG.SHIPPING_PRODUCT_ID 
+      : 3000; // Default shipping product ID from working script
     
-    const shippingName = `Shipping: ${shippingLineTitle}`;
+    const shippingName = shippingLineTitle || 'Shipping';
     
     productRows.push({
-      // DO NOT set PRODUCT_ID for shipping - this prevents conflicts with products that might have the same ID
-      PRODUCT_NAME: shippingName, // Explicit name - this is the ONLY identifier for shipping
+      PRODUCT_ID: shippingProductId, // Use shipping product ID (3000 from working script)
+      PRODUCT_NAME: shippingName, // Explicit name for visibility
       PRICE: actualShippingPrice,
       QUANTITY: 1,
       DISCOUNT_TYPE_ID: 1,
@@ -491,7 +468,7 @@ export function mapShopifyOrderToBitrixDeal(order) {
       TAX_RATE: 19.0, // Default tax rate for shipping
     });
     
-    console.log(`[ORDER MAPPER] Added shipping row (NO PRODUCT_ID): ${shippingName}, Price: ${actualShippingPrice}`);
+    console.log(`[ORDER MAPPER] Added shipping row (PRODUCT_ID: ${shippingProductId}): ${shippingName}, Price: ${actualShippingPrice}`);
   } else if (shippingPrice > 0 && !hasShippingLines) {
     // Log warning if we have shipping price but no shipping_lines (potential data issue)
     console.warn(`[ORDER MAPPER] Shipping price detected (${shippingPrice}) but no shipping_lines found. Skipping shipping row to avoid confusion.`);

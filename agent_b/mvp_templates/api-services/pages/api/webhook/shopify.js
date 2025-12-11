@@ -3,7 +3,6 @@ import { shopifyAdapter } from '../../../src/lib/adapters/shopify/index.js';
 import { callBitrix, getBitrixWebhookBase } from '../../../src/lib/bitrix/client.js';
 import { mapShopifyOrderToBitrixDeal } from '../../../src/lib/bitrix/orderMapper.js';
 import { upsertBitrixContact } from '../../../src/lib/bitrix/contact.js';
-import { BITRIX_CONFIG, financialStatusToStageId, financialStatusToPaymentStatus } from '../../../src/lib/bitrix/config.js';
 
 // Configure body parser to accept raw JSON
 export const config = {
@@ -19,9 +18,23 @@ export const config = {
  */
 async function handleOrderCreated(order) {
   console.log(`[SHOPIFY WEBHOOK] Handling order created: ${order.name || order.id}`);
+  console.log(`[SHOPIFY WEBHOOK] Order data:`, {
+    id: order.id,
+    name: order.name,
+    total_price: order.total_price,
+    current_total_price: order.current_total_price,
+    financial_status: order.financial_status,
+    line_items_count: order.line_items?.length || 0
+  });
 
   // Map order to Bitrix deal
   const { dealFields, productRows } = mapShopifyOrderToBitrixDeal(order);
+  
+  console.log(`[SHOPIFY WEBHOOK] Mapped dealFields:`, JSON.stringify(dealFields, null, 2));
+  console.log(`[SHOPIFY WEBHOOK] Mapped productRows count:`, productRows.length);
+  if (productRows.length > 0) {
+    console.log(`[SHOPIFY WEBHOOK] First product row:`, JSON.stringify(productRows[0], null, 2));
+  }
 
   // Upsert contact (non-blocking)
   let contactId = null;
@@ -36,16 +49,20 @@ async function handleOrderCreated(order) {
   }
 
   // 1. Create deal
+  console.log(`[SHOPIFY WEBHOOK] Sending deal to Bitrix with fields:`, Object.keys(dealFields));
   const dealAddResp = await callBitrix('/crm.deal.add.json', {
     fields: dealFields,
   });
 
+  console.log(`[SHOPIFY WEBHOOK] Bitrix response:`, JSON.stringify(dealAddResp, null, 2));
+
   if (!dealAddResp.result) {
+    console.error(`[SHOPIFY WEBHOOK] ❌ Failed to create deal. Response:`, dealAddResp);
     throw new Error(`Failed to create deal: ${JSON.stringify(dealAddResp)}`);
   }
 
   const dealId = dealAddResp.result;
-  console.log(`[SHOPIFY WEBHOOK] Deal created: ${dealId}`);
+  console.log(`[SHOPIFY WEBHOOK] ✅ Deal created: ${dealId}`);
 
   // 2. Set product rows
   if (productRows.length > 0) {
@@ -96,14 +113,14 @@ async function handleOrderUpdated(order) {
     fields.OPPORTUNITY = newAmount;
   }
 
-  // Payment status synchronization with full mapping
-  const paymentStatus = financialStatusToPaymentStatus(order.financial_status);
-  fields.UF_CRM_PAYMENT_STATUS = paymentStatus;
+  // Payment status synchronization
+  const isPaid = order.financial_status === 'paid';
+  // Update payment status field (adjust field name if needed)
+  fields.UF_CRM_PAYMENT_STATUS = isPaid ? 'PAID' : 'NOT_PAID';
 
-  // Update stage based on financial status
-  const stageId = financialStatusToStageId(order.financial_status);
-  if (stageId) {
-    fields.STAGE_ID = stageId;
+  // Optionally: move stage when order is paid
+  if (isPaid) {
+    fields.STAGE_ID = BITRIX_CONFIG.STAGES.PAID || 'WON'; // Use configured stage ID
   }
 
   // Update other fields if needed
@@ -151,7 +168,15 @@ async function handleOrderUpdated(order) {
 }
 
 export default async function handler(req, res) {
+  console.log(`[SHOPIFY WEBHOOK] ===== INCOMING REQUEST =====`);
+  console.log(`[SHOPIFY WEBHOOK] Method: ${req.method}`);
+  console.log(`[SHOPIFY WEBHOOK] Headers:`, {
+    'x-shopify-topic': req.headers['x-shopify-topic'],
+    'content-type': req.headers['content-type']
+  });
+  
   if (req.method !== 'POST') {
+    console.log(`[SHOPIFY WEBHOOK] ❌ Method not allowed: ${req.method}`);
     res.status(405).end('Method not allowed');
     return;
   }
@@ -159,13 +184,17 @@ export default async function handler(req, res) {
   const topic = req.headers['x-shopify-topic'];
   const order = req.body;
 
+  console.log(`[SHOPIFY WEBHOOK] Topic: ${topic}`);
+  console.log(`[SHOPIFY WEBHOOK] Order ID: ${order?.id || 'N/A'}`);
+  console.log(`[SHOPIFY WEBHOOK] Order Name: ${order?.name || 'N/A'}`);
+
   try {
     // Store event for monitoring (non-blocking)
     try {
       const storedEvent = shopifyAdapter.storeEvent(order);
-      console.log(`[SHOPIFY WEBHOOK] Event stored. Topic: ${topic}, Order: ${order.name || order.id}`);
+      console.log(`[SHOPIFY WEBHOOK] ✅ Event stored. Topic: ${topic}, Order: ${order.name || order.id}`);
     } catch (storeError) {
-      console.error('[SHOPIFY WEBHOOK] Failed to store event:', storeError);
+      console.error('[SHOPIFY WEBHOOK] ⚠️ Failed to store event:', storeError);
     }
 
     if (topic === 'orders/create') {
