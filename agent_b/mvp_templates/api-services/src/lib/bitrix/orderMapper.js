@@ -7,6 +7,7 @@ import { BITRIX_CONFIG, financialStatusToStageId, sourceNameToSourceId } from '.
 import skuMapping from './skuMapping.json' assert { type: 'json' };
 import handleMapping from './handleMapping.json' assert { type: 'json' };
 import brandMapping from './brandMapping.json' assert { type: 'json' };
+import { resolveResponsibleId } from './responsible.js';
 
 /**
  * Parse model name from product title
@@ -142,6 +143,12 @@ export function mapShopifyOrderToBitrixDeal(order) {
     UF_SHOPIFY_SHIPPING_PRICE: shippingPrice,
     UF_SHOPIFY_TOTAL_TAX: totalTax,
   };
+
+  // Resolve responsible: assign explicitly on create per mapping (Bitrix can reassign later)
+  const assigneeId = resolveResponsibleId(order);
+  if (assigneeId) {
+    dealFields.ASSIGNED_BY_ID = assigneeId;
+  }
 
   // Extract product properties from ALL line_items for UF-fields
   // Aggregate Size and Color across all positions to preserve ordering
