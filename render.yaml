@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: api-services
+    env: node
+    buildCommand: cd agent_b/mvp_templates/api-services && npm install && npm run build
+    startCommand: cd agent_b/mvp_templates/api-services && npm start
+    rootDir: agent_b/mvp_templates/api-services
+    envVars:
+      - key: NODE_ENV
+        value: production
+
