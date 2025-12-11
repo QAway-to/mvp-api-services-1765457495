@@ -2,16 +2,16 @@
 // TODO: Replace with actual IDs from your Bitrix24 instance
 
 export const BITRIX_CONFIG = {
-  // Category ID (Funnel ID) for deals
-  CATEGORY_ID: 0, // TODO: Set actual category ID
+  // Category ID (Funnel ID) for deals - will be determined dynamically
+  CATEGORY_ID: 2, // Default to category 2 (Stock site)
 
-  // Default stage IDs (should be replaced with actual stage IDs from your Bitrix24)
+  // Stage IDs for category 2 (Stock site)
   STAGES: {
-    PAID: '', // TODO: Set stage ID for paid orders
-    PENDING: '', // TODO: Set stage ID for pending payment
-    REFUNDED: '', // TODO: Set stage ID for refunded
-    CANCELLED: '', // TODO: Set stage ID for cancelled
-    DEFAULT: '' // TODO: Set default stage ID
+    PAID: 'C2:WON', // Paid orders
+    PENDING: 'C2:PREPARATION', // Pending payment
+    REFUNDED: 'C2:LOSE', // Refunded orders
+    CANCELLED: 'C2:LOSE', // Cancelled orders
+    DEFAULT: 'C2:NEW' // Default stage
   },
 
   // Source IDs mapping
@@ -32,19 +32,34 @@ export const BITRIX_CONFIG = {
   }
 };
 
-// Financial status to stage ID mapping
+// Financial status to stage ID mapping (category 2)
 export const financialStatusToStageId = (financialStatus) => {
   const status = financialStatus?.toLowerCase() || '';
   const mapping = {
-    'paid': BITRIX_CONFIG.STAGES.PAID,
-    'pending': BITRIX_CONFIG.STAGES.PENDING,
-    'refunded': BITRIX_CONFIG.STAGES.REFUNDED,
-    'cancelled': BITRIX_CONFIG.STAGES.CANCELLED,
-    'partially_paid': BITRIX_CONFIG.STAGES.PENDING,
-    'partially_refunded': BITRIX_CONFIG.STAGES.REFUNDED,
-    'voided': BITRIX_CONFIG.STAGES.CANCELLED
+    'paid': BITRIX_CONFIG.STAGES.PAID, // C2:WON
+    'pending': BITRIX_CONFIG.STAGES.PENDING, // C2:PREPARATION
+    'refunded': BITRIX_CONFIG.STAGES.REFUNDED, // C2:LOSE
+    'cancelled': BITRIX_CONFIG.STAGES.CANCELLED, // C2:LOSE
+    'partially_paid': BITRIX_CONFIG.STAGES.PENDING, // C2:PREPARATION
+    'partially_refunded': BITRIX_CONFIG.STAGES.REFUNDED, // C2:LOSE
+    'voided': BITRIX_CONFIG.STAGES.CANCELLED // C2:LOSE
   };
-  return mapping[status] || BITRIX_CONFIG.STAGES.DEFAULT;
+  return mapping[status] || BITRIX_CONFIG.STAGES.DEFAULT; // C2:NEW
+};
+
+// Financial status to payment status field mapping
+export const financialStatusToPaymentStatus = (financialStatus) => {
+  const status = financialStatus?.toLowerCase() || '';
+  const mapping = {
+    'paid': 'PAID',
+    'pending': 'NOT_PAID',
+    'refunded': 'REFUNDED',
+    'cancelled': 'VOIDED',
+    'partially_paid': 'PARTIALLY_PAID',
+    'partially_refunded': 'PARTIALLY_REFUNDED',
+    'voided': 'VOIDED'
+  };
+  return mapping[status] || 'NOT_PAID';
 };
 
 // Source name to source ID mapping

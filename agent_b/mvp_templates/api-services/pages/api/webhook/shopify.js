@@ -3,6 +3,7 @@ import { shopifyAdapter } from '../../../src/lib/adapters/shopify/index.js';
 import { callBitrix, getBitrixWebhookBase } from '../../../src/lib/bitrix/client.js';
 import { mapShopifyOrderToBitrixDeal } from '../../../src/lib/bitrix/orderMapper.js';
 import { upsertBitrixContact } from '../../../src/lib/bitrix/contact.js';
+import { BITRIX_CONFIG, financialStatusToStageId, financialStatusToPaymentStatus } from '../../../src/lib/bitrix/config.js';
 
 // Configure body parser to accept raw JSON
 export const config = {
@@ -95,14 +96,14 @@ async function handleOrderUpdated(order) {
     fields.OPPORTUNITY = newAmount;
   }
 
-  // Payment status synchronization
-  const isPaid = order.financial_status === 'paid';
-  // Update payment status field (adjust field name if needed)
-  fields.UF_CRM_PAYMENT_STATUS = isPaid ? 'PAID' : 'NOT_PAID';
+  // Payment status synchronization with full mapping
+  const paymentStatus = financialStatusToPaymentStatus(order.financial_status);
+  fields.UF_CRM_PAYMENT_STATUS = paymentStatus;
 
-  // Optionally: move stage when order is paid
-  if (isPaid) {
-    fields.STAGE_ID = BITRIX_CONFIG.STAGES.PAID || 'WON'; // Use configured stage ID
+  // Update stage based on financial status
+  const stageId = financialStatusToStageId(order.financial_status);
+  if (stageId) {
+    fields.STAGE_ID = stageId;
   }
 
   // Update other fields if needed

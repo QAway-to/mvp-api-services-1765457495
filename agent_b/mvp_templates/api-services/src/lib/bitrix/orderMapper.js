@@ -7,6 +7,7 @@ import { BITRIX_CONFIG, financialStatusToStageId, sourceNameToSourceId } from '.
 import skuMapping from './skuMapping.json' assert { type: 'json' };
 import handleMapping from './handleMapping.json' assert { type: 'json' };
 import brandMapping from './brandMapping.json' assert { type: 'json' };
+import preOrderWhitelist from './preOrderWhitelist.json' assert { type: 'json' };
 import { resolveResponsibleId } from './responsible.js';
 
 /**
@@ -107,16 +108,49 @@ export function mapShopifyOrderToBitrixDeal(order) {
     0
   );
 
-  // Determine if preorder
-  const isPreorder = order.source_name === 'pos'; // Add your conditions if needed
-  const sourceName = isPreorder ? 'offline (pre-order)' : 'online (stock)';
+  // Determine category ID based on stock/preorder logic
+  let categoryId = 2; // Default: Stock (site)
+  const lineItems = order.line_items || [];
+  
+  // Check if any item has stock (inventory_quantity > 0 or fulfillable_quantity > 0)
+  const hasStock = lineItems.some(item => {
+    const qty = item.inventory_quantity ?? item.fulfillable_quantity ?? 0;
+    return typeof qty === 'number' && qty > 0;
+  });
+  
+  if (!hasStock) {
+    // Check if any item is marked as preorder
+    const isPreorder = lineItems.some(item => {
+      // Check tags
+      const tags = Array.isArray(item.product?.tags) 
+        ? item.product.tags 
+        : String(item.product?.tags || '').split(',').map(t => t.trim());
+      const hasPreorderTag = tags.some(t => t.toLowerCase() === 'preorder');
+      
+      // Check metafield
+      const mfPreorder = item.product?.metafields?.custom?.preorder === true;
+      
+      // Check whitelist
+      const sku = item.sku || '';
+      const handle = item.product?.handle || '';
+      const inWhitelist = (preOrderWhitelist && (preOrderWhitelist[sku] || preOrderWhitelist[handle])) ? true : false;
+      
+      return hasPreorderTag || mfPreorder || inWhitelist;
+    });
+    
+    if (isPreorder) {
+      categoryId = 8; // Pre-order (site)
+    }
+  }
+  
+  const sourceName = categoryId === 8 ? 'online (pre-order)' : 'online (stock)';
 
   // Customer name
   const customerName = order.customer
     ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || null
     : null;
 
-  // Map financial status to stage ID
+  // Map financial status to stage ID (category-specific)
   const stageId = financialStatusToStageId(order.financial_status) || BITRIX_CONFIG.STAGES.DEFAULT;
   
   // Map source name to source ID
@@ -128,8 +162,8 @@ export function mapShopifyOrderToBitrixDeal(order) {
     OPPORTUNITY: totalPrice, // Final amount as in Shopify
     CURRENCY_ID: order.currency || 'EUR',
     COMMENTS: `Shopify order ${order.name || order.id}`,
-    CATEGORY_ID: BITRIX_CONFIG.CATEGORY_ID > 0 ? BITRIX_CONFIG.CATEGORY_ID : 0, // Use 0 if not configured
-    STAGE_ID: stageId || 'NEW', // Default to 'NEW' if not mapped
+    CATEGORY_ID: categoryId,
+    STAGE_ID: stageId || 'C2:NEW', // Default to C2:NEW if not mapped
     SOURCE_ID: sourceId || 'WEB', // Default to 'WEB' if not mapped
     SOURCE_DESCRIPTION: sourceName,
 
