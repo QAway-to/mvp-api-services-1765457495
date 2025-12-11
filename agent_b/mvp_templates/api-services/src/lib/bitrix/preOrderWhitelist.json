@@ -1,0 +1,6 @@
+{
+  "comment": "Whitelist of SKUs or handles that should be treated as pre-order items. Add SKUs or handles as keys with value true.",
+  "example_sku": true,
+  "example_handle": true
+}
+

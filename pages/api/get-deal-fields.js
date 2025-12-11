@@ -65,6 +65,37 @@ export default async function handler(req, res) {
           type: fieldInfo.TYPE || 'unknown'
         };
       }
+      
+      // Check for Order type / Delivery method / Payment status fields
+      if (label.includes('order type') || label.includes('тип заказа') || 
+          label.includes('order type') || label.includes('source description')) {
+        targetFields.ORDER_TYPE = {
+          code: fieldCode,
+          formLabel: formLabel,
+          listLabel: listLabel,
+          type: fieldInfo.TYPE || 'unknown'
+        };
+      }
+      
+      if (label.includes('delivery') || label.includes('доставк') || 
+          label.includes('shipping method') || label.includes('способ доставки')) {
+        targetFields.DELIVERY_METHOD = {
+          code: fieldCode,
+          formLabel: formLabel,
+          listLabel: listLabel,
+          type: fieldInfo.TYPE || 'unknown'
+        };
+      }
+      
+      if (label.includes('payment status') || label.includes('статус оплаты') ||
+          label.includes('payment') && label.includes('status')) {
+        targetFields.PAYMENT_STATUS = {
+          code: fieldCode,
+          formLabel: formLabel,
+          listLabel: listLabel,
+          type: fieldInfo.TYPE || 'unknown'
+        };
+      }
     }
     
     console.log('[GET DEAL FIELDS] Found target fields:', targetFields);
