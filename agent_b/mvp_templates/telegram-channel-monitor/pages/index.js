@@ -11,8 +11,28 @@ export default function Home() {
 
   useEffect(() => {
     loadStats();
-    const interval = setInterval(loadStats, 30000);
-    return () => clearInterval(interval);
+    const statsInterval = setInterval(loadStats, 30000);
+    
+    // Автоматическое сканирование каналов каждый час (3600000 мс)
+    const scanChannels = async () => {
+      try {
+        await fetch('/api/scan');
+        console.log('Channel scan triggered');
+      } catch (error) {
+        console.error('Error triggering scan:', error);
+      }
+    };
+    
+    // Запустить сразу при загрузке
+    scanChannels();
+    
+    // Затем каждые 60 минут
+    const scanInterval = setInterval(scanChannels, 3600000);
+    
+    return () => {
+      clearInterval(statsInterval);
+      clearInterval(scanInterval);
+    };
   }, []);
 
   const loadStats = async () => {
