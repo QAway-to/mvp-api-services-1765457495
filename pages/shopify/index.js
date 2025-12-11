@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import WebhookInfo from '../../src/components/shopify/WebhookInfo';
 import EventsList from '../../src/components/shopify/EventsList';
 import DataPreview from '../../src/components/shopify/DataPreview';
-import { shopifyAdapter } from '../../src/lib/adapters/shopify';
+import { shopifyAdapter } from '../../src/lib/adapters/shopify/index.js';
 
 export default function ShopifyPage() {
   const [events, setEvents] = useState([]);
