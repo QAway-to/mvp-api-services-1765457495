@@ -67,20 +67,27 @@ export function resolveResponsibleId(order) {
   const cyprusTime = getCyprusTime();
   const weekday = cyprusTime.day; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
   
+  console.log(`[RESPONSIBLE] Resolving for weekday ${weekday}, Cyprus time: ${cyprusTime.hours}:${String(cyprusTime.minutes).padStart(2, '0')}`);
+  
   // Check weekday schedule for Monday (switch at 9:01) and Friday (switch at 19:01)
   if (weekdaySchedule.monday && weekday === 1) {
     // Monday: switch to Alena at 9:01
-    if (isAfterSwitchTime(weekdaySchedule.monday.switchTime, cyprusTime)) {
+    const isAfter = isAfterSwitchTime(weekdaySchedule.monday.switchTime, cyprusTime);
+    console.log(`[RESPONSIBLE] Monday check: after ${weekdaySchedule.monday.switchTime} = ${isAfter}`);
+    
+    if (isAfter) {
       const mondayManagerId = weekdaySchedule.monday.managerId;
       if (mondayManagerId) {
-        console.log(`[RESPONSIBLE] Monday after 9:01 → Alena (ID: ${mondayManagerId})`);
+        console.log(`[RESPONSIBLE] ✅ Monday after 9:01 → Alena (ID: ${mondayManagerId})`);
         return mondayManagerId;
+      } else {
+        console.warn(`[RESPONSIBLE] ⚠️ Monday managerId is null/undefined, falling back`);
       }
     } else {
       // Monday before 9:01 → previous manager (Lena from Friday)
       const fridayManagerId = weekdaySchedule.friday?.managerId || defaultId;
       if (fridayManagerId) {
-        console.log(`[RESPONSIBLE] Monday before 9:01 → previous (Lena, ID: ${fridayManagerId})`);
+        console.log(`[RESPONSIBLE] ✅ Monday before 9:01 → previous (Lena, ID: ${fridayManagerId})`);
         return fridayManagerId;
       }
     }
@@ -88,17 +95,22 @@ export function resolveResponsibleId(order) {
   
   if (weekdaySchedule.friday && weekday === 5) {
     // Friday: switch to Lena at 19:01
-    if (isAfterSwitchTime(weekdaySchedule.friday.switchTime, cyprusTime)) {
+    const isAfter = isAfterSwitchTime(weekdaySchedule.friday.switchTime, cyprusTime);
+    console.log(`[RESPONSIBLE] Friday check: after ${weekdaySchedule.friday.switchTime} = ${isAfter}`);
+    
+    if (isAfter) {
       const fridayManagerId = weekdaySchedule.friday.managerId;
       if (fridayManagerId) {
-        console.log(`[RESPONSIBLE] Friday after 19:01 → Lena (ID: ${fridayManagerId})`);
+        console.log(`[RESPONSIBLE] ✅ Friday after 19:01 → Lena (ID: ${fridayManagerId})`);
         return fridayManagerId;
+      } else {
+        console.warn(`[RESPONSIBLE] ⚠️ Friday managerId is null/undefined, falling back`);
       }
     } else {
       // Friday before 19:01 → previous manager (Alena from Monday)
       const mondayManagerId = weekdaySchedule.monday?.managerId || defaultId;
       if (mondayManagerId) {
-        console.log(`[RESPONSIBLE] Friday before 19:01 → previous (Alena, ID: ${mondayManagerId})`);
+        console.log(`[RESPONSIBLE] ✅ Friday before 19:01 → previous (Alena, ID: ${mondayManagerId})`);
         return mondayManagerId;
       }
     }
@@ -108,8 +120,10 @@ export function resolveResponsibleId(order) {
   if (byWeekday && byWeekday.hasOwnProperty(String(weekday))) {
     const weekdayManagerId = byWeekday[String(weekday)];
     if (weekdayManagerId) {
-      console.log(`[RESPONSIBLE] Weekday ${weekday} → manager ID: ${weekdayManagerId}`);
+      console.log(`[RESPONSIBLE] ✅ Weekday ${weekday} → manager ID: ${weekdayManagerId}`);
       return weekdayManagerId;
+    } else {
+      console.warn(`[RESPONSIBLE] ⚠️ Weekday ${weekday} managerId is null/undefined`);
     }
   }
 
@@ -139,13 +153,15 @@ export function resolveResponsibleId(order) {
     return bySource[source];
   }
 
-  // 4) Default
+  // 4) Default - always return defaultId if available, never return null
   if (defaultId) {
-    console.warn(`[RESPONSIBLE] Matched by default for order ${order.id} → ID: ${defaultId}`);
+    console.warn(`[RESPONSIBLE] ⚠️ Matched by default for order ${order.id} → ID: ${defaultId} (Lena/Helen Bozbei)`);
     return defaultId;
   }
 
-  console.warn(`[RESPONSIBLE] Not resolved for order ${order.id}`);
+  // Last resort: if no default, log error but still try to return a fallback
+  console.error(`[RESPONSIBLE] ❌ CRITICAL: No default manager ID configured! Order ${order.id} will have no responsible.`);
+  console.error(`[RESPONSIBLE] Mapping config:`, JSON.stringify({ defaultId, byWeekday, weekdaySchedule }, null, 2));
   return null;
 }
 
