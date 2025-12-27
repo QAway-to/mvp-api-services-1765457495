@@ -12,12 +12,30 @@ export default function ShopifyPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastRefresh, setLastRefresh] = useState(null);
-  // ✅ Bitrix webhook URL from environment variable (via API)
   const [bitrixWebhookUrl, setBitrixWebhookUrl] = useState(null);
-  const [isLoadingWebhookUrl, setIsLoadingWebhookUrl] = useState(true);
   const [previewEvent, setPreviewEvent] = useState(null); // Event to preview
   const [previewData, setPreviewData] = useState(null); // { shopifyData, bitrixData } for preview
   const [isInitialLoad, setIsInitialLoad] = useState(true); // Track initial load
+  const [isLoadingBitrixUrl, setIsLoadingBitrixUrl] = useState(true);
+
+  const fetchBitrixWebhookUrl = async () => {
+    setIsLoadingBitrixUrl(true);
+    try {
+      const response = await fetch('/api/config/bitrix-webhook-url');
+      const data = await response.json();
+      if (data.success && data.webhookUrl) {
+        setBitrixWebhookUrl(data.webhookUrl);
+      } else {
+        console.error('Failed to fetch Bitrix webhook URL:', data.error);
+        setBitrixWebhookUrl(null);
+      }
+    } catch (err) {
+      console.error('Fetch Bitrix webhook URL error:', err);
+      setBitrixWebhookUrl(null);
+    } finally {
+      setIsLoadingBitrixUrl(false);
+    }
+  };
 
   const fetchEvents = async () => {
     setIsLoading(true);
@@ -65,27 +83,9 @@ export default function ShopifyPage() {
     }
   };
 
-  const fetchBitrixWebhookUrl = async () => {
-    setIsLoadingWebhookUrl(true);
-    try {
-      const response = await fetch('/api/config/bitrix-webhook-url');
-      const data = await response.json();
-      if (data.success && data.webhookUrl) {
-        setBitrixWebhookUrl(data.webhookUrl);
-        console.log(`[ShopifyPage] Bitrix webhook URL loaded from ${data.source}: ${data.webhookUrl}`);
-      } else {
-        console.error('Failed to fetch Bitrix webhook URL:', data.error);
-      }
-    } catch (err) {
-      console.error('Fetch Bitrix webhook URL error:', err);
-    } finally {
-      setIsLoadingWebhookUrl(false);
-    }
-  };
-
   // Initial fetch
   useEffect(() => {
-    fetchBitrixWebhookUrl(); // Fetch webhook URL first
+    fetchBitrixWebhookUrl();
     fetchEvents();
 
     // Auto-refresh every 5 seconds (don't refresh webhook URL - it comes from env)

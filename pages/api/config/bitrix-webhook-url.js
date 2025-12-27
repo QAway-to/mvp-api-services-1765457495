@@ -8,26 +8,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Get webhook URL from environment variable (same as used by webhook handlers)
     const webhookUrl = getBitrixWebhookBase();
-    
-    // Remove trailing slash for display consistency
     const webhookUrlWithoutSlash = webhookUrl.endsWith('/') ? webhookUrl.slice(0, -1) : webhookUrl;
-    
+
     return res.status(200).json({
       success: true,
       webhookUrl: webhookUrlWithoutSlash,
-      source: process.env.BITRIX_WEBHOOK_BASE ? 'BITRIX_WEBHOOK_BASE' : 
-              process.env.BITRIX_WEBHOOK_URL ? 'BITRIX_WEBHOOK_URL' : 
-              'default'
+      source: process.env.BITRIX_WEBHOOK_BASE ? 'BITRIX_WEBHOOK_BASE' :
+              process.env.BITRIX_WEBHOOK_URL ? 'BITRIX_WEBHOOK_URL' :
+              'missing'
     });
   } catch (error) {
     console.error('Get Bitrix webhook URL error:', error);
-    return res.status(500).json({
+    return res.status(200).json({
       success: false,
-      error: 'Failed to retrieve Bitrix webhook URL',
+      error: 'BITRIX_WEBHOOK_BASE is not configured',
       message: error.message
     });
   }
 }
-
